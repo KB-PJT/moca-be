@@ -42,5 +42,6 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-### AGENTS.md ###
+### AGENTS ###
 AGENTS.md
+.agents/
