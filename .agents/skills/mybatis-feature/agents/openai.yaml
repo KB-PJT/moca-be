@@ -1,0 +1,4 @@
+interface:
+  display_name: "MyBatis Feature"
+  short_description: "MyBatis 기반 데이터 기능 구현 기준을 안내합니다."
+  default_prompt: "Use $mybatis-feature to implement a MyBatis-backed feature."
