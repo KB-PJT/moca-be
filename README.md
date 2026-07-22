@@ -80,6 +80,12 @@ Git에는 `pre-pull` 훅이 없으므로 pull 후 검증에는 `post-merge`와 `
 
 GUI에서 Node 버전 관리자를 사용한다면 Husky가 Node를 찾을 수 있도록 사용자별 Husky 초기화 파일에 해당 초기화 설정을 추가합니다. macOS/Linux는 `~/.config/husky/init.sh`, Windows는 `C:\\Users\\<사용자>\\.config\\husky\\init.sh`를 사용합니다.
 
+## Pull Request 자동 리뷰
+
+CodeRabbit으로 `main`과 `dev` 대상 Pull Request를 한국어로 자동 리뷰합니다. Draft PR과 `do-not-review` 라벨이 있는 PR은 자동 리뷰에서 제외합니다.
+
+사용하려면 GitHub 조직에 CodeRabbit App을 설치하고 이 저장소에 대한 접근을 허용해야 합니다. 세부 리뷰 기준은 루트의 `.coderabbit.yaml`과 `AGENTS.md`에서 관리합니다.
+
 ## API 문서 관리
 
 현재 Swagger 문서는 Spring Boot 자동 설정 없이 정적 OpenAPI 계약을 사용합니다. REST API를 추가하거나 변경하면 `src/main/resources/openapi/openapi.yaml`도 함께 수정해야 합니다.
