@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: MOCA Backend API
+  description: 결제 전 최적 카드 추천을 위한 MOCA Backend REST API
+  version: 1.0.0
+tags:
+  - name: Health
+    description: 서버 상태 확인
+paths:
+  /api/v1/health:
+    get:
+      tags:
+        - Health
+      summary: 서버 상태 조회
+      operationId: getHealth
+      responses:
+        '200':
+          description: 서버가 정상 동작 중임
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: UP
