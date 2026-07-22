@@ -83,3 +83,7 @@ GUI에서 Node 버전 관리자를 사용한다면 Husky가 Node를 찾을 수 �
 ## API 문서 관리
 
 현재 Swagger 문서는 Spring Boot 자동 설정 없이 정적 OpenAPI 계약을 사용합니다. REST API를 추가하거나 변경하면 `src/main/resources/openapi/openapi.yaml`도 함께 수정해야 합니다.
+
+## 라이선스
+
+이 프로젝트는 [MIT License](LICENSE)를 따릅니다.
