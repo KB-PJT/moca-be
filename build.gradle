@@ -1,6 +1,8 @@
 plugins {
   id 'java'
   id 'war'
+  id 'jacoco'
+  id 'checkstyle'
 }
 
 group 'com.moca'
@@ -12,21 +14,80 @@ repositories {
 
 ext {
   junitVersion = '5.10.2'
+  springVersion = '5.3.39'
+  jacksonVersion = '2.20.2'
+  swaggerUiVersion = '5.32.8'
+  checkstyleVersion = '12.3.1'
 }
 
-sourceCompatibility = '1.8'
-targetCompatibility = '1.8'
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(17)
+  }
+}
 
-tasks.withType(JavaCompile) {
+tasks.withType(JavaCompile).configureEach {
   options.encoding = 'UTF-8'
+}
+
+jacoco {
+  toolVersion = '0.8.15'
+}
+
+checkstyle {
+  toolVersion = checkstyleVersion
+  configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+}
+
+tasks.withType(Checkstyle).configureEach {
+  reports {
+    xml.required = true
+    html.required = true
+  }
 }
 
 dependencies {
   compileOnly('javax.servlet:javax.servlet-api:4.0.1')
+  implementation("org.springframework:spring-webmvc:${springVersion}")
+  implementation("com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
+  implementation("org.webjars:swagger-ui:${swaggerUiVersion}")
 
   testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
+  testImplementation("org.springframework:spring-test:${springVersion}")
+  testImplementation('javax.servlet:javax.servlet-api:4.0.1')
   testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
+  testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.10.2')
 }
 
 test {
-useJUnitPlatform()}
+  useJUnitPlatform()
+  finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+  dependsOn test
+
+  reports {
+    xml.required = true
+    html.required = true
+    csv.required = false
+  }
+}
+
+jacocoTestCoverageVerification {
+  dependsOn test
+
+  violationRules {
+    rule {
+      limit {
+        counter = 'LINE'
+        value = 'COVEREDRATIO'
+        minimum = 1.0
+      }
+    }
+  }
+}
+
+check {
+  dependsOn jacocoTestCoverageVerification
+}
