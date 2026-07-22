@@ -38,7 +38,7 @@ body:
       description: 이번 작업에서 구현할 내용을 작성해주세요.
       placeholder: |
         - OAuth 로그인 API 구현
-        - 자체 불투명 Access Token 및 Refresh Token 발급
+        - 서버 관리형 opaque access token 및 refresh token 발급
         - 로그인 성공 처리
     validations:
       required: true
@@ -50,7 +50,7 @@ body:
       description: 작업이 완료되었다고 판단하는 기준을 작성해주세요.
       placeholder: |
         - [ ] OAuth 로그인이 정상 동작한다.
-        - [ ] 자체 불투명 토큰이 정상 발급된다.
+        - [ ] opaque token이 정상 발급된다.
         - [ ] 테스트를 완료했다.
     validations:
       required: true

@@ -45,7 +45,7 @@ body:
       description: 이번 부모 이슈에서 구현할 기능을 작성해주세요.
       placeholder: |
         - OAuth 로그인
-        - 자체 불투명 Access Token 및 Refresh Token 발급
+        - 서버 관리형 opaque access token 및 refresh token 발급
         - 로그인 성공 처리
         - 최초 회원가입 처리
     validations:
