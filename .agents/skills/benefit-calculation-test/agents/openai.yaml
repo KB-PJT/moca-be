@@ -1,0 +1,4 @@
+interface:
+  display_name: "Benefit Calculation Test"
+  short_description: "카드 혜택 계산 테스트 설계와 검증 기준을 안내합니다."
+  default_prompt: "$benefit-calculation-test를 사용해 카드 혜택 계산 테스트 케이스를 설계하고 구현해 주세요."

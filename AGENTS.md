@@ -88,3 +88,4 @@ docs(github-flow): 이슈 템플릿 보완
 
 - `spring-api`: Spring MVC API 작업
 - `mybatis-feature`: MyBatis Mapper와 SQL 작업
+- `benefit-calculation-test`: 카드 혜택 계산 규칙과 CODEF 역산 테스트 작업
