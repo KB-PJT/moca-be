@@ -28,3 +28,6 @@ jobs:
 
       - name: Verify
         run: ./gradlew clean check war --no-daemon
+
+      - name: Integration test with Testcontainers MySQL
+        run: ./gradlew integrationTest --no-daemon

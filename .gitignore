@@ -38,3 +38,11 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Local documentation and generated outputs ###
+docs/
+outputs/
+
+### Local environment secrets ###
+.env
+.env.local

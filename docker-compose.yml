@@ -1,0 +1,62 @@
+name: moca
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: moca-redis
+    restart: unless-stopped
+    environment:
+      MOCA_REDIS_PASSWORD: ${MOCA_REDIS_PASSWORD:-}
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$$MOCA_REDIS_PASSWORD" ]; then
+          exec redis-server --appendonly yes --requirepass "$$MOCA_REDIS_PASSWORD"
+        fi
+        exec redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:${MOCA_REDIS_PORT:-6379}:6379"
+    volumes:
+      - moca-redis-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          if [ -n "$$MOCA_REDIS_PASSWORD" ]; then
+            redis-cli --no-auth-warning -a "$$MOCA_REDIS_PASSWORD" ping;
+          else
+            redis-cli ping;
+          fi
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mysql:
+    image: mysql:8.0.36
+    container_name: moca-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MOCA_DB_NAME:-moca}
+      MYSQL_USER: ${MOCA_DB_USERNAME:-moca}
+      MYSQL_PASSWORD: ${MOCA_DB_PASSWORD:-moca}
+      MYSQL_ROOT_PASSWORD: ${MOCA_DB_ROOT_PASSWORD:-moca-local-root}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    ports:
+      - "127.0.0.1:${MOCA_DB_PORT:-3307}:3306"
+    volumes:
+      - moca-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  moca-mysql-data:
+  moca-redis-data:
