@@ -11,7 +11,8 @@ class WebApplicationInitializerTest {
     @Test
     void registersSpringMvcConfiguration() {
         assertArrayEquals(
-                new Class<?>[]{PersistenceConfig.class, RedisConfig.class, AuthConfig.class, AppConfig.class},
+                new Class<?>[]{PersistenceConfig.class, RedisConfig.class, AuthConfig.class, LocalTestAuthConfig.class,
+                        AppConfig.class},
                 initializer.getRootConfigClasses()
         );
         assertArrayEquals(

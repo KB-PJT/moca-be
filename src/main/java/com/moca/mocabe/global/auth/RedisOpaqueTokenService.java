@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 /** 토큰 원문 대신 pepper를 포함한 SHA-256 해시만 Redis 키로 사용하는 구현체다. */
 public class RedisOpaqueTokenService implements OpaqueTokenService {
@@ -19,11 +20,28 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
     private static final String REFRESH_KEY_PREFIX = "moca:refresh:";
     private static final String SESSION_KEY_PREFIX = "moca:session:";
     private static final String USER_SESSIONS_KEY_PREFIX = "moca:user-sessions:";
+    private static final String SESSION_TOKENS_KEY_PREFIX = "moca:session-tokens:";
+    private static final String REFRESH_ROTATION_SCRIPT = ""
+            + "local sessionId = redis.call('GET', KEYS[1])\n"
+            + "if not sessionId then return nil end\n"
+            + "local sessionKey = ARGV[3] .. sessionId\n"
+            + "local sessionValue = redis.call('GET', sessionKey)\n"
+            + "if not sessionValue then redis.call('DEL', KEYS[1]); return nil end\n"
+            + "redis.call('DEL', KEYS[1])\n"
+            + "redis.call('SET', KEYS[2], sessionId, 'PX', ARGV[1])\n"
+            + "redis.call('SET', KEYS[3], sessionId, 'PX', ARGV[2])\n"
+            + "redis.call('PEXPIRE', sessionKey, ARGV[2])\n"
+            + "local tokenKeys = ARGV[4] .. sessionId\n"
+            + "redis.call('SREM', tokenKeys, KEYS[1])\n"
+            + "redis.call('SADD', tokenKeys, KEYS[2], KEYS[3])\n"
+            + "redis.call('PEXPIRE', tokenKeys, ARGV[2])\n"
+            + "return sessionValue";
 
     private final StringRedisTemplate redisTemplate;
     private final String pepper;
     private final OpaqueTokenPolicy tokenPolicy;
     private final String hashAlgorithm;
+    private final DefaultRedisScript<String> refreshRotationScript;
     private final SecureRandom secureRandom = new SecureRandom();
     private String localTestAccessTokenHash;
 
@@ -38,6 +56,7 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
         this.pepper = pepper;
         this.tokenPolicy = tokenPolicy;
         this.hashAlgorithm = hashAlgorithm;
+        this.refreshRotationScript = new DefaultRedisScript<String>(REFRESH_ROTATION_SCRIPT, String.class);
     }
 
     @Override
@@ -60,6 +79,7 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
                 tokenPolicy.getAccessTokenTtl());
         redisTemplate.opsForValue().set(ACCESS_KEY_PREFIX + localTestAccessTokenHash, sessionId,
                 tokenPolicy.getAccessTokenTtl());
+        trackSessionToken(sessionId, ACCESS_KEY_PREFIX + localTestAccessTokenHash);
         trackUserSession(userId, sessionId);
     }
 
@@ -68,15 +88,17 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
         if (refreshToken == null || refreshToken.trim().isEmpty()) {
             throw new InvalidOpaqueTokenException();
         }
-        String sessionId = redisTemplate.opsForValue().getAndDelete(refreshKey(refreshToken));
-        String sessionValue = sessionId == null ? null : redisTemplate.opsForValue().get(sessionKey(sessionId));
+        String accessToken = newToken();
+        String newRefreshToken = newToken();
+        String sessionValue = redisTemplate.execute(refreshRotationScript,
+                java.util.Arrays.asList(refreshKey(refreshToken), accessKey(accessToken), refreshKey(newRefreshToken)),
+                Long.toString(tokenPolicy.getAccessTokenTtl().toMillis()),
+                Long.toString(tokenPolicy.getRefreshTokenTtl().toMillis()),
+                SESSION_KEY_PREFIX, SESSION_TOKENS_KEY_PREFIX);
         if (sessionValue == null) {
             throw new InvalidOpaqueTokenException();
         }
-        AuthenticatedUser user = deserialize(sessionValue);
-        redisTemplate.expire(sessionKey(sessionId), tokenPolicy.getRefreshTokenTtl());
-        trackUserSession(user.getUserId(), sessionId);
-        return issueForSession(sessionId);
+        return new OpaqueTokenPair(accessToken, newRefreshToken, tokenPolicy.getAccessTokenTtl().getSeconds());
     }
 
     @Override
@@ -102,14 +124,15 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
         if (sessionId == null) {
             sessionId = sessionId(refreshToken, REFRESH_KEY_PREFIX);
         }
+        if (sessionId != null) {
+            deleteSession(sessionId);
+            return;
+        }
         if (accessToken != null) {
             redisTemplate.delete(accessKey(accessToken));
         }
         if (refreshToken != null) {
             redisTemplate.delete(refreshKey(refreshToken));
-        }
-        if (sessionId != null) {
-            deleteSession(sessionId);
         }
     }
 
@@ -122,6 +145,11 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
         List<String> sessionKeys = new ArrayList<String>();
         for (String sessionId : sessionIds) {
             sessionKeys.add(sessionKey(sessionId));
+            Set<String> tokenKeys = redisTemplate.opsForSet().members(sessionTokensKey(sessionId));
+            if (tokenKeys != null) {
+                sessionKeys.addAll(tokenKeys);
+            }
+            sessionKeys.add(sessionTokensKey(sessionId));
         }
         redisTemplate.delete(sessionKeys);
         redisTemplate.delete(userSessionsKey(userId));
@@ -130,8 +158,11 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
     private OpaqueTokenPair issueForSession(String sessionId) {
         String accessToken = newToken();
         String refreshToken = newToken();
-        redisTemplate.opsForValue().set(accessKey(accessToken), sessionId, tokenPolicy.getAccessTokenTtl());
-        redisTemplate.opsForValue().set(refreshKey(refreshToken), sessionId, tokenPolicy.getRefreshTokenTtl());
+        String accessKey = accessKey(accessToken);
+        String refreshKey = refreshKey(refreshToken);
+        redisTemplate.opsForValue().set(accessKey, sessionId, tokenPolicy.getAccessTokenTtl());
+        redisTemplate.opsForValue().set(refreshKey, sessionId, tokenPolicy.getRefreshTokenTtl());
+        trackSessionToken(sessionId, accessKey, refreshKey);
         return new OpaqueTokenPair(accessToken, refreshToken, tokenPolicy.getAccessTokenTtl().getSeconds());
     }
 
@@ -153,6 +184,10 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
 
     private String userSessionsKey(String userId) {
         return USER_SESSIONS_KEY_PREFIX + userId;
+    }
+
+    private String sessionTokensKey(String sessionId) {
+        return SESSION_TOKENS_KEY_PREFIX + sessionId;
     }
 
     private String newToken() {
@@ -192,8 +227,18 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
         redisTemplate.expire(userSessionsKey(userId), tokenPolicy.getRefreshTokenTtl());
     }
 
+    private void trackSessionToken(String sessionId, String... tokenKeys) {
+        redisTemplate.opsForSet().add(sessionTokensKey(sessionId), tokenKeys);
+        redisTemplate.expire(sessionTokensKey(sessionId), tokenPolicy.getRefreshTokenTtl());
+    }
+
     private void deleteSession(String sessionId) {
         String sessionValue = redisTemplate.opsForValue().get(sessionKey(sessionId));
+        Set<String> tokenKeys = redisTemplate.opsForSet().members(sessionTokensKey(sessionId));
+        if (tokenKeys != null && !tokenKeys.isEmpty()) {
+            redisTemplate.delete(new ArrayList<String>(tokenKeys));
+        }
+        redisTemplate.delete(sessionTokensKey(sessionId));
         redisTemplate.delete(sessionKey(sessionId));
         if (sessionValue != null) {
             redisTemplate.opsForSet().remove(userSessionsKey(deserialize(sessionValue).getUserId()), sessionId);

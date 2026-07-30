@@ -21,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -70,7 +71,8 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("요청 형식과 필수 입력 오류를 400 응답으로 변환한다")
     void handlesInvalidRequestErrors() throws Exception {
-        assertError(handler.handleUnreadableBody(new HttpMessageNotReadableException("invalid")),
+        assertError(handler.handleUnreadableBody(new HttpMessageNotReadableException("invalid",
+                        new MockHttpInputMessage(new byte[0]))),
                 HttpStatus.BAD_REQUEST, "INVALID_REQUEST_BODY");
         assertError(handler.handleMissingParameter(new MissingServletRequestParameterException("page", "int")),
                 HttpStatus.BAD_REQUEST, "MISSING_PARAMETER");

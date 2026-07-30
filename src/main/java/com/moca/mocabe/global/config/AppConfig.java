@@ -1,8 +1,10 @@
 package com.moca.mocabe.global.config;
 
 import com.moca.mocabe.domain.user.mapper.UserMapper;
+import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
+import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
 import com.moca.mocabe.global.exception.GlobalExceptionHandler;
 import org.springframework.context.annotation.Bean;
@@ -22,8 +24,14 @@ public class AppConfig {
     }
 
     @Bean
-    public UserApplicationService userApplicationService(UserMapper userMapper) {
-        return new UserApplicationService(userMapper);
+    public UserDomainService userDomainService(UserMapper userMapper) {
+        return new UserDomainService(userMapper);
+    }
+
+    @Bean
+    public UserApplicationService userApplicationService(UserDomainService userDomainService,
+                                                         OpaqueTokenService opaqueTokenService) {
+        return new UserApplicationService(userDomainService, opaqueTokenService);
     }
 
     @Bean

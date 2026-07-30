@@ -42,22 +42,25 @@ class RedisOpaqueTokenServiceTest {
     }
 
     @Test
-    @DisplayName("refresh token은 getAndDelete로 한 번만 소비하고 새 토큰 쌍을 발급한다")
+    @DisplayName("refresh token은 Lua 스크립트로 원자적으로 회전하고 새 토큰 쌍을 발급한다")
     void rotatesRefreshTokenAtomically() {
-        when(valueOperations.getAndDelete(anyString())).thenReturn("session-1");
-        when(valueOperations.get("moca:session:session-1")).thenReturn(USER_ID + "|user");
+        when(redisTemplate.execute(any(org.springframework.data.redis.core.script.DefaultRedisScript.class), any(),
+                any(Object[].class)))
+                .thenReturn(USER_ID + "|user");
 
         OpaqueTokenPair tokenPair = tokenService.refresh("refresh-token");
 
-        verify(valueOperations).getAndDelete(anyString());
-        verify(valueOperations, times(2)).set(anyString(), anyString(), any(Duration.class));
+        verify(redisTemplate).execute(any(org.springframework.data.redis.core.script.DefaultRedisScript.class), any(),
+                any(Object[].class));
         org.junit.jupiter.api.Assertions.assertEquals(1800, tokenPair.getAccessTokenExpiresIn());
     }
 
     @Test
     @DisplayName("이미 소비했거나 존재하지 않는 refresh token은 재발급에 사용할 수 없다")
     void rejectsConsumedRefreshToken() {
-        when(valueOperations.getAndDelete(anyString())).thenReturn(null);
+        when(redisTemplate.execute(any(org.springframework.data.redis.core.script.DefaultRedisScript.class), any(),
+                any(Object[].class)))
+                .thenReturn(null);
 
         assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.refresh("used-token"));
     }
@@ -70,7 +73,8 @@ class RedisOpaqueTokenServiceTest {
 
         assertDoesNotThrow(() -> tokenService.revokeAll(USER_ID));
 
-        verify(redisTemplate).delete(Arrays.asList("moca:session:session-1", "moca:session:session-2"));
+        verify(redisTemplate).delete(Arrays.asList("moca:session:session-1", "moca:session-tokens:session-1",
+                "moca:session:session-2", "moca:session-tokens:session-2"));
         verify(redisTemplate).delete("moca:user-sessions:" + USER_ID);
     }
 
@@ -129,13 +133,27 @@ class RedisOpaqueTokenServiceTest {
     void revokesSessionFromEitherToken() {
         when(valueOperations.get(anyString()))
                 .thenReturn(null, "session-1", USER_ID + "|user");
+        when(setOperations.members("moca:session-tokens:session-1"))
+                .thenReturn(new LinkedHashSet<String>(Collections.singleton("moca:access:hashed-token")));
 
         tokenService.revoke("access-token", "refresh-token");
 
-        verify(redisTemplate).delete(org.mockito.ArgumentMatchers.startsWith("moca:access:"));
-        verify(redisTemplate).delete(org.mockito.ArgumentMatchers.startsWith("moca:refresh:"));
+        verify(redisTemplate).delete(Collections.singletonList("moca:access:hashed-token"));
+        verify(redisTemplate).delete("moca:session-tokens:session-1");
         verify(redisTemplate).delete("moca:session:session-1");
         verify(setOperations).remove("moca:user-sessions:" + USER_ID, "session-1");
+    }
+
+    @Test
+    @DisplayName("세션을 찾지 못한 로그아웃은 전달된 토큰 키만 개별적으로 폐기한다")
+    void revokesProvidedTokensWhenSessionIsMissing() {
+        when(valueOperations.get(anyString())).thenReturn(null);
+
+        tokenService.revoke("access-token", "refresh-token");
+        tokenService.revoke(null, null);
+
+        verify(redisTemplate).delete(org.mockito.ArgumentMatchers.startsWith("moca:access:"));
+        verify(redisTemplate).delete(org.mockito.ArgumentMatchers.startsWith("moca:refresh:"));
     }
 
     @Test
@@ -143,8 +161,9 @@ class RedisOpaqueTokenServiceTest {
     void handlesMissingTokenAndSessionValues() {
         assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.refresh(null));
         assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.refresh("  "));
-        when(valueOperations.getAndDelete(anyString())).thenReturn("session-1");
-        when(valueOperations.get("moca:session:session-1")).thenReturn(null);
+        when(redisTemplate.execute(any(org.springframework.data.redis.core.script.DefaultRedisScript.class), any(),
+                any(Object[].class)))
+                .thenReturn(null);
         assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.refresh("expired"));
 
         when(setOperations.members("moca:user-sessions:" + USER_ID)).thenReturn(Collections.<String>emptySet());

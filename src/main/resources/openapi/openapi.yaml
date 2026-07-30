@@ -404,6 +404,19 @@ components:
           enum: [AUTO, MANUAL]
     NotificationSettingsRequest:
       type: object
+      required: [performanceClosingEnabled, nearbyBenefitEnabled, benefitLimitEnabled, marketingEnabled]
+      properties:
+        performanceClosingEnabled:
+          type: boolean
+        nearbyBenefitEnabled:
+          type: boolean
+        benefitLimitEnabled:
+          type: boolean
+        marketingEnabled:
+          type: boolean
+    NotificationSettingsResponse:
+      type: object
+      required: [performanceClosingEnabled, nearbyBenefitEnabled, benefitLimitEnabled, marketingEnabled]
       properties:
         performanceClosingEnabled:
           type: boolean
@@ -420,9 +433,15 @@ components:
           type: boolean
           example: true
         data:
-          $ref: '#/components/schemas/NotificationSettingsRequest'
+          $ref: '#/components/schemas/NotificationSettingsResponse'
     LocationSettingsRequest:
       type: object
+      properties:
+        locationRecommendationEnabled:
+          type: boolean
+    LocationSettingsResponse:
+      type: object
+      required: [locationRecommendationEnabled]
       properties:
         locationRecommendationEnabled:
           type: boolean
@@ -433,7 +452,7 @@ components:
           type: boolean
           example: true
         data:
-          $ref: '#/components/schemas/LocationSettingsRequest'
+          $ref: '#/components/schemas/LocationSettingsResponse'
     WithdrawUserRequest:
       type: object
       required: [confirmed]

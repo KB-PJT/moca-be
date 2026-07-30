@@ -1,7 +1,7 @@
 package com.moca.mocabe.global.config;
 
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
-import com.moca.mocabe.domain.user.mapper.UserMapper;
+import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.global.auth.GoogleIdTokenVerifier;
 import com.moca.mocabe.global.auth.MocaOpaqueAuthenticationFilter;
 import com.moca.mocabe.global.auth.NimbusGoogleIdTokenVerifier;
@@ -72,46 +72,29 @@ public class AuthConfig {
 
     @Bean
     public RefreshCookiePolicy refreshCookiePolicy(Environment environment) {
-        boolean localProfile = "local".equals(environment.getProperty("MOCA_PROFILE", "local"));
+        boolean localProfile = environment.matchesProfiles("local", "local-test");
         boolean secure = environment.getProperty("MOCA_REFRESH_COOKIE_SECURE", Boolean.class, !localProfile);
         return new RefreshCookiePolicy(secure);
     }
 
     @Bean
-    public OpaqueTokenService opaqueTokenService(StringRedisTemplate stringRedisTemplate,
-                                                  Environment environment, OpaqueTokenPolicy opaqueTokenPolicy) {
-        String profile = environment.getProperty("MOCA_PROFILE", "local");
+    public RedisOpaqueTokenService opaqueTokenService(StringRedisTemplate stringRedisTemplate,
+                                                       Environment environment, OpaqueTokenPolicy opaqueTokenPolicy) {
         String pepper = environment.getProperty("MOCA_TOKEN_HASH_PEPPER");
         if (pepper == null || pepper.trim().isEmpty()) {
-            if (!"local".equals(profile)) {
+            if (!environment.matchesProfiles("local")) {
                 throw new IllegalStateException("local 이외 환경에서는 MOCA_TOKEN_HASH_PEPPER가 필수입니다.");
             }
             pepper = "local-token-hash-pepper";
         }
-        RedisOpaqueTokenService opaqueTokenService = new RedisOpaqueTokenService(
-                stringRedisTemplate, pepper, opaqueTokenPolicy);
-        if ("local-test".equals(profile)) {
-            opaqueTokenService.registerLocalTestAccessToken(
-                    requiredProperty(environment, "MOCA_LOCAL_TEST_ACCESS_TOKEN"),
-                    requiredProperty(environment, "MOCA_LOCAL_TEST_USER_ID"),
-                    environment.getProperty("MOCA_LOCAL_TEST_USER_TYPE", "user"));
-        }
-        return opaqueTokenService;
-    }
-
-    private String requiredProperty(Environment environment, String propertyName) {
-        String value = environment.getProperty(propertyName);
-        if (value == null || value.trim().isEmpty()) {
-            throw new IllegalStateException(propertyName + "는 local-test 환경에서 필수입니다.");
-        }
-        return value;
+        return new RedisOpaqueTokenService(stringRedisTemplate, pepper, opaqueTokenPolicy);
     }
 
     @Bean
-    public AuthApplicationService authApplicationService(UserMapper userMapper,
+    public AuthApplicationService authApplicationService(UserDomainService userDomainService,
                                                          GoogleIdTokenVerifier googleIdTokenVerifier,
                                                          OpaqueTokenService opaqueTokenService) {
-        return new AuthApplicationService(userMapper, googleIdTokenVerifier, opaqueTokenService);
+        return new AuthApplicationService(userDomainService, googleIdTokenVerifier, opaqueTokenService);
     }
 
     @Bean

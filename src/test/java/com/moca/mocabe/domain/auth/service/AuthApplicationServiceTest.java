@@ -9,13 +9,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.auth.dto.GoogleLoginResponse;
-import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
+import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.global.auth.GoogleIdTokenClaims;
 import com.moca.mocabe.global.auth.GoogleIdTokenVerifier;
 import com.moca.mocabe.global.auth.OpaqueTokenPair;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
-import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +29,7 @@ class AuthApplicationServiceTest {
     private static final String GOOGLE_SUBJECT = "google-subject";
 
     @Mock
-    private UserMapper userMapper;
+    private UserDomainService userDomainService;
 
     @Mock
     private GoogleIdTokenVerifier googleIdTokenVerifier;
@@ -47,8 +46,8 @@ class AuthApplicationServiceTest {
         UserProfile user = user();
         when(googleIdTokenVerifier.verify("google-id-token"))
                 .thenReturn(new GoogleIdTokenClaims(GOOGLE_SUBJECT, "moca@example.com", "모카"));
-        when(userMapper.findProfileByGoogleSubject(GOOGLE_SUBJECT)).thenReturn(user);
-        when(userMapper.findProfileById(USER_ID)).thenReturn(user);
+        when(userDomainService.findOrCreateGoogleUser(GOOGLE_SUBJECT, "moca@example.com", "모카"))
+                .thenReturn(new UserDomainService.GoogleUserResult(user, false));
         when(opaqueTokenService.issue(USER_ID, "user"))
                 .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
 
@@ -66,15 +65,15 @@ class AuthApplicationServiceTest {
         UserProfile user = user();
         when(googleIdTokenVerifier.verify("google-id-token"))
                 .thenReturn(new GoogleIdTokenClaims(GOOGLE_SUBJECT, "moca@example.com", "모카"));
-        when(userMapper.findProfileByGoogleSubject(GOOGLE_SUBJECT)).thenReturn(null);
-        when(userMapper.findProfileById(anyString())).thenReturn(user);
+        when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), anyString()))
+                .thenReturn(new UserDomainService.GoogleUserResult(user, true));
         when(opaqueTokenService.issue(USER_ID, "user"))
                 .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
 
         GoogleLoginResponse response = authApplicationService.login("google-id-token");
 
         assertTrue(response.isNewMember());
-        verify(userMapper).insertGoogleUser(anyString(), eq(GOOGLE_SUBJECT), eq("moca@example.com"), eq("모카"));
+        verify(userDomainService).findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), eq("모카"));
         verify(opaqueTokenService).issue(USER_ID, "user");
     }
 
@@ -84,27 +83,26 @@ class AuthApplicationServiceTest {
         UserProfile user = user();
         when(googleIdTokenVerifier.verify("google-id-token"))
                 .thenReturn(new GoogleIdTokenClaims(GOOGLE_SUBJECT, "moca@example.com", " "));
-        when(userMapper.findProfileByGoogleSubject(GOOGLE_SUBJECT)).thenReturn(null);
-        when(userMapper.findProfileById(anyString())).thenReturn(user);
+        when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), anyString()))
+                .thenReturn(new UserDomainService.GoogleUserResult(user, true));
         when(opaqueTokenService.issue(USER_ID, "user"))
                 .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
 
         authApplicationService.login("google-id-token");
 
-        verify(userMapper).insertGoogleUser(anyString(), eq(GOOGLE_SUBJECT), eq("moca@example.com"),
+        verify(userDomainService).findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"),
                 eq("MOCA 회원"));
     }
 
     @Test
-    @DisplayName("연결된 Google 사용자를 찾을 수 없으면 MOCA token을 발급하지 않는다")
-    void rejectsMissingGoogleMember() {
-        UserProfile user = user();
+    @DisplayName("사용자 도메인 서비스의 사용자 조회 오류를 로그인 흐름에 전달한다")
+    void propagatesMissingGoogleMember() {
         when(googleIdTokenVerifier.verify("google-id-token"))
                 .thenReturn(new GoogleIdTokenClaims(GOOGLE_SUBJECT, "moca@example.com", "모카"));
-        when(userMapper.findProfileByGoogleSubject(GOOGLE_SUBJECT)).thenReturn(user);
-        when(userMapper.findProfileById(USER_ID)).thenReturn(null);
-
-        org.junit.jupiter.api.Assertions.assertThrows(UserNotFoundException.class,
+        when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), anyString(), anyString()))
+                .thenThrow(new com.moca.mocabe.global.exception.user.UserNotFoundException());
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.moca.mocabe.global.exception.user.UserNotFoundException.class,
                 () -> authApplicationService.login("google-id-token"));
     }
 
@@ -118,14 +116,6 @@ class AuthApplicationServiceTest {
         authApplicationService.logout("access", "refresh");
 
         verify(opaqueTokenService).revoke("access", "refresh");
-    }
-
-    @Test
-    @DisplayName("회원 탈퇴 시 해당 사용자의 모든 opaque 세션을 폐기한다")
-    void revokesAllSessionsForWithdrawnUser() {
-        authApplicationService.revokeAllSessions(USER_ID);
-
-        verify(opaqueTokenService).revokeAll(USER_ID);
     }
 
     private UserProfile user() {

@@ -22,7 +22,6 @@ import com.moca.mocabe.domain.user.dto.WithdrawUserRequest;
 import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.model.NotificationSettings;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
-import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.GlobalExceptionHandler;
@@ -38,7 +37,6 @@ class UserControllerTest {
     private static final String USER_ID = "01980d6a-5c0c-7aaf-9b85-010203040506";
 
     private UserApplicationService userApplicationService;
-    private AuthApplicationService authApplicationService;
     private CurrentUserProvider currentUserProvider;
     private UserController controller;
     private MockMvc mockMvc;
@@ -46,9 +44,8 @@ class UserControllerTest {
     @BeforeEach
     void setUp() {
         userApplicationService = org.mockito.Mockito.mock(UserApplicationService.class);
-        authApplicationService = org.mockito.Mockito.mock(AuthApplicationService.class);
         currentUserProvider = org.mockito.Mockito.mock(CurrentUserProvider.class);
-        controller = new UserController(userApplicationService, authApplicationService, currentUserProvider);
+        controller = new UserController(userApplicationService, currentUserProvider);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .defaultResponseCharacterEncoding(StandardCharsets.UTF_8)
@@ -168,8 +165,8 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("회원 탈퇴가 성공하면 사용자 계정을 변경하고 모든 인증 세션을 폐기한다")
-    void withdrawsAndRevokesAllSessions() {
+    @DisplayName("회원 탈퇴는 사용자 서비스의 세션 폐기와 계정 삭제 결과를 반환한다")
+    void withdrawsUser() {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         WithdrawUserRequest request = new WithdrawUserRequest();
         request.setConfirmed(true);
@@ -177,7 +174,7 @@ class UserControllerTest {
 
         assertTrue(controller.withdraw(request).getBody().getData().isSuccess());
 
-        verify(authApplicationService).revokeAllSessions(USER_ID);
+        verify(userApplicationService).withdraw(USER_ID, request);
     }
 
     private UserProfileResponse profileResponse() {

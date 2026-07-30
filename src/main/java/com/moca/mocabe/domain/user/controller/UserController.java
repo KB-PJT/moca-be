@@ -10,7 +10,6 @@ import com.moca.mocabe.domain.user.dto.UpdateCardSortModeRequest;
 import com.moca.mocabe.domain.user.dto.UserProfileResponse;
 import com.moca.mocabe.domain.user.dto.WithdrawUserRequest;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
-import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.response.ApiResponse;
 
@@ -34,7 +33,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserApplicationService userApplicationService;
-    private final AuthApplicationService authApplicationService;
     private final CurrentUserProvider currentUserProvider;
 
     @GetMapping
@@ -65,7 +63,7 @@ public class UserController {
 
     @PatchMapping("/notification-settings")
     public ResponseEntity<ApiResponse<NotificationSettingsResponse>> updateNotificationSettings(
-            @RequestBody NotificationSettingsRequest request) {
+            @Valid @RequestBody NotificationSettingsRequest request) {
         return ResponseEntity.ok(ApiResponse.success(userApplicationService.updateNotificationSettings(
                 currentUserProvider.getCurrentUserId(), request)));
     }
@@ -88,9 +86,6 @@ public class UserController {
             @Valid @RequestBody WithdrawUserRequest request) {
         String userId = currentUserProvider.getCurrentUserId();
         boolean withdrawn = userApplicationService.withdraw(userId, request);
-        if (withdrawn) {
-            authApplicationService.revokeAllSessions(userId);
-        }
         return ResponseEntity.ok(ApiResponse.success(new SuccessResponse(withdrawn)));
     }
 }

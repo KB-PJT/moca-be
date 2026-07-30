@@ -66,7 +66,7 @@ class UserMapperIntegrationTest {
     @DisplayName("Flyway가 초기 스키마 마이그레이션 이력을 기록한다")
     void recordsFlywayMigrationHistory() {
         Integer migrationCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE", Integer.class);
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = TRUE", Integer.class);
 
         assertEquals(1, migrationCount);
     }
