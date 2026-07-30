@@ -3,7 +3,6 @@ package com.moca.mocabe.domain.user.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,7 +79,10 @@ class UserApplicationServiceTest {
     void returnsDisabledDefaultNotificationSettings() {
         when(userDomainService.findNotificationSettings(USER_ID)).thenReturn(null);
 
+        assertFalse(userApplicationService.getNotificationSettings(USER_ID).isPerformanceClosingEnabled());
         assertFalse(userApplicationService.getNotificationSettings(USER_ID).isNearbyBenefitEnabled());
+        assertFalse(userApplicationService.getNotificationSettings(USER_ID).isBenefitLimitEnabled());
+        assertFalse(userApplicationService.getNotificationSettings(USER_ID).isMarketingEnabled());
     }
 
     @Test
@@ -92,7 +96,13 @@ class UserApplicationServiceTest {
 
         userApplicationService.updateNotificationSettings(USER_ID, request);
 
-        verify(userDomainService).saveNotificationSettings(eq(USER_ID), any());
+        ArgumentCaptor<com.moca.mocabe.domain.user.model.NotificationSettings> settingsCaptor =
+                ArgumentCaptor.forClass(com.moca.mocabe.domain.user.model.NotificationSettings.class);
+        verify(userDomainService).saveNotificationSettings(eq(USER_ID), settingsCaptor.capture());
+        assertTrue(settingsCaptor.getValue().isPerformanceClosingEnabled());
+        assertTrue(settingsCaptor.getValue().isNearbyBenefitEnabled());
+        assertFalse(settingsCaptor.getValue().isBenefitLimitEnabled());
+        assertFalse(settingsCaptor.getValue().isMarketingEnabled());
     }
 
     @Test
@@ -133,8 +143,9 @@ class UserApplicationServiceTest {
         request.setConfirmed(true);
 
         assertTrue(userApplicationService.withdraw(USER_ID, request));
-        verify(opaqueTokenService).revokeAll(USER_ID);
-        verify(userDomainService).deleteUser(USER_ID);
+        InOrder inOrder = org.mockito.Mockito.inOrder(opaqueTokenService, userDomainService);
+        inOrder.verify(opaqueTokenService).revokeAll(USER_ID);
+        inOrder.verify(userDomainService).deleteUser(USER_ID);
     }
 
     private UserProfile user() {

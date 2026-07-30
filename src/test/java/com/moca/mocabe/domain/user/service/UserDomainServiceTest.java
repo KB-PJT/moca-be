@@ -119,14 +119,14 @@ class UserDomainServiceTest {
     }
 
     @Test
-    @DisplayName("없는 사용자는 공통 사용자 없음 예외로 처리하고 삭제 실패는 false를 반환한다")
-    void handlesMissingUserAndDeleteFailure() {
+    @DisplayName("없는 사용자는 공통 사용자 없음 예외로 처리하고 삭제 경합도 롤백시킨다")
+    void rejectsMissingUserAndDeleteFailure() {
         when(userMapper.findProfileById(USER_ID)).thenReturn(null);
         assertThrows(UserNotFoundException.class, () -> userDomainService.requireUser(USER_ID));
 
         when(userMapper.findProfileById(USER_ID)).thenReturn(user());
         when(userMapper.deleteUser(USER_ID)).thenReturn(0);
-        assertFalse(userDomainService.deleteUser(USER_ID));
+        assertThrows(UserNotFoundException.class, () -> userDomainService.deleteUser(USER_ID));
     }
 
     private UserProfile user() {

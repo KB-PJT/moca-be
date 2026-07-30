@@ -77,7 +77,10 @@ public class UserDomainService {
     public boolean deleteUser(String userId) {
         requireUser(userId);
         userMapper.deleteNotificationSettings(userId);
-        return userMapper.deleteUser(userId) == 1;
+        if (userMapper.deleteUser(userId) != 1) {
+            throw new UserNotFoundException();
+        }
+        return true;
     }
 
     /** Google 사용자 생성 결과와 최초 가입 여부를 함께 전달한다. */

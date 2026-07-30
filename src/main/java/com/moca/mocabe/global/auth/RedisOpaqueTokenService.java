@@ -35,6 +35,11 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
             + "redis.call('SREM', tokenKeys, KEYS[1])\n"
             + "redis.call('SADD', tokenKeys, KEYS[2], KEYS[3])\n"
             + "redis.call('PEXPIRE', tokenKeys, ARGV[2])\n"
+            + "local separator = string.find(sessionValue, '|')\n"
+            + "local userId = string.sub(sessionValue, 1, separator - 1)\n"
+            + "local userSessionsKey = ARGV[5] .. userId\n"
+            + "redis.call('SADD', userSessionsKey, sessionId)\n"
+            + "redis.call('PEXPIRE', userSessionsKey, ARGV[2])\n"
             + "return sessionValue";
 
     private final StringRedisTemplate redisTemplate;
@@ -94,7 +99,7 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
                 java.util.Arrays.asList(refreshKey(refreshToken), accessKey(accessToken), refreshKey(newRefreshToken)),
                 Long.toString(tokenPolicy.getAccessTokenTtl().toMillis()),
                 Long.toString(tokenPolicy.getRefreshTokenTtl().toMillis()),
-                SESSION_KEY_PREFIX, SESSION_TOKENS_KEY_PREFIX);
+                SESSION_KEY_PREFIX, SESSION_TOKENS_KEY_PREFIX, USER_SESSIONS_KEY_PREFIX);
         if (sessionValue == null) {
             throw new InvalidOpaqueTokenException();
         }

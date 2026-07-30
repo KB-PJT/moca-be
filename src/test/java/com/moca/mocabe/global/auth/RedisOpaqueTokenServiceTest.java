@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.times;
 
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 class RedisOpaqueTokenServiceTest {
 
@@ -44,7 +46,7 @@ class RedisOpaqueTokenServiceTest {
     @Test
     @DisplayName("refresh token은 Lua 스크립트로 원자적으로 회전하고 새 토큰 쌍을 발급한다")
     void rotatesRefreshTokenAtomically() {
-        when(redisTemplate.execute(any(org.springframework.data.redis.core.script.DefaultRedisScript.class), any(),
+        when(redisTemplate.execute(any(DefaultRedisScript.class), any(),
                 any(Object[].class)))
                 .thenReturn(USER_ID + "|user");
 
@@ -53,6 +55,21 @@ class RedisOpaqueTokenServiceTest {
         verify(redisTemplate).execute(any(org.springframework.data.redis.core.script.DefaultRedisScript.class), any(),
                 any(Object[].class));
         org.junit.jupiter.api.Assertions.assertEquals(1800, tokenPair.getAccessTokenExpiresIn());
+    }
+
+    @Test
+    @DisplayName("refresh 회전 Lua 스크립트는 사용자 세션 인덱스의 TTL도 함께 연장한다")
+    void extendsUserSessionIndexDuringRefresh() {
+        when(redisTemplate.execute(any(org.springframework.data.redis.core.script.DefaultRedisScript.class), any(),
+                any(Object[].class))).thenReturn(USER_ID + "|user");
+
+        tokenService.refresh("refresh-token");
+
+        org.mockito.ArgumentCaptor<DefaultRedisScript> scriptCaptor =
+                org.mockito.ArgumentCaptor.forClass(DefaultRedisScript.class);
+        verify(redisTemplate).execute(scriptCaptor.capture(), any(), any(Object[].class));
+        assertTrue(scriptCaptor.getValue().getScriptAsString().contains("userSessionsKey"));
+        assertTrue(scriptCaptor.getValue().getScriptAsString().contains("PEXPIRE', userSessionsKey"));
     }
 
     @Test

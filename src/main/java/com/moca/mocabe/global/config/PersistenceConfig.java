@@ -28,7 +28,7 @@ public class PersistenceConfig {
         HikariConfig config = new HikariConfig();
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
         config.setJdbcUrl(environment.getProperty(
-                "MOCA_DB_URL", "jdbc:mysql://localhost:3306/moca?serverTimezone=UTC&characterEncoding=utf8"));
+                "MOCA_DB_URL", "jdbc:mysql://localhost:3307/moca?serverTimezone=UTC&characterEncoding=utf8"));
         config.setUsername(environment.getProperty("MOCA_DB_USERNAME", "moca"));
         config.setPassword(environment.getProperty("MOCA_DB_PASSWORD", ""));
         config.setMaximumPoolSize(environment.getProperty("MOCA_DB_POOL_MAX_SIZE", Integer.class, 10));
