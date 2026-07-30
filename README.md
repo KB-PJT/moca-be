@@ -2,14 +2,20 @@
 
 사용 가능한 카드 혜택을 분석해 결제 전에 가장 유리한 카드를 추천하는 백엔드 API 서버입니다.
 
-## 기술 스택
+## 기술 스택 및 의존성
 
-- Java 17
-- Spring Framework 5.3 / Spring MVC
-- Gradle 8.8
-- Tomcat 9 / Servlet 4.0
-- JUnit 5 / JaCoCo
-- OpenAPI 3 / Swagger UI
+| 구분 | 추가 의존성 | 용도 |
+| --- | --- | --- |
+| 언어·실행 | Java 17, Gradle 8.14.4 Wrapper, Tomcat 9 / Servlet 4.0 | Legacy Spring MVC WAR 실행 환경 |
+| 웹·트랜잭션 | Spring Web MVC 5.3, Spring JDBC, Spring TX | REST API, JDBC, 선언적 트랜잭션 |
+| 보안 | Spring Security Core / Config / Web / OAuth2 JOSE | Google ID Token 검증, MOCA opaque token 인증·인가 |
+| 영속성 | MyBatis 3.5, MyBatis-Spring 2.1, MySQL Connector/J 8.4 | SQL Mapper와 MySQL 8 연결 |
+| 스키마 관리 | Flyway Core / MySQL 12.10 | 애플리케이션 시작 시 초기 스키마 적용 |
+| 캐시·세션 | Spring Data Redis 2.7, Lettuce 6.1 | access·refresh token 해시 기반 Redis 세션 관리 |
+| 검증 | Hibernate Validator 6.2, Jakarta EL 구현체 | 요청 DTO 입력값 검증 |
+| API 문서 | OpenAPI 3, Swagger UI WebJar 5.32 | API 계약 및 로컬 Swagger UI 제공 |
+| 개발 편의 | Lombok 1.18 | 반복 코드 감소 |
+| 테스트·품질 | JUnit 5, Mockito 5, Testcontainers MySQL 2.0, JaCoCo, Checkstyle | 단위·MySQL 통합 테스트, 커버리지, 스타일 검사 |
 
 Spring Framework 5.3과 Tomcat 9은 `javax.servlet` 기반 레거시 환경을 유지하기 위한 선택입니다. 운영 배포 전에 Spring 5.3 보안 패치 수급 방안을 별도로 검토해야 합니다.
 
@@ -47,6 +53,68 @@ Tomcat에 `moca-be` 컨텍스트로 배포한 경우:
 - Health API: `GET /moca-be/api/v1/health`
 - Swagger UI: `/moca-be/swagger-ui`
 - OpenAPI YAML: `/moca-be/api-docs/openapi.yaml`
+
+## 로컬 MySQL과 Docker 통합 테스트
+
+로컬 MySQL은 Docker Compose로 실행합니다. `.env.example`을 복사한 뒤 필요한 값을 수정합니다.
+
+```bash
+cp .env.example .env
+docker compose up -d mysql
+docker compose ps
+```
+
+애플리케이션 시작 시 Flyway가 `src/main/resources/db/migration/V1__create_initial_schema.sql`을 적용해
+현재 초기 개발에 필요한 사용자·알림 설정 테이블을 한 번에 생성합니다. 이 초기화 방식은 아직
+개발 데이터가 없는 상태를 전제로 합니다. 기존에 생성된 로컬 DB가 있다면 Docker 볼륨 또는 스키마와
+`flyway_schema_history`를 함께 비운 뒤 다시 시작해야 합니다.
+컨테이너를 중지하려면 `docker compose down`을 실행합니다. 로컬 DB 볼륨까지 삭제하려면
+`docker compose down -v`를 사용합니다.
+
+기본 단위 테스트는 Docker 없이 실행됩니다.
+
+```bash
+./gradlew test
+```
+
+Docker 기반 MySQL 통합 테스트는 Testcontainers로 매번 독립 컨테이너를 생성합니다.
+
+```bash
+./gradlew integrationTest
+```
+
+`integrationTest`를 실행하려면 Docker Desktop 또는 Docker Engine이 실행 중이어야 합니다.
+
+### 고정 local-test access token
+
+Google 로그인 없이 보호 API를 확인할 때만 `local-test` 모드를 사용합니다. 이 모드는 Redis DB 1을 기본으로
+사용하며, `.env`에 지정한 **단 하나의 access token** 해시만 인증합니다. 기존 Redis 세션이나 로그인 과정에서
+발급된 다른 토큰은 이 모드에서 사용할 수 없습니다.
+
+```dotenv
+MOCA_PROFILE=local-test
+MOCA_REDIS_DATABASE=1
+MOCA_TOKEN_HASH_PEPPER=local-test-only-random-pepper
+MOCA_LOCAL_TEST_ACCESS_TOKEN=직접_생성한_충분히_긴_랜덤_문자열
+MOCA_LOCAL_TEST_USER_ID=활성_상태로_존재하는_사용자_UUID
+MOCA_LOCAL_TEST_USER_TYPE=user
+```
+
+`MOCA_LOCAL_TEST_USER_ID`는 MySQL `users` 테이블에 이미 존재하는 사용자 UUID여야 합니다.
+재기동하면 해당 토큰의 Redis TTL이 다시 설정됩니다. 테스트가 끝나면 `MOCA_PROFILE=local`로 되돌립니다.
+
+### 외부 Tomcat 환경 변수
+
+외부 Tomcat 배포에서는 `$CATALINA_BASE/bin/setenv.sh`에 DB·Redis·보안 값을 설정합니다. 프로젝트 루트가
+Tomcat의 작업 경로와 다르면 `.env`를 자동으로 찾을 수 없으므로, 필요할 때만 다음처럼 절대 경로를 지정합니다.
+
+```sh
+export MOCA_ENV_FILE='/absolute/path/to/moca-be/.env'
+```
+
+운영 환경은 `.env` 대신 `MOCA_DB_PASSWORD`, `MOCA_TOKEN_HASH_PEPPER` 등을 운영 비밀 관리 수단으로 직접
+주입하는 방식을 권장합니다. `MOCA_REFRESH_COOKIE_SECURE`는 local HTTP에서는 `false`, HTTPS 배포에서는
+반드시 `true`로 설정합니다.
 
 ## 테스트와 커버리지
 
