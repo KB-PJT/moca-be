@@ -1,0 +1,22 @@
+name: moca
+
+services:
+  moca-api:
+    image: ${MOCA_IMAGE:?MOCA_IMAGE 환경 변수가 필요합니다.}
+    container_name: moca-api
+    restart: unless-stopped
+    init: true
+    env_file:
+      - /home/ec2-user/moca/.env
+    environment:
+      TZ: Asia/Seoul
+      CATALINA_OPTS: -Xms256m -Xmx512m -Duser.timezone=Asia/Seoul
+    ports:
+      - "80:8080"
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
