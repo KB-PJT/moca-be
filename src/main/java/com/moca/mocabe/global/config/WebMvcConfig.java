@@ -3,7 +3,6 @@ package com.moca.mocabe.global.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
-import org.springframework.context.annotation.Import;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
@@ -14,7 +13,6 @@ import org.springframework.web.method.HandlerTypePredicate;
 
 @Configuration
 @EnableWebMvc
-@Import(AppConfig.class)
 @ComponentScan(
         basePackages = "com.moca.mocabe",
         includeFilters = @ComponentScan.Filter(type = FilterType.ANNOTATION, classes = RestController.class),
