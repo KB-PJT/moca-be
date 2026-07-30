@@ -46,3 +46,11 @@ outputs/
 ### Local environment secrets ###
 .env
 .env.local
+
+### Node.js and Husky local artifacts ###
+node_modules/
+.husky/_/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
