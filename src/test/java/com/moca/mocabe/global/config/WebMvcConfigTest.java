@@ -25,7 +25,7 @@ class WebMvcConfigTest {
     void setUp() {
         context = new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());
-        context.register(WebMvcConfig.class);
+        context.register(PersistenceConfig.class, RedisConfig.class, AuthConfig.class, WebMvcConfig.class);
         context.refresh();
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
     }
@@ -52,6 +52,14 @@ class WebMvcConfigTest {
     }
 
     @Test
+    void servesSwaggerUiFromDocsAlias() throws Exception {
+        mockMvc.perform(get("/docs/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
+                        .contains("url: \"../api-docs/openapi.yaml\"")));
+    }
+
+    @Test
     void servesSwaggerUiConfiguredForMocaSpecification() throws Exception {
         mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isOk())
@@ -74,6 +82,8 @@ class WebMvcConfigTest {
                 .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
                         .contains("openapi: 3.0.3")))
                 .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
-                        .contains("/api/v1/health:")));
+                        .contains("/health:")))
+                .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
+                        .contains("MocaBearerAuth:")));
     }
 }
