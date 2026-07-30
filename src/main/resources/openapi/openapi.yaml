@@ -1,18 +1,30 @@
 openapi: 3.0.3
 info:
   title: MOCA Backend API
-  description: 결제 전 최적 카드 추천을 위한 MOCA Backend REST API
+  description: |
+    결제 전 최적 카드 추천을 위한 MOCA Backend REST API입니다.
+
+    Google PKCE 로그인은 PWA가 수행합니다. PWA는 PKCE 교환 후 받은 Google ID Token을 로그인 API에 전달하고,
+    이후 MOCA API는 서버가 발급한 opaque access token으로 인증합니다.
   version: 1.0.0
+servers:
+  - url: /api/v1
+    description: MOCA API v1
 tags:
+  - name: Auth
+    description: Google ID Token 검증 및 MOCA opaque 세션 관리
+  - name: User
+    description: 인증 사용자 프로필과 개인 설정 관리
   - name: Health
     description: 서버 상태 확인
 paths:
-  /api/v1/health:
+  /health:
     get:
-      tags:
-        - Health
+      tags: [Health]
       summary: 서버 상태 조회
+      description: 인증 없이 사용할 수 있는 상태 확인 API입니다.
       operationId: getHealth
+      security: []
       responses:
         '200':
           description: 서버가 정상 동작 중임
@@ -20,12 +32,457 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+  /auth/google/login:
+    post:
+      tags: [Auth]
+      summary: Google ID Token으로 MOCA 로그인
+      description: |
+        PWA가 PKCE S256 교환 뒤 받은 Google ID Token을 검증하고 MOCA opaque token을 발급합니다.
+        refresh token은 JSON이 아닌 HttpOnly cookie로만 반환합니다.
+      operationId: loginWithGoogle
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleLoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공
+          headers:
+            Set-Cookie:
+              description: HttpOnly refresh token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoogleLoginApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Google ID Token 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: MOCA access token 갱신
+      description: HttpOnly refresh cookie를 사용해 새 access/refresh token을 발급합니다.
+      operationId: refreshToken
+      security: []
+      responses:
+        '200':
+          description: 갱신 성공
+          headers:
+            Set-Cookie:
+              description: 회전된 HttpOnly refresh token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenApiResponse'
+        '401':
+          description: refresh cookie가 없거나 만료됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: MOCA 로그아웃
+      description: access token 또는 refresh cookie에 연결된 Redis 세션을 폐기합니다.
+      operationId: logout
+      security: []
+      responses:
+        '200':
+          description: 로그아웃 성공
+          headers:
+            Set-Cookie:
+              description: 만료된 refresh token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessApiResponse'
+  /me:
+    get:
+      tags: [User]
+      summary: 내 프로필 조회
+      description: MOCA opaque access token이 필요한 인증 사용자 API입니다. 사용자 정보와 연관 설정·탈퇴 이력을 물리 삭제합니다.
+      operationId: getMyProfile
+      security:
+        - MocaBearerAuth: []
+      responses:
+        '200':
+          description: 프로필 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+    delete:
+      tags: [User]
+      summary: 회원 탈퇴
+      description: MOCA opaque access token이 필요한 인증 사용자 API입니다.
+      operationId: withdrawMe
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawUserRequest'
+      responses:
+        '200':
+          description: 탈퇴 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+  /me/nickname:
+    patch:
+      tags: [User]
+      summary: 내 닉네임 변경
+      operationId: updateMyNickname
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNicknameRequest'
+      responses:
+        '200':
+          description: 닉네임 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+  /me/card-sort-mode:
+    patch:
+      tags: [User]
+      summary: 홈 보유 카드 정렬 방식 변경
+      description: AUTO는 서버 추천 규칙 순서, MANUAL은 사용자가 지정한 카드 순서를 사용합니다.
+      operationId: updateMyCardSortMode
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCardSortModeRequest'
+      responses:
+        '200':
+          description: 카드 정렬 방식 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+  /me/notification-settings:
+    get:
+      tags: [User]
+      summary: 내 알림 설정 조회
+      operationId: getMyNotificationSettings
+      security:
+        - MocaBearerAuth: []
+      responses:
+        '200':
+          description: 알림 설정 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettingsApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+    patch:
+      tags: [User]
+      summary: 내 알림 설정 변경
+      operationId: updateMyNotificationSettings
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettingsRequest'
+      responses:
+        '200':
+          description: 알림 설정 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettingsApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+  /me/location-settings:
+    get:
+      tags: [User]
+      summary: 내 위치 추천 설정 조회
+      operationId: getMyLocationSettings
+      security:
+        - MocaBearerAuth: []
+      responses:
+        '200':
+          description: 위치 추천 설정 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSettingsApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+    patch:
+      tags: [User]
+      summary: 내 위치 추천 설정 변경
+      operationId: updateMyLocationSettings
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationSettingsRequest'
+      responses:
+        '200':
+          description: 위치 추천 설정 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSettingsApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
 components:
+  securitySchemes:
+    MocaBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Google token이 아닌 MOCA 서버 발급 opaque access token을 입력합니다.
+  responses:
+    AuthenticationError:
+      description: access token이 없거나 유효하지 않음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    AuthorizationError:
+      description: 인증은 완료됐지만 해당 리소스 권한이 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: 요청값 검증 실패
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    GoogleLoginRequest:
+      type: object
+      required: [idToken]
+      properties:
+        idToken:
+          type: string
+          description: PWA PKCE 교환 후 받은 Google ID Token
+    GoogleLoginApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/GoogleLoginResponse'
+    GoogleLoginResponse:
+      type: object
+      properties:
+        newMember:
+          type: boolean
+        accessToken:
+          type: string
+        accessTokenExpiresIn:
+          type: integer
+          example: 1800
+        member:
+          $ref: '#/components/schemas/UserProfileResponse'
+    RefreshTokenApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/RefreshTokenResponse'
+    RefreshTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        accessTokenExpiresIn:
+          type: integer
+          example: 1800
+    UserProfileApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/UserProfileResponse'
+    UserProfileResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        userType:
+          type: string
+          enum: [user, admin]
+        cardSortMode:
+          type: string
+          enum: [AUTO, MANUAL]
+    UpdateNicknameRequest:
+      type: object
+      required: [nickname]
+      properties:
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 50
+    UpdateCardSortModeRequest:
+      type: object
+      required: [cardSortMode]
+      properties:
+        cardSortMode:
+          type: string
+          enum: [AUTO, MANUAL]
+    NotificationSettingsRequest:
+      type: object
+      properties:
+        performanceClosingEnabled:
+          type: boolean
+        nearbyBenefitEnabled:
+          type: boolean
+        benefitLimitEnabled:
+          type: boolean
+        marketingEnabled:
+          type: boolean
+    NotificationSettingsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/NotificationSettingsRequest'
+    LocationSettingsRequest:
+      type: object
+      properties:
+        locationRecommendationEnabled:
+          type: boolean
+    LocationSettingsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/LocationSettingsRequest'
+    WithdrawUserRequest:
+      type: object
+      required: [confirmed]
+      properties:
+        reason:
+          type: string
+          enum: [inconvenient, not_needed, incorrect_benefit, privacy_concern, low_usage, etc]
+        reasonDetail:
+          type: string
+          maxLength: 500
+        confirmed:
+          type: boolean
+          example: true
+    SuccessApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        data:
+          nullable: true
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: 클라이언트 분기용 오류 코드
+              example: AUTHENTICATION_REQUIRED
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
     HealthResponse:
       type: object
-      required:
-        - status
+      required: [status]
       properties:
         status:
           type: string
