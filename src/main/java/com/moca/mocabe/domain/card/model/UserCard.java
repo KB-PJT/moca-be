@@ -8,7 +8,7 @@ public class UserCard {
     private String userCardId;
     private String userId;
     private String cardId;
-    private String codefConnectionId;
+    private String codefAccountCredentialId;
     private String issuerId;
     private String cardNameFromCodef;
     private Integer displayOrder;
@@ -42,12 +42,12 @@ public class UserCard {
         this.cardId = cardId;
     }
 
-    public String getCodefConnectionId() {
-        return codefConnectionId;
+    public String getCodefAccountCredentialId() {
+        return codefAccountCredentialId;
     }
 
-    public void setCodefConnectionId(String codefConnectionId) {
-        this.codefConnectionId = codefConnectionId;
+    public void setCodefAccountCredentialId(String codefAccountCredentialId) {
+        this.codefAccountCredentialId = codefAccountCredentialId;
     }
 
     public String getIssuerId() {

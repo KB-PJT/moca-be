@@ -27,7 +27,7 @@ class UserCardSchemaIntegrationTest {
     private static final String USER_ID = "01980d6a-5c0c-7aaf-9b85-010203040506";
     private static final String USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040531";
     private static final String ANOTHER_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040532";
-    private static final String CODEF_CONNECTION_ID = "01980d6a-5c0c-7aaf-9b85-010203040521";
+    private static final String CODEF_ACCOUNT_CREDENTIAL_ID = "01980d6a-5c0c-7aaf-9b85-010203040521";
     private static final String ISSUER_ID = "00000000-0000-4000-8000-000000000301";
     private static final String CARD_KEY_HASH =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -93,10 +93,11 @@ class UserCardSchemaIntegrationTest {
 
     private void insertUserCard(String userCardId, String cardKeyHash, boolean active, int displayOrder) {
         jdbcTemplate.update("INSERT INTO user_cards "
-                        + "(user_card_id, user_id, card_id, codef_connection_id, card_name_from_codef, issuer_id, "
+                        + "(user_card_id, user_id, card_id, codef_account_credential_id, "
+                        + "card_name_from_codef, issuer_id, "
                         + "display_order, is_active, codef_card_key_hash, memo, created_at, updated_at) "
                         + "VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                userCardId, USER_ID, CODEF_CONNECTION_ID, "KB My WE:SH",
+                userCardId, USER_ID, CODEF_ACCOUNT_CREDENTIAL_ID, "KB My WE:SH",
                 ISSUER_ID, displayOrder, active, cardKeyHash);
     }
 
