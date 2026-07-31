@@ -95,6 +95,24 @@ class AuthApplicationServiceTest {
     }
 
     @Test
+    @DisplayName("이름이 50자를 초과한 최초 회원은 닉네임을 50자로 잘라 생성한다")
+    void truncatesLongNicknameForNewMember() {
+        UserProfile user = user();
+        String longName = "가".repeat(51);
+        when(googleIdTokenVerifier.verify("google-id-token"))
+                .thenReturn(new GoogleIdTokenClaims(GOOGLE_SUBJECT, "moca@example.com", longName));
+        when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), anyString()))
+                .thenReturn(new UserDomainService.GoogleUserResult(user, true));
+        when(opaqueTokenService.issue(USER_ID, "user"))
+                .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
+
+        authApplicationService.login("google-id-token");
+
+        verify(userDomainService).findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"),
+                eq("가".repeat(50)));
+    }
+
+    @Test
     @DisplayName("사용자 도메인 서비스의 사용자 조회 오류를 로그인 흐름에 전달한다")
     void propagatesMissingGoogleMember() {
         when(googleIdTokenVerifier.verify("google-id-token"))
