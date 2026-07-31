@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   build-and-push:
+    environment: DEPLOYMENT
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,6 +54,7 @@ jobs:
 
   deploy:
     needs: build-and-push
+    environment: DEPLOYMENT
     runs-on: ubuntu-latest
     permissions:
       id-token: write
