@@ -37,7 +37,8 @@ class NimbusGoogleIdTokenVerifierTest {
     @DisplayName("서명이 잘못되었거나 sub가 없는 Google ID Token은 거절한다")
     void rejectsInvalidGoogleIdToken() {
         NimbusJwtDecoder decoder = mock(NimbusJwtDecoder.class);
-        when(decoder.decode("invalid")).thenThrow(new IllegalArgumentException("invalid token"));
+        when(decoder.decode("invalid"))
+                .thenThrow(new org.springframework.security.oauth2.jwt.JwtException("invalid token"));
         NimbusGoogleIdTokenVerifier verifier = new NimbusGoogleIdTokenVerifier(decoder, "client-id");
 
         assertThrows(InvalidGoogleIdTokenException.class, () -> verifier.verify("invalid"));
@@ -75,6 +76,20 @@ class NimbusGoogleIdTokenVerifierTest {
     }
 
     @Test
+    @DisplayName("Google issuer validator는 공식 및 레거시 issuer만 허용한다")
+    void validatesIssuer() {
+        NimbusGoogleIdTokenVerifier verifier = new NimbusGoogleIdTokenVerifier("client-id");
+
+        OAuth2TokenValidatorResult official = verifier.issuerValidator().validate(jwtWithIssuer("https://accounts.google.com"));
+        OAuth2TokenValidatorResult legacy = verifier.issuerValidator().validate(jwtWithIssuer("accounts.google.com"));
+        OAuth2TokenValidatorResult rejected = verifier.issuerValidator().validate(jwtWithIssuer("https://example.com"));
+
+        org.junit.jupiter.api.Assertions.assertFalse(official.hasErrors());
+        org.junit.jupiter.api.Assertions.assertFalse(legacy.hasErrors());
+        org.junit.jupiter.api.Assertions.assertTrue(rejected.hasErrors());
+    }
+
+    @Test
     @DisplayName("Google Client ID가 비어 있으면 ID Token 검증기를 만들 수 없다")
     void rejectsBlankClientId() {
         assertThrows(IllegalArgumentException.class, () -> new NimbusGoogleIdTokenVerifier(" "));
@@ -91,5 +106,16 @@ class NimbusGoogleIdTokenVerifierTest {
             builder.claim("azp", authorizedParty);
         }
         return builder.build();
+    }
+
+    private Jwt jwtWithIssuer(String issuer) {
+        return Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .claim("iss", issuer)
+                .subject("subject")
+                .audience(java.util.Collections.singletonList("client-id"))
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
     }
 }

@@ -46,6 +46,7 @@ outputs/
 ### Local environment secrets ###
 .env
 .env.local
+deploy/.env.production
 
 ### Node.js and Husky local artifacts ###
 node_modules/

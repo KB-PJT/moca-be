@@ -115,7 +115,7 @@ paths:
     get:
       tags: [User]
       summary: 내 프로필 조회
-      description: MOCA opaque access token이 필요한 인증 사용자 API입니다. 사용자 정보와 연관 설정·탈퇴 이력을 물리 삭제합니다.
+      description: MOCA opaque access token이 필요한 인증 사용자 API입니다. 사용자 프로필과 개인 설정 값을 반환합니다.
       operationId: getMyProfile
       security:
         - MocaBearerAuth: []

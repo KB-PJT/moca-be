@@ -30,7 +30,8 @@ class AuthConfigTest {
     @Test
     @DisplayName("local 이외 환경은 token hash pepper 없이 시작할 수 없다")
     void rejectsMissingPepperOutsideLocal() {
-        MockEnvironment environment = new MockEnvironment().withProperty("MOCA_PROFILE", "production");
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("production");
 
         assertThrows(IllegalStateException.class, () -> authConfig.opaqueTokenService(new StringRedisTemplate(),
                 environment, new OpaqueTokenPolicy(1800, 1209600)));
