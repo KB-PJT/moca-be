@@ -1,0 +1,18 @@
+{
+  "name": "moca-be-git-hooks",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "prepare": "node .husky/install.mjs",
+    "hooks:pre-commit": "node .husky/scripts/pre-commit.mjs",
+    "hooks:pre-push": "node .husky/scripts/pre-push.mjs",
+    "hooks:post-merge": "node .husky/scripts/post-merge.mjs",
+    "hooks:post-rewrite": "node .husky/scripts/post-rewrite.mjs"
+  },
+  "devDependencies": {
+    "husky": "9.1.7"
+  }
+}
