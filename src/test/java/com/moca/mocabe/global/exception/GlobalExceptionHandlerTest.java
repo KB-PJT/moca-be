@@ -16,6 +16,7 @@ import javax.validation.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -45,6 +46,15 @@ class GlobalExceptionHandlerTest {
         assertEquals("DATA_STORE_UNAVAILABLE", response.getBody().getError().getCode());
         assertEquals("데이터 저장소에 일시적으로 연결할 수 없습니다.",
                 response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("데이터 무결성 위반은 충돌 응답으로 변환한다")
+    void handlesDataIntegrityViolation() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleDataIntegrityViolation(
+                new DataIntegrityViolationException("duplicate"));
+
+        assertError(response, HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION");
     }
 
     @Test
