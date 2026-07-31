@@ -1,5 +1,7 @@
 package com.moca.mocabe.global.config;
 
+import com.moca.mocabe.domain.card.mapper.UserCardMapper;
+import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
@@ -21,6 +23,11 @@ public class AppConfig {
     @Bean
     public CurrentUserProvider currentUserProvider() {
         return new SecurityContextCurrentUserProvider();
+    }
+
+    @Bean
+    public CardQueryService cardQueryService(UserCardMapper userCardMapper) {
+        return new CardQueryService(userCardMapper);
     }
 
     @Bean
