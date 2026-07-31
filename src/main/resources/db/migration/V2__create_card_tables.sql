@@ -14,8 +14,8 @@ CREATE TABLE user_cards (
     user_id CHAR(36) NOT NULL,
     -- FIXME: 카드 마스터 테이블 마이그레이션 추가 후 card_id 외래키를 연결한다.
     card_id CHAR(36) NULL,
-    -- FIXME: codef_connections 테이블 마이그레이션 추가 후 codef_connection_id 외래키를 연결한다.
-    codef_connection_id CHAR(36) NOT NULL,
+    -- codef_account_credential_id 외래키는 codef_account_credentials 생성 후 연결한다.
+    codef_account_credential_id CHAR(36) NOT NULL,
     card_name_from_codef VARCHAR(150) NOT NULL,
     issuer_id CHAR(36) NOT NULL,
     display_order SMALLINT NOT NULL DEFAULT 0,
@@ -33,5 +33,5 @@ CREATE TABLE user_cards (
         FOREIGN KEY (issuer_id) REFERENCES issuers (issuer_id),
     INDEX idx_user_cards_user_active_order (user_id, is_active, display_order, user_card_id),
     INDEX idx_user_cards_card_id (card_id),
-    INDEX idx_user_cards_codef_connection_id (codef_connection_id)
+    INDEX idx_user_cards_codef_account_credential_id (codef_account_credential_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
