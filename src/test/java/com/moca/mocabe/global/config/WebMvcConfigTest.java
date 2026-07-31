@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
+import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenPolicy;
@@ -106,6 +107,11 @@ class WebMvcConfigTest {
         @Bean
         public UserApplicationService userApplicationService() {
             return org.mockito.Mockito.mock(UserApplicationService.class);
+        }
+
+        @Bean
+        public CardQueryService cardQueryService() {
+            return org.mockito.Mockito.mock(CardQueryService.class);
         }
 
         @Bean
