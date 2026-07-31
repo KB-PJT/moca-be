@@ -1,0 +1,13 @@
+.git
+.github
+.gradle
+.idea
+.agents
+.env
+.env.*
+!deploy/.env.production.example
+build/reports
+docs
+outputs
+node_modules
+npm-debug.log

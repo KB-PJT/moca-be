@@ -13,8 +13,8 @@ import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
-import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
+import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
@@ -26,11 +26,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
-/**
- * 애플리케이션 객체의 생성과 의존성 연결을 한 곳에서 관리한다.
- *
- * <p>Controller와 Application Service는 컴포넌트 스캔으로 등록하지 않고 이 설정에서 명시적으로 조립한다.</p>
- */
+/** 애플리케이션 객체의 생성과 의존성 연결을 한 곳에서 관리한다. */
 @Configuration
 public class AppConfig {
 
