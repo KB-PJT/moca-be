@@ -4,12 +4,14 @@ import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
-import com.moca.mocabe.domain.codef.infra.CodefHttpResponse;
+import com.moca.mocabe.domain.codef.infra.CodefHttpClient;
 import com.moca.mocabe.domain.codef.infra.CredentialFingerprintGenerator;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
+import com.moca.mocabe.domain.codef.infra.JdkCodefHttpClient;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
+import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
@@ -17,14 +19,9 @@ import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
 import com.moca.mocabe.global.exception.GlobalExceptionHandler;
-import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Base64;
-import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -37,8 +34,8 @@ import org.springframework.core.env.Environment;
 @Configuration
 public class AppConfig {
 
-    private static final String DEFAULT_CODEF_BASE_URL = "https://development.codef.io";
-    private static final String DEFAULT_CODEF_TOKEN_URL = "https://oauth.codef.io/oauth/token";
+    private static final long DEFAULT_CODEF_CONNECT_TIMEOUT_MS = 3_000L;
+    private static final long DEFAULT_CODEF_REQUEST_TIMEOUT_MS = 10_000L;
 
     @Bean
     public CurrentUserProvider currentUserProvider() {
@@ -76,24 +73,46 @@ public class AppConfig {
     }
 
     @Bean
-    public CodefClient codefClient(Environment environment) {
+    public HttpClient codefJavaHttpClient(Environment environment) {
+        return HttpClient.newBuilder()
+                .connectTimeout(timeoutProperty(
+                        environment, "MOCA_CODEF_CONNECT_TIMEOUT_MS", DEFAULT_CODEF_CONNECT_TIMEOUT_MS))
+                .build();
+    }
+
+    @Bean
+    public CodefHttpClient codefHttpClient(HttpClient codefJavaHttpClient, Environment environment) {
+        return new JdkCodefHttpClient(
+                codefJavaHttpClient,
+                timeoutProperty(environment, "MOCA_CODEF_REQUEST_TIMEOUT_MS", DEFAULT_CODEF_REQUEST_TIMEOUT_MS));
+    }
+
+    @Bean
+    public CodefClient codefClient(CodefHttpClient codefHttpClient, Environment environment) {
         return new CodefClient(
-                AppConfig::sendPost,
+                codefHttpClient,
                 requiredProperty(environment, "MOCA_CODEF_CLIENT_ID"),
                 requiredProperty(environment, "MOCA_CODEF_CLIENT_SECRET"),
                 requiredProperty(environment, "MOCA_CODEF_PUBLIC_KEY"),
-                environment.getProperty("MOCA_CODEF_BASE_URL", DEFAULT_CODEF_BASE_URL),
-                environment.getProperty("MOCA_CODEF_TOKEN_URL", DEFAULT_CODEF_TOKEN_URL));
+                requiredProperty(environment, "MOCA_CODEF_BASE_URL"),
+                requiredProperty(environment, "MOCA_CODEF_TOKEN_URL"));
     }
 
     @Bean
     public CardLinkService cardLinkService(CodefClient codefClient,
                                            CodefCredentialMapper codefCredentialMapper,
+                                           CodefCredentialStore codefCredentialStore,
                                            IssuerMapper issuerMapper,
                                            Encryptor codefEncryptor,
                                            CredentialFingerprintGenerator fingerprintGenerator) {
         return new CardLinkService(
-                codefClient, codefCredentialMapper, issuerMapper, codefEncryptor, fingerprintGenerator);
+                codefClient, codefCredentialMapper, codefCredentialStore,
+                issuerMapper, codefEncryptor, fingerprintGenerator);
+    }
+
+    @Bean
+    public CodefCredentialStore codefCredentialStore(CodefCredentialMapper codefCredentialMapper) {
+        return new CodefCredentialStore(codefCredentialMapper);
     }
 
     @Bean
@@ -109,23 +128,11 @@ public class AppConfig {
         return value;
     }
 
-    private static CodefHttpResponse sendPost(String url, Map<String, String> headers, String body) {
-        try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
-                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
-            headers.forEach(builder::header);
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                    .send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException(
-                        "CODEF HTTP 요청에 실패했습니다. status=" + response.statusCode());
-            }
-            return new CodefHttpResponse(response.statusCode(), response.body());
-        } catch (IOException exception) {
-            throw new IllegalStateException("CODEF 요청에 실패했습니다.", exception);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("CODEF 요청이 중단되었습니다.", exception);
+    private static Duration timeoutProperty(Environment environment, String name, long defaultValue) {
+        long value = environment.getProperty(name, Long.class, defaultValue);
+        if (value <= 0) {
+            throw new IllegalStateException(name + " 환경변수는 1 이상이어야 합니다.");
         }
+        return Duration.ofMillis(value);
     }
 }

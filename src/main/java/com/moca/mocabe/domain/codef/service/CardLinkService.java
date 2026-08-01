@@ -14,10 +14,9 @@ import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefIssuerPolicy;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * CODEF Connected ID를 생성하고, 발급된 connectedId와 자격정보를 codef_account_credentials에 저장하는
@@ -33,21 +32,22 @@ public class CardLinkService {
 
     private final CodefClient codefClient;
     private final CodefCredentialMapper codefCredentialMapper;
+    private final CodefCredentialStore codefCredentialStore;
     private final IssuerMapper issuerMapper;
     private final Encryptor encryptor;
     private final CredentialFingerprintGenerator fingerprintGenerator;
 
     public CardLinkService(CodefClient codefClient, CodefCredentialMapper codefCredentialMapper,
-                           IssuerMapper issuerMapper, Encryptor encryptor,
+                           CodefCredentialStore codefCredentialStore, IssuerMapper issuerMapper, Encryptor encryptor,
                            CredentialFingerprintGenerator fingerprintGenerator) {
         this.codefClient = codefClient;
         this.codefCredentialMapper = codefCredentialMapper;
+        this.codefCredentialStore = codefCredentialStore;
         this.issuerMapper = issuerMapper;
         this.encryptor = encryptor;
         this.fingerprintGenerator = fingerprintGenerator;
     }
 
-    @Transactional
     public CardLinkResponse createLink(String userId, CreateCardLinkRequest request) {
         CodefIssuerPolicy policy = issuerMapper.findCodefPolicyByIssuerId(request.getIssuerId());
         if (policy == null) {
@@ -68,13 +68,9 @@ public class CardLinkService {
         String connectedId = codefClient.createConnectedId(command);
         String credentialId = UUID.randomUUID().toString();
 
-        // 민감정보 암호화 후 DB 저장
-        try {
-            codefCredentialMapper.insertAccountCredential(
-                    buildCredential(userId, request, connectedId, credentialId, credentialFingerprint));
-        } catch (DuplicateKeyException exception) {
-            throw new CodefAccountAlreadyLinkedException();
-        }
+        // 외부 호출이 끝난 뒤 저장 구간만 별도 트랜잭션으로 실행한다.
+        codefCredentialStore.save(
+                buildCredential(userId, request, connectedId, credentialId, credentialFingerprint));
 
         return new CardLinkResponse(credentialId, request.getIssuerId(), STATUS_ACTIVE);
     }
@@ -100,7 +96,7 @@ public class CardLinkService {
 
     private void validateRequiredCredentials(CodefIssuerPolicy policy, CreateCardLinkRequest request) {
         Map<String, String> fields = new LinkedHashMap<String, String>();
-        require(fields, "id", request.getId(), policy.isRequiresId() || !policy.isRequiresCardNo(),
+        require(fields, "id", request.getId(), policy.isRequiresId(),
                 "아이디는 필수입니다.");
         require(fields, "password", request.getPassword(), policy.isRequiresPassword(),
                 "패스워드는 필수입니다.");
@@ -123,12 +119,31 @@ public class CardLinkService {
     }
 
     private String createFingerprint(CodefIssuerPolicy policy, CreateCardLinkRequest request) {
-        // CardNo로 fingerprint 생성
         if (policy.isRequiresCardNo()) {
-            String normalizedCardNo = request.getCardNo().replaceAll("[^0-9]", "");
+            String normalizedCardNo = normalizeCardNumber(request.getCardNo());
+            if (normalizedCardNo.isBlank()) {
+                throw invalidFingerprintSource("cardNo", "유효한 카드번호가 필요합니다.");
+            }
             return fingerprintGenerator.generate(FINGERPRINT_CARD_NO, normalizedCardNo);
         }
-        // Id(카드사)로 fingerprint 생성
-        return fingerprintGenerator.generate(FINGERPRINT_ACCOUNT_ID, request.getId().trim());
+        String normalizedAccountId = normalizeAccountId(request.getId());
+        if (normalizedAccountId.isBlank()) {
+            throw invalidFingerprintSource("id", "중복 연동 확인을 위한 아이디가 필요합니다.");
+        }
+        return fingerprintGenerator.generate(FINGERPRINT_ACCOUNT_ID, normalizedAccountId);
+    }
+
+    private String normalizeCardNumber(String cardNumber) {
+        return cardNumber == null ? "" : cardNumber.replaceAll("[^0-9]", "");
+    }
+
+    private String normalizeAccountId(String accountId) {
+        return accountId == null ? "" : accountId.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private CodefCredentialRequiredException invalidFingerprintSource(String field, String message) {
+        Map<String, String> fields = new LinkedHashMap<String, String>();
+        fields.put(field, message);
+        return new CodefCredentialRequiredException(fields);
     }
 }

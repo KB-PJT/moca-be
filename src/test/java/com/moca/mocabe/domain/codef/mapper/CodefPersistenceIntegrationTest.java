@@ -1,6 +1,7 @@
 package com.moca.mocabe.domain.codef.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,7 @@ import com.moca.mocabe.domain.codef.infra.CredentialFingerprintGenerator;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
+import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
@@ -31,6 +33,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Tag("integration")
 @SpringJUnitConfig(CodefPersistenceIntegrationTest.CodefPersistenceTestConfig.class)
@@ -66,7 +69,10 @@ class CodefPersistenceIntegrationTest {
                         + "VALUES (?, ?, ?, TRUE, TRUE, TRUE, TRUE, TRUE, "
                         + "UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 ISSUER_ID, "0301", "KB카드");
-        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn(CONNECTED_ID);
+        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenAnswer(invocation -> {
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            return CONNECTED_ID;
+        });
     }
 
     @AfterEach
@@ -162,12 +168,19 @@ class CodefPersistenceIntegrationTest {
         public CardLinkService cardLinkService(
                 CodefClient codefClient,
                 CodefCredentialMapper codefCredentialMapper,
+                CodefCredentialStore codefCredentialStore,
                 IssuerMapper issuerMapper,
                 Encryptor encryptor,
                 CredentialFingerprintGenerator fingerprintGenerator
         ) {
             return new CardLinkService(
-                    codefClient, codefCredentialMapper, issuerMapper, encryptor, fingerprintGenerator);
+                    codefClient, codefCredentialMapper, codefCredentialStore,
+                    issuerMapper, encryptor, fingerprintGenerator);
+        }
+
+        @Bean
+        public CodefCredentialStore codefCredentialStore(CodefCredentialMapper codefCredentialMapper) {
+            return new CodefCredentialStore(codefCredentialMapper);
         }
 
         @Bean

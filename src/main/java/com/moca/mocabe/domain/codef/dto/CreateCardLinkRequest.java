@@ -8,10 +8,8 @@ public class CreateCardLinkRequest {
     @NotBlank(message = "발급사 식별자는 필수입니다.")
     private String issuerId;
 
-    @NotBlank(message = "아이디는 필수입니다.")
     private String id;
 
-    @NotBlank(message = "비밀번호는 필수입니다.")
     private String password;
 
     private String cardNo;

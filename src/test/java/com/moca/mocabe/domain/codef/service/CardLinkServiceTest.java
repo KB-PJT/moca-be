@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -23,7 +22,6 @@ import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefIssuerPolicy;
-import org.springframework.dao.DuplicateKeyException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,6 +41,8 @@ class CardLinkServiceTest {
     @Mock
     private CodefCredentialMapper codefCredentialMapper;
     @Mock
+    private CodefCredentialStore codefCredentialStore;
+    @Mock
     private IssuerMapper issuerMapper;
     @Mock
     private Encryptor encryptor;
@@ -54,7 +54,8 @@ class CardLinkServiceTest {
     @BeforeEach
     void setUp() {
         cardLinkService = new CardLinkService(
-                codefClient, codefCredentialMapper, issuerMapper, encryptor, fingerprintGenerator);
+                codefClient, codefCredentialMapper, codefCredentialStore,
+                issuerMapper, encryptor, fingerprintGenerator);
     }
 
     @Test
@@ -74,7 +75,7 @@ class CardLinkServiceTest {
 
         ArgumentCaptor<CodefAccountCredential> credentialCaptor =
                 ArgumentCaptor.forClass(CodefAccountCredential.class);
-        verify(codefCredentialMapper).insertAccountCredential(credentialCaptor.capture());
+        verify(codefCredentialStore).save(credentialCaptor.capture());
         CodefAccountCredential credential = credentialCaptor.getValue();
         assertEquals(response.getLinkId(), credential.getCodefAccountCredentialId());
         assertEquals(USER_ID, credential.getUserId());
@@ -95,7 +96,7 @@ class CardLinkServiceTest {
                 IssuerNotFoundException.class, () -> cardLinkService.createLink(USER_ID, request()));
 
         assertEquals("등록되지 않은 발급사입니다: " + ISSUER_ID, exception.getMessage());
-        verifyNoInteractions(codefClient, codefCredentialMapper, encryptor);
+        verifyNoInteractions(codefClient, codefCredentialMapper, codefCredentialStore, encryptor);
     }
 
     @Test
@@ -111,7 +112,8 @@ class CardLinkServiceTest {
         assertEquals(5, exception.getFields().size());
         assertEquals("아이디는 필수입니다.", exception.getFields().get("id"));
         assertEquals("카드번호는 필수입니다.", exception.getFields().get("cardNo"));
-        verifyNoInteractions(codefClient, codefCredentialMapper, encryptor, fingerprintGenerator);
+        verifyNoInteractions(codefClient, codefCredentialMapper, codefCredentialStore,
+                encryptor, fingerprintGenerator);
     }
 
     @Test
@@ -119,7 +121,7 @@ class CardLinkServiceTest {
     void createsAccountIdFingerprint() {
         CodefIssuerPolicy policy = accountPolicy();
         CreateCardLinkRequest request = request();
-        request.setId(" tester ");
+        request.setId(" Tester ");
         request.setCardNo(null);
         request.setCardPassword(null);
         request.setBirthDate(null);
@@ -149,17 +151,34 @@ class CardLinkServiceTest {
     }
 
     @Test
-    @DisplayName("동시 요청으로 UNIQUE 제약이 충돌하면 중복 연동 오류로 변환한다")
-    void convertsDuplicateInsertFailure() {
+    @DisplayName("카드번호 정규화 결과가 비어 있으면 검증 오류를 반환한다")
+    void rejectsEmptyNormalizedCardNumber() {
         when(issuerMapper.findCodefPolicyByIssuerId(ISSUER_ID)).thenReturn(cardPolicy());
-        when(fingerprintGenerator.generate("CARD_NO", "1234567890123456")).thenReturn("duplicate");
-        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-3");
-        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1});
-        doThrow(new DuplicateKeyException("duplicate"))
-                .when(codefCredentialMapper).insertAccountCredential(any(CodefAccountCredential.class));
+        CreateCardLinkRequest request = request();
+        request.setCardNo("----");
 
-        assertThrows(CodefAccountAlreadyLinkedException.class,
-                () -> cardLinkService.createLink(USER_ID, request()));
+        CodefCredentialRequiredException exception = assertThrows(
+                CodefCredentialRequiredException.class,
+                () -> cardLinkService.createLink(USER_ID, request));
+
+        assertEquals("유효한 카드번호가 필요합니다.", exception.getFields().get("cardNo"));
+        verifyNoInteractions(codefClient, codefCredentialStore, fingerprintGenerator);
+    }
+
+    @Test
+    @DisplayName("정책상 ID와 카드번호가 선택이어도 fingerprint 원천 부재는 명시적으로 거부한다")
+    void rejectsMissingFingerprintSourceSeparatelyFromPolicy() {
+        CodefIssuerPolicy policy = basePolicy();
+        CreateCardLinkRequest request = new CreateCardLinkRequest();
+        request.setIssuerId(ISSUER_ID);
+        when(issuerMapper.findCodefPolicyByIssuerId(ISSUER_ID)).thenReturn(policy);
+
+        CodefCredentialRequiredException exception = assertThrows(
+                CodefCredentialRequiredException.class,
+                () -> cardLinkService.createLink(USER_ID, request));
+
+        assertEquals("중복 연동 확인을 위한 아이디가 필요합니다.", exception.getFields().get("id"));
+        verifyNoInteractions(codefClient, codefCredentialMapper, codefCredentialStore, fingerprintGenerator);
     }
 
     private CreateCardLinkRequest request() {
