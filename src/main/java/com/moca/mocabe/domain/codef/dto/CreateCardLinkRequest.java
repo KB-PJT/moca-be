@@ -67,4 +67,11 @@ public class CreateCardLinkRequest {
     public void setBirthDate(String birthDate) {
         this.birthDate = birthDate;
     }
+
+    @Override
+    public String toString() {
+        return "CreateCardLinkRequest{issuerId=" + issuerId + ", id=[MASKED], "
+                + "password=[MASKED], cardNo=[MASKED], cardPassword=[MASKED], "
+                + "birthDate=[MASKED]}";
+    }
 }

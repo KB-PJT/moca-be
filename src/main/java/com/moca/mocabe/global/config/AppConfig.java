@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
+import com.moca.mocabe.domain.codef.infra.CodefHttpResponse;
 import com.moca.mocabe.domain.codef.infra.CredentialFingerprintGenerator;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
@@ -108,14 +109,18 @@ public class AppConfig {
         return value;
     }
 
-    private static String sendPost(String url, Map<String, String> headers, String body) {
+    private static CodefHttpResponse sendPost(String url, Map<String, String> headers, String body) {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
             headers.forEach(builder::header);
             HttpResponse<String> response = HttpClient.newHttpClient()
                     .send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            return response.body();
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalStateException(
+                        "CODEF HTTP 요청에 실패했습니다. status=" + response.statusCode());
+            }
+            return new CodefHttpResponse(response.statusCode(), response.body());
         } catch (IOException exception) {
             throw new IllegalStateException("CODEF 요청에 실패했습니다.", exception);
         } catch (InterruptedException exception) {

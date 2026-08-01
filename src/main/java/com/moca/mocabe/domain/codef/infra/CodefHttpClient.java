@@ -11,5 +11,5 @@ import java.util.Map;
 @FunctionalInterface
 public interface CodefHttpClient {
 
-    String post(String url, Map<String, String> headers, String body);
+    CodefHttpResponse post(String url, Map<String, String> headers, String body);
 }

@@ -53,7 +53,7 @@ public class CodefClient {
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", "Bearer " + accessToken);
         headers.put("Content-Type", "application/json");
-        String responseBody = httpClient.post(baseUrl + "/v1/account/create", headers, requestBody);
+        String responseBody = postSuccessful(baseUrl + "/v1/account/create", headers, requestBody);
 
         // CODEF는 응답 본문을 URL 인코딩해서 주므로 디코드 후 파싱한다
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
@@ -71,8 +71,21 @@ public class CodefClient {
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", "Basic " + basic);
         headers.put("Content-Type", "application/x-www-form-urlencoded");
-        String body = httpClient.post(tokenUrl, headers, "grant_type=client_credentials&scope=read");
-        return readTree(body).path("access_token").asText("");
+        String body = postSuccessful(tokenUrl, headers, "grant_type=client_credentials&scope=read");
+        String accessToken = readTree(body).path("access_token").asText("");
+        if (accessToken.isBlank()) {
+            throw new IllegalStateException("CODEF 액세스 토큰 발급에 실패했습니다.");
+        }
+        return accessToken;
+    }
+
+    private String postSuccessful(String url, Map<String, String> headers, String body) {
+        CodefHttpResponse response = httpClient.post(url, headers, body);
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IllegalStateException(
+                    "CODEF HTTP 요청에 실패했습니다. status=" + response.statusCode());
+        }
+        return response.body();
     }
 
     private String buildRequestBody(CodefConnectionCommand command) {

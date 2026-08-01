@@ -43,9 +43,9 @@ class CodefClientTest {
     @Test
     @DisplayName("토큰 발급·RSA 암호화·요청을 거쳐 connectedId를 반환한다")
     void returnsConnectedId() {
-        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(TOKEN_RESPONSE);
-        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(urlEncoded(
-                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{\"connectedId\":\"cid-xyz\"}}"));
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{\"connectedId\":\"cid-xyz\"}}")));
 
         String connectedId = codefClient.createConnectedId(command("pw", "1234567890", "1234", "900101"));
 
@@ -55,9 +55,9 @@ class CodefClientTest {
     @Test
     @DisplayName("응답에 connectedId가 없으면 예외를 던진다")
     void throwsWhenConnectedIdMissing() {
-        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(TOKEN_RESPONSE);
-        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(urlEncoded(
-                "{\"result\":{\"code\":\"CF-12345\",\"message\":\"실패\"}}"));
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-12345\",\"message\":\"실패\"}}")));
 
         assertThrows(IllegalStateException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
@@ -66,8 +66,8 @@ class CodefClientTest {
     @Test
     @DisplayName("응답 JSON이 손상되면 예외를 던진다")
     void throwsWhenResponseMalformed() {
-        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(TOKEN_RESPONSE);
-        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(urlEncoded("not-json"));
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded("not-json")));
 
         assertThrows(IllegalStateException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
@@ -78,7 +78,7 @@ class CodefClientTest {
     void throwsWhenPublicKeyInvalid() {
         CodefClient invalidKeyClient = new CodefClient(httpClient, "client-id", "client-secret",
                 "!!!not-base64!!!", BASE_URL, TOKEN_URL);
-        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(TOKEN_RESPONSE);
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
 
         assertThrows(IllegalStateException.class,
                 () -> invalidKeyClient.createConnectedId(command("pw", null, null, null)));
@@ -87,11 +87,35 @@ class CodefClientTest {
     @Test
     @DisplayName("RSA 한도를 넘는 비밀번호는 암호화 실패로 예외를 던진다")
     void throwsWhenRsaEncryptionFails() {
-        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(TOKEN_RESPONSE);
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
         String tooLongPassword = "a".repeat(500);
 
         assertThrows(IllegalStateException.class,
                 () -> codefClient.createConnectedId(command(tooLongPassword, null, null, null)));
+    }
+
+    @Test
+    @DisplayName("액세스 토큰이 비어 있으면 토큰 발급 단계에서 실패한다")
+    void throwsWhenAccessTokenMissing() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString()))
+                .thenReturn(ok("{\"token_type\":\"bearer\"}"));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+
+        assertEquals("CODEF 액세스 토큰 발급에 실패했습니다.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("CODEF가 비 2xx 상태를 반환하면 상태 코드를 포함해 실패한다")
+    void throwsWhenHttpStatusIsNotSuccessful() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString()))
+                .thenReturn(new CodefHttpResponse(401, "{\"error\":\"unauthorized\"}"));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+
+        assertEquals("CODEF HTTP 요청에 실패했습니다. status=401", exception.getMessage());
     }
 
     private CodefConnectionCommand command(String password, String cardNo, String cardPassword,
@@ -101,6 +125,10 @@ class CodefClientTest {
 
     private String urlEncoded(String json) {
         return URLEncoder.encode(json, StandardCharsets.UTF_8);
+    }
+
+    private CodefHttpResponse ok(String body) {
+        return new CodefHttpResponse(200, body);
     }
 
     private static String generatePublicKey() {
