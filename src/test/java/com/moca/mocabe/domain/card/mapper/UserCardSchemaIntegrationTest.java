@@ -48,9 +48,18 @@ class UserCardSchemaIntegrationTest {
                         + "VALUES (?, ?, ?, 'user', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 USER_ID, "card-schema-google-subject", "모카");
         jdbcTemplate.update("INSERT INTO issuers "
-                        + "(issuer_id, institution_code, issuer_name, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                        + "(issuer_id, institution_code, issuer_name, "
+                        + "requires_id, requires_password, requires_card_no, requires_card_password, "
+                        + "requires_birth_date, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, TRUE, TRUE, TRUE, TRUE, TRUE, "
+                        + "UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 ISSUER_ID, "0301", "KB카드");
+        jdbcTemplate.update("INSERT INTO codef_account_credentials "
+                        + "(codef_account_credential_id, user_id, issuer_id, connected_id, "
+                        + "credential_fingerprint, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, 'ACTIVE', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                CODEF_ACCOUNT_CREDENTIAL_ID, USER_ID, ISSUER_ID,
+                "01980d6a-5c0c-7aaf-9b85-010203040522", CARD_KEY_HASH);
     }
 
     @AfterEach
@@ -103,6 +112,7 @@ class UserCardSchemaIntegrationTest {
 
     private void deleteTestData() {
         jdbcTemplate.update("DELETE FROM user_cards");
+        jdbcTemplate.update("DELETE FROM codef_account_credentials");
         jdbcTemplate.update("DELETE FROM issuers");
         jdbcTemplate.update("DELETE FROM user_notification_settings");
         jdbcTemplate.update("DELETE FROM users");
