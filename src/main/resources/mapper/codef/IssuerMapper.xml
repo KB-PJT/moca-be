@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.codef.mapper.IssuerMapper">
+
+    <resultMap id="codefIssuerPolicyMap" type="com.moca.mocabe.domain.codef.model.CodefIssuerPolicy">
+        <id property="issuerId" column="issuer_id"/>
+        <result property="institutionCode" column="institution_code"/>
+        <result property="requiresId" column="requires_id"/>
+        <result property="requiresPassword" column="requires_password"/>
+        <result property="requiresCardNo" column="requires_card_no"/>
+        <result property="requiresCardPassword" column="requires_card_password"/>
+        <result property="requiresBirthDate" column="requires_birth_date"/>
+    </resultMap>
+
+    <select id="findCodefPolicyByIssuerId" resultMap="codefIssuerPolicyMap">
+        SELECT issuer_id,
+               institution_code,
+               requires_id,
+               requires_password,
+               requires_card_no,
+               requires_card_password,
+               requires_birth_date
+        FROM issuers
+        WHERE issuer_id = #{issuerId}
+    </select>
+</mapper>

@@ -34,6 +34,83 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+  /card-links:
+    post:
+      tags: [CardLink]
+      summary: CODEF 카드 연동(Connected ID) 생성
+      description: |
+        카드사 자격정보로 CODEF Connected ID를 생성하고 연동 정보를 저장합니다.
+        비밀번호는 CODEF 공개키로 RSA 암호화해 전송하며, 저장 시 자격정보는 AES로 암호화합니다.
+        적재된 보유 카드 목록 반환은 후속 작업에서 확장합니다.
+      operationId: createCardLink
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issuerId]
+              properties:
+                issuerId:
+                  type: string
+                  format: uuid
+                  description: 발급사(카드사) 식별자. 서버가 CODEF 기관코드로 변환한다.
+                id:
+                  type: string
+                  description: 카드사 정책에 따라 필수입니다.
+                password:
+                  type: string
+                  description: 카드사 정책에 따라 필수입니다.
+                cardNo:
+                  type: string
+                  description: 카드사 정책에 따라 필수입니다.
+                cardPassword:
+                  type: string
+                  description: 카드사 정책에 따라 필수입니다.
+                birthDate:
+                  type: string
+                  description: 카드사 정책에 따라 필수입니다.
+      responses:
+        '201':
+          description: 연동 생성 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      linkId:
+                        type: string
+                      issuerId:
+                        type: string
+                      status:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: 인증 필요
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 등록되지 않은 발급사
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 이미 연동된 카드사 계정 또는 카드
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/google/login:
     post:
       tags: [Auth]
