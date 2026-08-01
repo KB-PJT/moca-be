@@ -2,6 +2,9 @@ package com.moca.mocabe.global.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -10,6 +13,8 @@ import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.validation.Path;
@@ -66,6 +71,35 @@ class GlobalExceptionHandlerTest {
         assertError(handler.handleInvalidToken(new InvalidOpaqueTokenException()),
                 HttpStatus.UNAUTHORIZED, "INVALID_TOKEN");
         assertError(handler.handleUserNotFound(new UserNotFoundException()), HttpStatus.NOT_FOUND, "USER_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("등록되지 않은 발급사는 식별 가능한 404 오류로 변환한다")
+    void handlesIssuerNotFound() {
+        String issuerId = "00000000-0000-4000-8000-000000000301";
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleIssuerNotFound(
+                new IssuerNotFoundException(issuerId));
+
+        assertError(response, HttpStatus.NOT_FOUND, "ISSUER_NOT_FOUND");
+        assertEquals("등록되지 않은 발급사입니다: " + issuerId,
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("CODEF 필수정보 누락과 중복 연동을 식별 가능한 오류로 변환한다")
+    void handlesCodefCredentialErrors() {
+        Map<String, String> fields = new LinkedHashMap<String, String>();
+        fields.put("cardNo", "카드번호는 필수입니다.");
+
+        ResponseEntity<ApiErrorResponse> requiredResponse = handler.handleCodefCredentialRequired(
+                new CodefCredentialRequiredException(fields));
+        ResponseEntity<ApiErrorResponse> duplicateResponse = handler.handleCodefAccountAlreadyLinked(
+                new CodefAccountAlreadyLinkedException());
+
+        assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CODEF_CREDENTIAL_REQUIRED");
+        assertEquals("카드번호는 필수입니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
+        assertError(duplicateResponse, HttpStatus.CONFLICT, "CODEF_ACCOUNT_ALREADY_LINKED");
     }
 
     @Test

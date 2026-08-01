@@ -1,5 +1,8 @@
 package com.moca.mocabe.global.exception;
 
+import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -42,6 +45,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleUserNotFound(UserNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(IssuerNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleIssuerNotFound(IssuerNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "ISSUER_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(CodefCredentialRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefCredentialRequired(
+            CodefCredentialRequiredException exception) {
+        return error(HttpStatus.BAD_REQUEST, "CODEF_CREDENTIAL_REQUIRED",
+                exception.getMessage(), exception.getFields());
+    }
+
+    @ExceptionHandler(CodefAccountAlreadyLinkedException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefAccountAlreadyLinked(
+            CodefAccountAlreadyLinkedException exception) {
+        return error(HttpStatus.CONFLICT, "CODEF_ACCOUNT_ALREADY_LINKED", exception.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
