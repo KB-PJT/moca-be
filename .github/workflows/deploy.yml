@@ -110,7 +110,7 @@ jobs:
               echo "새 릴리스 상태 점검에 실패했습니다. 이전 릴리스로 복구합니다."
               if [ -n "$PREVIOUS_IMAGE" ]; then
                 cp "$ROLLBACK_FILE" "$COMPOSE_FILE"
-                if ! MOCA_IMAGE="$PREVIOUS_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans; then
+                if ! MOCA_IMAGE="$PREVIOUS_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --pull always --force-recreate --remove-orphans; then
                   echo "이전 릴리스 컨테이너 재기동에 실패했습니다."
                   rollback_failed=1
                 elif ! wait_for_health 10; then
@@ -136,7 +136,12 @@ jobs:
             --output "$COMPOSE_FILE.next"
           mv "$COMPOSE_FILE.next" "$COMPOSE_FILE"
           MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
-          MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+          MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --pull always --force-recreate --remove-orphans
+          RUNNING_IMAGE="$(docker inspect --format '{{.Config.Image}}' moca-api 2>/dev/null || true)"
+          if [ "$RUNNING_IMAGE" != "$MOCA_IMAGE" ]; then
+            echo "실행 이미지가 배포 대상과 다릅니다. expected=$MOCA_IMAGE actual=$RUNNING_IMAGE"
+            exit 1
+          fi
           wait_for_health 20
 
           trap - EXIT
