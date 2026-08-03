@@ -86,6 +86,21 @@ jobs:
 
           cp "$COMPOSE_FILE" "$ROLLBACK_FILE"
 
+          wait_for_health() {
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent --show-error --connect-timeout 3 --max-time 5 \
+                  http://127.0.0.1:8080/api/v1/health; then
+                return 0
+              fi
+              echo "health check 대기 중 (${attempt}/30)"
+              sleep 3
+            done
+            echo "health check에 실패했습니다. 컨테이너 상태와 로그를 출력합니다."
+            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps || true
+            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs --tail=100 moca-api || true
+            return 1
+          }
+
           rollback() {
             exit_code=$?
             rollback_failed=0
@@ -96,7 +111,7 @@ jobs:
                 if ! MOCA_IMAGE="$PREVIOUS_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans; then
                   echo "이전 릴리스 컨테이너 재기동에 실패했습니다."
                   rollback_failed=1
-                elif ! curl --fail --retry 20 --retry-delay 3 http://127.0.0.1:8080/api/v1/health; then
+                elif ! wait_for_health; then
                   echo "이전 릴리스 health check에도 실패했습니다."
                   rollback_failed=1
                 fi
@@ -120,7 +135,7 @@ jobs:
           mv "$COMPOSE_FILE.next" "$COMPOSE_FILE"
           MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
           MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
-          curl --fail --retry 20 --retry-delay 3 http://127.0.0.1:8080/api/v1/health
+          wait_for_health
 
           trap - EXIT
           rm -f "$ROLLBACK_FILE"
