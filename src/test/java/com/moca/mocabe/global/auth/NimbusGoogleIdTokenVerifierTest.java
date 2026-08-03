@@ -75,6 +75,22 @@ class NimbusGoogleIdTokenVerifierTest {
     }
 
     @Test
+    @DisplayName("Google issuer는 공식 URI와 레거시 도메인만 허용한다")
+    void validatesGoogleIssuer() {
+        NimbusGoogleIdTokenVerifier verifier = new NimbusGoogleIdTokenVerifier("client-id");
+        Jwt officialIssuer = mock(Jwt.class);
+        when(officialIssuer.getClaimAsString("iss")).thenReturn("https://accounts.google.com");
+        Jwt legacyIssuer = mock(Jwt.class);
+        when(legacyIssuer.getClaimAsString("iss")).thenReturn("accounts.google.com");
+        Jwt unknownIssuer = mock(Jwt.class);
+        when(unknownIssuer.getClaimAsString("iss")).thenReturn("https://accounts.example.com");
+
+        assertEquals(false, verifier.issuerValidator().validate(officialIssuer).hasErrors());
+        assertEquals(false, verifier.issuerValidator().validate(legacyIssuer).hasErrors());
+        assertEquals(true, verifier.issuerValidator().validate(unknownIssuer).hasErrors());
+    }
+
+    @Test
     @DisplayName("Google Client ID가 비어 있으면 ID Token 검증기를 만들 수 없다")
     void rejectsBlankClientId() {
         assertThrows(IllegalArgumentException.class, () -> new NimbusGoogleIdTokenVerifier(" "));
