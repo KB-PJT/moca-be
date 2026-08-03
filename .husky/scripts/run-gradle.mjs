@@ -6,7 +6,9 @@ export function runGradle(args, hookName) {
     const result = spawnSync(command, args, {
         cwd: process.cwd(),
         stdio: "inherit",
-        shell: isWindows
+        shell: isWindows,
+        timeout: 600000,
+        killSignal: "SIGTERM"
     });
 
     if (result.error) {

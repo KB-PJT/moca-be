@@ -2,6 +2,7 @@ package com.moca.mocabe.global.auth;
 
 import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
 import java.util.List;
+import java.util.Set;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -13,6 +14,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
 
     private static final String GOOGLE_ISSUER = "https://accounts.google.com";
+    private static final Set<String> GOOGLE_ISSUERS = Set.of(GOOGLE_ISSUER, "accounts.google.com");
     private static final String GOOGLE_JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs";
 
     private final NimbusJwtDecoder jwtDecoder;
@@ -24,7 +26,8 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
     NimbusGoogleIdTokenVerifier(NimbusJwtDecoder jwtDecoder, String clientId) {
         this.jwtDecoder = jwtDecoder;
         this.jwtDecoder.setJwtValidator(new DelegatingOAuth2TokenValidator<Jwt>(
-                org.springframework.security.oauth2.jwt.JwtValidators.createDefaultWithIssuer(GOOGLE_ISSUER),
+                org.springframework.security.oauth2.jwt.JwtValidators.createDefault(),
+                issuerValidator(),
                 audienceValidator(clientId)));
     }
 
@@ -37,10 +40,9 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
                 throw new InvalidGoogleIdTokenException();
             }
             return new GoogleIdTokenClaims(subject, jwt.getClaimAsString("email"), jwt.getClaimAsString("name"));
+        } catch (InvalidGoogleIdTokenException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
-            if (exception instanceof InvalidGoogleIdTokenException) {
-                throw exception;
-            }
             throw new InvalidGoogleIdTokenException();
         }
     }
@@ -56,6 +58,12 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
             }
             return OAuth2TokenValidatorResult.success();
         };
+    }
+
+    OAuth2TokenValidator<Jwt> issuerValidator() {
+        return token -> GOOGLE_ISSUERS.contains(token.getClaimAsString("iss"))
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"));
     }
 
     private static String requireClientId(String clientId) {
