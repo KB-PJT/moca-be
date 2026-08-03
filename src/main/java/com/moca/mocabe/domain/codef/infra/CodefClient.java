@@ -62,6 +62,10 @@ public class CodefClient {
 
         // CODEF는 응답 본문을 URL 인코딩해서 주므로 디코드 후 파싱한다
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
+        // HTTP 200이어도 result.code로 실패를 반환할 수 있어 connectedId 유무보다 먼저 확인한다.
+        if (!"CF-00000".equals(root.path("result").path("code").asText())) {
+            throw new IllegalStateException("CODEF Connected ID 발급 실패: " + root.path("result"));
+        }
         String connectedId = root.path("data").path("connectedId").asText("");
         if (connectedId.isBlank()) {
             throw new IllegalStateException("CODEF Connected ID 발급 실패: " + root.path("result"));

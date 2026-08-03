@@ -1,11 +1,15 @@
 package com.moca.mocabe.domain.codef.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
+import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
@@ -47,13 +51,36 @@ class CodefCredentialStoreTest {
     }
 
     @Test
-    @DisplayName("UNIQUE 충돌을 중복 연동 오류로 변환한다")
-    void convertsDuplicateKeyException() {
+    @DisplayName("자격정보 UNIQUE 충돌은 계정 중복 오류로 변환하고 원인 예외를 보존하며, 카드는 적재를 시도하지 않는다")
+    void convertsCredentialDuplicateKeyException() {
         CodefAccountCredential credential = new CodefAccountCredential();
-        org.mockito.Mockito.doThrow(new DuplicateKeyException("duplicate"))
-                .when(mapper).insertAccountCredential(credential);
+        LinkedCardInsert card = new LinkedCardInsert(
+                "uc-1", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+        DuplicateKeyException cause = new DuplicateKeyException("duplicate");
+        org.mockito.Mockito.doThrow(cause).when(mapper).insertAccountCredential(credential);
 
-        assertThrows(CodefAccountAlreadyLinkedException.class, () -> store.save(credential, List.of()));
+        CodefAccountAlreadyLinkedException exception = assertThrows(
+                CodefAccountAlreadyLinkedException.class, () -> store.save(credential, List.of(card)));
+
+        assertSame(cause, exception.getCause());
+        verifyNoInteractions(linkedCardMapper);
+    }
+
+    @Test
+    @DisplayName("보유카드 UNIQUE 충돌은 계정 중복이 아니라 카드 중복 오류로 구분하고 원인 예외를 보존한다")
+    void convertsCardDuplicateKeyExceptionSeparatelyFromCredential() {
+        CodefAccountCredential credential = new CodefAccountCredential();
+        LinkedCardInsert card = new LinkedCardInsert(
+                "uc-1", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+        DuplicateKeyException cause = new DuplicateKeyException("duplicate");
+        org.mockito.Mockito.doThrow(cause).when(linkedCardMapper).insertLinkedCard(
+                "uc-1", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+
+        CardAlreadyLinkedException exception = assertThrows(
+                CardAlreadyLinkedException.class, () -> store.save(credential, List.of(card)));
+
+        assertSame(cause, exception.getCause());
+        assertEquals("이미 등록된 보유카드입니다.", exception.getMessage());
     }
 
     @Test

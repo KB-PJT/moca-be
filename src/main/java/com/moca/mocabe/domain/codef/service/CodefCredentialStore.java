@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.codef.service;
 
+import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
@@ -23,15 +24,29 @@ public class CodefCredentialStore {
 
     @Transactional
     public void save(CodefAccountCredential credential, List<LinkedCardInsert> cards) {
+        insertCredential(credential);
+        for (LinkedCardInsert card : cards) {
+            insertCard(card);
+        }
+    }
+
+    private void insertCredential(CodefAccountCredential credential) {
         try {
             codefCredentialMapper.insertAccountCredential(credential);
-            for (LinkedCardInsert card : cards) {
-                linkedCardMapper.insertLinkedCard(card.userCardId(), card.linkId(), card.userId(),
-                        card.issuerId(), card.cardId(), card.cardNameFromCodef(), card.cardNo(),
-                        card.codefCardKeyHash(), card.displayOrder());
-            }
         } catch (DuplicateKeyException exception) {
-            throw new CodefAccountAlreadyLinkedException();
+            // credential_identity_hash UNIQUE 위반 = 같은 카드사 계정을 이미 연동함
+            throw new CodefAccountAlreadyLinkedException(exception);
+        }
+    }
+
+    private void insertCard(LinkedCardInsert card) {
+        try {
+            linkedCardMapper.insertLinkedCard(card.userCardId(), card.linkId(), card.userId(),
+                    card.issuerId(), card.cardId(), card.cardNameFromCodef(), card.cardNo(),
+                    card.codefCardKeyHash(), card.displayOrder());
+        } catch (DuplicateKeyException exception) {
+            // (user_id, codef_card_key_hash) UNIQUE 위반 = 계정이 아니라 이 카드 한 장이 이미 적재됨
+            throw new CardAlreadyLinkedException(exception);
         }
     }
 }

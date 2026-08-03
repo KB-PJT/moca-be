@@ -103,9 +103,11 @@ public class CardLinkService {
         List<CardLinkCardResponse> cards = new ArrayList<>();
         Set<String> cardKeyHashes = new HashSet<>();
         int displayOrder = linkedCardMapper.findNextDisplayOrder(userId);
+        // issuerId는 루프 내내 동일하므로 카탈로그는 한 번만 조회해 재사용한다(카드 수만큼 반복 조회하지 않도록).
+        List<CardCatalogEntry> catalog = cardCatalogMapper.findCardsByIssuerId(policy.getIssuerId());
         for (CodefOwnedCard ownedCard : ownedCards) {
             // 매칭 실패(matched == null)여도 응답엔 회색 카드로 노출하되, card_id NOT NULL이라 적재는 하지 않는다.
-            CardCatalogEntry matched = cardCatalogMatcher.match(policy.getIssuerId(), ownedCard.cardName());
+            CardCatalogEntry matched = cardCatalogMatcher.match(catalog, ownedCard.cardName());
             // 카드번호를 그대로 저장하지 않고 해시로 카드를 식별한다. 같은 카드가 중복 응답되면 한 건만 남긴다.
             String keySource = policy.getIssuerId() + ":" + ownedCard.cardNumber() + ":" + ownedCard.cardName();
             String cardKeyHash = credentialHasher.generate(HASH_TYPE_CODEF_CARD, keySource);
@@ -240,7 +242,7 @@ public class CardLinkService {
         credential.setCardPasswordEnc(encryptor.encrypt(request.getCardPassword()));
         credential.setBirthDateEnc(encryptor.encrypt(request.getBirthDate()));
         credential.setCredentialIdentityHash(credentialIdentityHash);
-        credential.setStatus("ACTIVE");
+        credential.setStatus("active");
         return credential;
     }
 

@@ -1,5 +1,6 @@
 package com.moca.mocabe.global.exception;
 
+import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
@@ -80,6 +81,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleCodefAccountAlreadyLinked(
             CodefAccountAlreadyLinkedException exception) {
         return error(HttpStatus.CONFLICT, "CODEF_ACCOUNT_ALREADY_LINKED", exception.getMessage());
+    }
+
+    @ExceptionHandler(CardAlreadyLinkedException.class)
+    public ResponseEntity<ApiErrorResponse> handleCardAlreadyLinked(CardAlreadyLinkedException exception) {
+        return error(HttpStatus.CONFLICT, "CARD_ALREADY_LINKED", exception.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

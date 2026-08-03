@@ -469,7 +469,7 @@ components:
           $ref: '#/components/schemas/CardLinkResponse'
     CardLinkResponse:
       type: object
-      required: [linkId, issuerId, status, cards]
+      required: [linkId, institutionCode, status, cards]
       properties:
         linkId:
           type: string

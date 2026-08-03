@@ -101,7 +101,7 @@ class CodefPersistenceIntegrationTest {
         assertEquals(USER_ID, findString("user_id", response.getLinkId()));
         assertEquals(ISSUER_ID, findString("issuer_id", response.getLinkId()));
         assertEquals(CONNECTED_ID, findString("connected_id", response.getLinkId()));
-        assertEquals("ACTIVE", findString("status", response.getLinkId()));
+        assertEquals("active", findString("status", response.getLinkId()));
         assertEquals(64, findString("credential_identity_hash", response.getLinkId()).length());
         assertEquals("tester", decrypt("account_id_enc", response.getLinkId()));
         assertEquals("secret-pw", decrypt("account_password_enc", response.getLinkId()));
@@ -126,7 +126,7 @@ class CodefPersistenceIntegrationTest {
     void activatesMatchedCardWithOption() {
         jdbcTemplate.update("INSERT INTO cards "
                         + "(card_id, issuer_id, card_type, first_seen_at, last_seen_at) "
-                        + "VALUES (?, ?, 'CHECK', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                        + "VALUES (?, ?, 'check', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 CARD_ID, ISSUER_ID);
         jdbcTemplate.update("INSERT INTO card_content_versions "
                         + "(content_version_id, card_id, content_sha256, name, image_url, "
@@ -267,9 +267,8 @@ class CodefPersistenceIntegrationTest {
         }
 
         @Bean
-        public CardCatalogMatcher cardCatalogMatcher(CardCatalogMapper cardCatalogMapper,
-                                                      CardNameNormalizer normalizer) {
-            return new CardCatalogMatcher(cardCatalogMapper, normalizer);
+        public CardCatalogMatcher cardCatalogMatcher(CardNameNormalizer normalizer) {
+            return new CardCatalogMatcher(normalizer);
         }
 
         @Bean

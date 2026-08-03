@@ -58,7 +58,7 @@ class UserCardSchemaIntegrationTest {
                 ISSUER_ID, "0301", "KB카드");
         jdbcTemplate.update("INSERT INTO cards "
                         + "(card_id, issuer_id, card_type, first_seen_at, last_seen_at) "
-                        + "VALUES (?, ?, 'CHECK', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                        + "VALUES (?, ?, 'check', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 CARD_ID, ISSUER_ID);
         jdbcTemplate.update("INSERT INTO card_content_versions "
                         + "(content_version_id, card_id, content_sha256, name, image_url, "
@@ -70,7 +70,7 @@ class UserCardSchemaIntegrationTest {
         jdbcTemplate.update("INSERT INTO codef_account_credentials "
                         + "(codef_account_credential_id, user_id, issuer_id, connected_id, "
                         + "credential_identity_hash, status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, 'ACTIVE', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                        + "VALUES (?, ?, ?, ?, ?, 'active', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 CODEF_ACCOUNT_CREDENTIAL_ID, USER_ID, ISSUER_ID,
                 "01980d6a-5c0c-7aaf-9b85-010203040522", CARD_KEY_HASH);
     }

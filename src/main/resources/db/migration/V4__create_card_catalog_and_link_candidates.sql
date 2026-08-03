@@ -10,6 +10,7 @@ CREATE TABLE cards (
     PRIMARY KEY (card_id),
     CONSTRAINT fk_cards_issuer
         FOREIGN KEY (issuer_id) REFERENCES issuers (issuer_id),
+    CONSTRAINT chk_cards_card_type CHECK (card_type IN ('credit', 'check')),
     INDEX idx_cards_issuer (issuer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -70,7 +71,9 @@ ALTER TABLE user_cards
 ALTER TABLE codef_account_credentials
     RENAME COLUMN credential_fingerprint TO credential_identity_hash,
     RENAME INDEX uk_codef_account_credentials_user_issuer_fingerprint
-        TO uk_codef_account_credentials_user_issuer_identity_hash;
+        TO uk_codef_account_credentials_user_issuer_identity_hash,
+    ADD CONSTRAINT chk_codef_account_credentials_status
+        CHECK (status IN ('active', 'expired', 'revoked'));
 
 CREATE TABLE card_option_groups (
     option_group_id CHAR(36) NOT NULL,

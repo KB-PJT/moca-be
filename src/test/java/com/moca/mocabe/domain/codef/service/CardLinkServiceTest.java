@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -107,7 +108,7 @@ class CardLinkServiceTest {
         CodefAccountCredential credential = credentialCaptor.getValue();
         assertEquals(response.getLinkId(), credential.getCodefAccountCredentialId());
         assertEquals("hash-1", credential.getCredentialIdentityHash());
-        assertEquals("ACTIVE", credential.getStatus());
+        assertEquals("active", credential.getStatus());
         assertNotNull(credential.getCardPasswordEnc());
     }
 
@@ -219,7 +220,8 @@ class CardLinkServiceTest {
         // 매칭 카드의 CODEF resCardType는 빈 값이지만, 카탈로그가 credit이므로 응답은 CREDIT이어야 한다.
         CardCatalogEntry matched = new CardCatalogEntry(
                 "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
-        when(cardCatalogMatcher.match(ISSUER_ID, "매칭 카드")).thenReturn(matched);
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
         when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of(
                 new CardOptionRow("group-1", "main", "혜택 팩", "choice-1", "a", "A팩"),
                 new CardOptionRow("group-1", "main", "혜택 팩", "choice-2", "b", "B팩")));
@@ -252,6 +254,8 @@ class CardLinkServiceTest {
         assertEquals("card-1", inserts.get(0).cardId());
         assertEquals("1111****2222", inserts.get(0).cardNo());
         assertEquals(first.userCardId(), inserts.get(0).userCardId());
+        // 보유카드 3장을 순회해도 카탈로그 조회는 한 번만 일어나야 한다(N+1 방지).
+        verify(cardCatalogMapper, times(1)).findCardsByIssuerId(ISSUER_ID);
     }
 
     @Test

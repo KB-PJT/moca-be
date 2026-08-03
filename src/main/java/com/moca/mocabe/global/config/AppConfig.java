@@ -126,9 +126,8 @@ public class AppConfig {
     }
 
     @Bean
-    public CardCatalogMatcher cardCatalogMatcher(CardCatalogMapper cardCatalogMapper,
-                                                  CardNameNormalizer cardNameNormalizer) {
-        return new CardCatalogMatcher(cardCatalogMapper, cardNameNormalizer);
+    public CardCatalogMatcher cardCatalogMatcher(CardNameNormalizer cardNameNormalizer) {
+        return new CardCatalogMatcher(cardNameNormalizer);
     }
 
     @Bean
