@@ -97,10 +97,9 @@ jobs:
               sleep 5
             done
             echo "health check에 실패했습니다. 컨테이너 상태와 로그를 출력합니다."
-            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps || true
+            docker ps -a --filter name=moca-api || true
             docker inspect --format 'container={{.Name}} status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} exit={{.State.ExitCode}}' moca-api || true
             docker logs --tail=200 moca-api || true
-            docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs --tail=100 moca-api || true
             return 1
           }
 
