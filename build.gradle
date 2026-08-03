@@ -59,6 +59,7 @@ dependencies {
     implementation("org.springframework.security:spring-security-config:${springSecurityVersion}")
     implementation("org.springframework.security:spring-security-web:${springSecurityVersion}")
     implementation("org.springframework.security:spring-security-oauth2-jose:${springSecurityVersion}")
+    implementation('ch.qos.logback:logback-classic:1.2.13')
     implementation('org.springframework.data:spring-data-redis:2.7.18')
     implementation('io.lettuce:lettuce-core:6.1.10.RELEASE')
     implementation('com.zaxxer:HikariCP:5.1.0')
