@@ -3,6 +3,8 @@ package com.moca.mocabe.global.exception;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
+import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
+import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -10,6 +12,8 @@ import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.validation.ConstraintViolationException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,6 +36,8 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger LOGGER = Logger.getLogger(GlobalExceptionHandler.class.getName());
+
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<ApiErrorResponse> handleAuthenticationRequired(
             AuthenticationRequiredException exception) {
@@ -51,6 +57,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IssuerNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleIssuerNotFound(IssuerNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, "ISSUER_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(CardLinkNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCardLinkNotFound(CardLinkNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "CARD_LINK_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCardSelectionException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCardSelection(InvalidCardSelectionException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_CARD_SELECTION", exception.getMessage());
     }
 
     @ExceptionHandler(CodefCredentialRequiredException.class)
@@ -137,6 +153,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
+        // 처리되지 않은 예외는 클라이언트에 감추되, 원인 추적을 위해 서버 로그에는 스택트레이스를 남긴다.
+        LOGGER.log(Level.SEVERE, "처리되지 않은 예외로 500을 반환합니다.", exception);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 내부 오류가 발생했습니다.");
     }
 
