@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
+import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,9 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
 import javax.crypto.Cipher;
 
 /**
@@ -26,6 +30,7 @@ public class CodefClient {
 
     private static final String RSA_TRANSFORMATION = "RSA/ECB/PKCS1Padding";
     private static final String LOGIN_TYPE_ID_PASSWORD = "1";
+    private static final Logger LOGGER = Logger.getLogger(CodefClient.class.getName());
 
     private final CodefHttpClient httpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -62,6 +67,58 @@ public class CodefClient {
             throw new IllegalStateException("CODEF Connected ID 발급 실패: " + root.path("result"));
         }
         return connectedId;
+    }
+
+    /** Connected ID로 개인 보유카드를 조회한다. */
+    public List<CodefOwnedCard> getOwnedCards(String connectedId, String organization) {
+        String accessToken = requestAccessToken();
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put("connectedId", connectedId);
+        request.put("organization", organization);
+        request.put("birthDate", "");
+        request.put("inquiryType", "0");
+
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Authorization", "Bearer " + accessToken);
+        headers.put("Content-Type", "application/json");
+        String responseBody = postSuccessful(
+                baseUrl + "/v1/kr/card/p/account/card-list", headers, request.toString());
+        JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
+        if (!"CF-00000".equals(root.path("result").path("code").asText())) {
+            throw new IllegalStateException("CODEF 보유카드 조회에 실패했습니다.");
+        }
+
+        List<CodefOwnedCard> cards = new ArrayList<>();
+        JsonNode data = root.path("data");
+        if (data.isArray()) {
+            for (JsonNode item : data) {
+                cards.add(toOwnedCard(item));
+            }
+        } else if (data.isObject() && data.hasNonNull("resCardName")) {
+            // 보유카드가 1장이면 CODEF는 배열이 아닌 단일 객체로 응답한다.
+            cards.add(toOwnedCard(data));
+        } else {
+            LOGGER.warning("CODEF 보유카드 data 형식을 해석할 수 없습니다. result=" + root.path("result")
+                    + ", dataType=" + data.getNodeType());
+            throw new IllegalStateException("CODEF 보유카드 응답 형식이 올바르지 않습니다.");
+        }
+        return cards;
+    }
+
+    private CodefOwnedCard toOwnedCard(JsonNode item) {
+        String cardName = item.path("resCardName").asText("").trim();
+        if (cardName.isEmpty()) {
+            throw new IllegalStateException("CODEF 보유카드 이름이 누락되었습니다.");
+        }
+        return new CodefOwnedCard(
+                cardName,
+                item.path("resCardNo").asText(""),
+                item.path("resCardType").asText(""),
+                blankToNull(item.path("resImageLink").asText(null)));
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private String requestAccessToken() {
