@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.codef.mapper.CardCatalogMapper">
+
+    <resultMap id="cardCatalogEntryMap" type="com.moca.mocabe.domain.codef.model.CardCatalogEntry">
+        <constructor>
+            <arg column="card_id" javaType="java.lang.String"/>
+            <arg column="issuer_id" javaType="java.lang.String"/>
+            <arg column="card_name" javaType="java.lang.String"/>
+            <arg column="card_type" javaType="java.lang.String"/>
+            <arg column="image_url" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="cardOptionRowMap" type="com.moca.mocabe.domain.codef.model.CardOptionRow">
+        <constructor>
+            <arg column="option_group_id" javaType="java.lang.String"/>
+            <arg column="group_key" javaType="java.lang.String"/>
+            <arg column="group_name" javaType="java.lang.String"/>
+            <arg column="option_choice_id" javaType="java.lang.String"/>
+            <arg column="choice_key" javaType="java.lang.String"/>
+            <arg column="choice_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 카드별 최신 콘텐츠 버전(가장 최근 last_seen_at, 동률이면 content_version_id 큰 것)만 유일하게 고른다. -->
+    <sql id="currentContentVersionJoin">
+        INNER JOIN card_content_versions cv ON cv.card_id = c.card_id
+            AND NOT EXISTS (
+                SELECT 1 FROM card_content_versions cv2
+                WHERE cv2.card_id = cv.card_id
+                  AND (cv2.last_seen_at > cv.last_seen_at
+                       OR (cv2.last_seen_at = cv.last_seen_at
+                           AND cv2.content_version_id > cv.content_version_id))
+            )
+    </sql>
+
+    <select id="findCardsByIssuerId" resultMap="cardCatalogEntryMap">
+        SELECT c.card_id, c.issuer_id, cv.name AS card_name, c.card_type, cv.image_url
+        FROM cards c
+        <include refid="currentContentVersionJoin"/>
+        WHERE c.issuer_id = #{issuerId}
+        ORDER BY c.card_id ASC
+    </select>
+
+    <select id="findCardById" resultMap="cardCatalogEntryMap">
+        SELECT c.card_id, c.issuer_id, cv.name AS card_name, c.card_type, cv.image_url
+        FROM cards c
+        <include refid="currentContentVersionJoin"/>
+        WHERE c.card_id = #{cardId}
+    </select>
+
+    <select id="findVerifiedOptionsByCardId" resultMap="cardOptionRowMap">
+        SELECT g.option_group_id, g.group_key, g.group_name,
+               c.option_choice_id, c.choice_key, c.choice_name
+        FROM card_option_groups g
+        INNER JOIN card_option_choices c ON c.option_group_id = g.option_group_id
+        WHERE g.card_id = #{cardId}
+          AND g.parse_status = 'verified'
+          AND c.parse_status = 'verified'
+        ORDER BY g.option_group_id ASC, c.option_choice_id ASC
+    </select>
+</mapper>

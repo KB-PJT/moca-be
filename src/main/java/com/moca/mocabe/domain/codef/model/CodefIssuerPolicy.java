@@ -5,6 +5,7 @@ public class CodefIssuerPolicy {
 
     private String issuerId;
     private String institutionCode;
+    private String issuerName;
     private boolean requiresId;
     private boolean requiresPassword;
     private boolean requiresCardNo;
@@ -25,6 +26,14 @@ public class CodefIssuerPolicy {
 
     public void setInstitutionCode(String institutionCode) {
         this.institutionCode = institutionCode;
+    }
+
+    public String getIssuerName() {
+        return issuerName;
+    }
+
+    public void setIssuerName(String issuerName) {
+        this.issuerName = issuerName;
     }
 
     public boolean isRequiresId() {
