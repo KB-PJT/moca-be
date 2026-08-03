@@ -88,17 +88,29 @@ jobs:
 
           rollback() {
             exit_code=$?
+            rollback_failed=0
             if [ "$exit_code" -ne 0 ]; then
               echo "새 릴리스 상태 점검에 실패했습니다. 이전 릴리스로 복구합니다."
               if [ -n "$PREVIOUS_IMAGE" ]; then
                 cp "$ROLLBACK_FILE" "$COMPOSE_FILE"
-                MOCA_IMAGE="$PREVIOUS_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans || true
-                curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8080/api/v1/health || true
+                if ! MOCA_IMAGE="$PREVIOUS_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans; then
+                  echo "이전 릴리스 컨테이너 재기동에 실패했습니다."
+                  rollback_failed=1
+                elif ! curl --fail --retry 20 --retry-delay 3 http://127.0.0.1:8080/api/v1/health; then
+                  echo "이전 릴리스 health check에도 실패했습니다."
+                  rollback_failed=1
+                fi
               else
                 echo "복구할 기존 컨테이너가 없어 롤백을 수행할 수 없습니다."
+                rollback_failed=1
               fi
             fi
             rm -f "$ROLLBACK_FILE"
+            trap - EXIT
+            if [ "$rollback_failed" -ne 0 ]; then
+              echo "롤백에 실패했습니다. 수동 복구가 필요합니다."
+              exit 1
+            fi
             exit "$exit_code"
           }
           trap rollback EXIT
@@ -108,11 +120,11 @@ jobs:
           mv "$COMPOSE_FILE.next" "$COMPOSE_FILE"
           MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
           MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
-          curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8080/api/v1/health
+          curl --fail --retry 20 --retry-delay 3 http://127.0.0.1:8080/api/v1/health
 
           trap - EXIT
           rm -f "$ROLLBACK_FILE"
-          docker image prune -f
+          docker image prune -af --filter "until=168h"
           SCRIPT
           )"
           SCRIPT_B64="$(printf '%s' "$REMOTE_SCRIPT" | base64 --wrap=0)"
