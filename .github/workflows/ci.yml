@@ -29,7 +29,16 @@ jobs:
           cache: gradle
 
       - name: Verify
-        run: ./gradlew clean check war --no-daemon
+        run: ./gradlew check war --no-daemon
+
+      - name: Pre-pull MySQL image for Testcontainers
+        run: |
+          for attempt in 1 2 3; do
+            docker pull mysql:8.0.36 && exit 0
+            echo "MySQL 이미지 pull 실패 (${attempt}/3), 10초 후 재시도합니다."
+            sleep 10
+          done
+          exit 1
 
       - name: Integration test with Testcontainers MySQL
         run: ./gradlew integrationTest --no-daemon
