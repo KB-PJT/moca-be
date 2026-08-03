@@ -2,6 +2,7 @@ package com.moca.mocabe.global.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
@@ -106,10 +107,13 @@ class GlobalExceptionHandlerTest {
                 new CodefCredentialRequiredException(fields));
         ResponseEntity<ApiErrorResponse> duplicateResponse = handler.handleCodefAccountAlreadyLinked(
                 new CodefAccountAlreadyLinkedException());
+        ResponseEntity<ApiErrorResponse> duplicateCardResponse = handler.handleCardAlreadyLinked(
+                new CardAlreadyLinkedException(new RuntimeException("cause")));
 
         assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CODEF_CREDENTIAL_REQUIRED");
         assertEquals("카드번호는 필수입니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
         assertError(duplicateResponse, HttpStatus.CONFLICT, "CODEF_ACCOUNT_ALREADY_LINKED");
+        assertError(duplicateCardResponse, HttpStatus.CONFLICT, "CARD_ALREADY_LINKED");
     }
 
     @Test

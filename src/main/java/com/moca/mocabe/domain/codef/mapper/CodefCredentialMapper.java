@@ -8,10 +8,13 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CodefCredentialMapper {
 
-    boolean existsByUserIdAndIssuerIdAndFingerprint(
+    boolean existsByUserIdAndIssuerIdAndIdentityHash(
             @Param("userId") String userId,
             @Param("issuerId") String issuerId,
-            @Param("credentialFingerprint") String credentialFingerprint);
+            @Param("credentialIdentityHash") String credentialIdentityHash);
 
     void insertAccountCredential(CodefAccountCredential credential);
+
+    String lockOwnedLink(@Param("linkId") String linkId,
+                         @Param("userId") String userId);
 }

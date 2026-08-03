@@ -12,7 +12,7 @@ class CreateCardLinkRequestTest {
     @DisplayName("문자열 표현에서 카드사 자격정보를 마스킹한다")
     void masksSensitiveCredentialsInToString() {
         CreateCardLinkRequest request = new CreateCardLinkRequest();
-        request.setIssuerId("issuer-1");
+        request.setInstitutionCode("0301");
         request.setId("login-id");
         request.setPassword("password");
         request.setCardNo("1234567890123456");
@@ -21,7 +21,7 @@ class CreateCardLinkRequestTest {
 
         String result = request.toString();
 
-        assertEquals("CreateCardLinkRequest{issuerId=issuer-1, id=[MASKED], "
+        assertEquals("CreateCardLinkRequest{institutionCode=0301, id=[MASKED], "
                 + "password=[MASKED], cardNo=[MASKED], cardPassword=[MASKED], "
                 + "birthDate=[MASKED]}", result);
         assertFalse(result.contains("login-id"));
