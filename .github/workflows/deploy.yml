@@ -75,9 +75,49 @@ jobs:
         run: |
           set -euo pipefail
 
-          COMMANDS="$(jq -cn --arg image "$MOCA_IMAGE" --arg commit "$GITHUB_SHA" '[
-            "set -euo pipefail",
-            "sudo -iu ec2-user bash -lc '\''cd /home/ec2-user/moca && curl --fail --silent --show-error --location https://raw.githubusercontent.com/KB-PJT/moca-be/\($commit)/docker-compose.prod.yml --output docker-compose.prod.yml.next && mv docker-compose.prod.yml.next docker-compose.prod.yml && MOCA_IMAGE=\"\($image)\" docker compose -f docker-compose.prod.yml --env-file /home/ec2-user/moca/.env pull && MOCA_IMAGE=\"\($image)\" docker compose -f docker-compose.prod.yml --env-file /home/ec2-user/moca/.env up -d --remove-orphans && curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8080/api/v1/health && docker image prune -f'\''"
+          REMOTE_SCRIPT="$(cat <<'SCRIPT'
+          set -euo pipefail
+
+          cd /home/ec2-user/moca
+          COMPOSE_FILE="docker-compose.prod.yml"
+          ROLLBACK_FILE="docker-compose.prod.yml.rollback"
+          ENV_FILE="/home/ec2-user/moca/.env"
+          PREVIOUS_IMAGE="$(docker inspect --format '{{.Config.Image}}' moca-api 2>/dev/null || true)"
+
+          cp "$COMPOSE_FILE" "$ROLLBACK_FILE"
+
+          rollback() {
+            exit_code=$?
+            if [ "$exit_code" -ne 0 ]; then
+              echo "새 릴리스 상태 점검에 실패했습니다. 이전 릴리스로 복구합니다."
+              if [ -n "$PREVIOUS_IMAGE" ]; then
+                cp "$ROLLBACK_FILE" "$COMPOSE_FILE"
+                MOCA_IMAGE="$PREVIOUS_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans || true
+                curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8080/api/v1/health || true
+              else
+                echo "복구할 기존 컨테이너가 없어 롤백을 수행할 수 없습니다."
+              fi
+            fi
+            rm -f "$ROLLBACK_FILE"
+            exit "$exit_code"
+          }
+          trap rollback EXIT
+
+          curl --fail --silent --show-error --location "https://raw.githubusercontent.com/KB-PJT/moca-be/$COMMIT_SHA/docker-compose.prod.yml" \
+            --output "$COMPOSE_FILE.next"
+          mv "$COMPOSE_FILE.next" "$COMPOSE_FILE"
+          MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
+          MOCA_IMAGE="$MOCA_IMAGE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --remove-orphans
+          curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8080/api/v1/health
+
+          trap - EXIT
+          rm -f "$ROLLBACK_FILE"
+          docker image prune -f
+          SCRIPT
+          )"
+          SCRIPT_B64="$(printf '%s' "$REMOTE_SCRIPT" | base64 --wrap=0)"
+          COMMANDS="$(jq -cn --arg script "$SCRIPT_B64" --arg image "$MOCA_IMAGE" --arg commit "$GITHUB_SHA" '[
+            "echo \($script) | base64 --decode | sudo -iu ec2-user env MOCA_IMAGE=\"\($image)\" COMMIT_SHA=\"\($commit)\" bash -s"
           ]')"
 
           COMMAND_ID="$(aws ssm send-command \
