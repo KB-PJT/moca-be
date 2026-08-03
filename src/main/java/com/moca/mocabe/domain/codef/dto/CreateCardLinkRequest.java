@@ -5,8 +5,8 @@ import javax.validation.constraints.NotBlank;
 /** CODEF 카드 연동(Connected ID 생성) 요청이다. */
 public class CreateCardLinkRequest {
 
-    @NotBlank(message = "발급사 식별자는 필수입니다.")
-    private String issuerId;
+    @NotBlank(message = "기관코드는 필수입니다.")
+    private String institutionCode;
 
     private String id;
 
@@ -18,12 +18,12 @@ public class CreateCardLinkRequest {
 
     private String birthDate;
 
-    public String getIssuerId() {
-        return issuerId;
+    public String getInstitutionCode() {
+        return institutionCode;
     }
 
-    public void setIssuerId(String issuerId) {
-        this.issuerId = issuerId;
+    public void setInstitutionCode(String institutionCode) {
+        this.institutionCode = institutionCode;
     }
 
     public String getId() {
@@ -68,7 +68,7 @@ public class CreateCardLinkRequest {
 
     @Override
     public String toString() {
-        return "CreateCardLinkRequest{issuerId=" + issuerId + ", id=[MASKED], "
+        return "CreateCardLinkRequest{institutionCode=" + institutionCode + ", id=[MASKED], "
                 + "password=[MASKED], cardNo=[MASKED], cardPassword=[MASKED], "
                 + "birthDate=[MASKED]}";
     }

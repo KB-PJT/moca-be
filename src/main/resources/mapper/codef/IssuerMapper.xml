@@ -7,6 +7,7 @@
     <resultMap id="codefIssuerPolicyMap" type="com.moca.mocabe.domain.codef.model.CodefIssuerPolicy">
         <id property="issuerId" column="issuer_id"/>
         <result property="institutionCode" column="institution_code"/>
+        <result property="issuerName" column="issuer_name"/>
         <result property="requiresId" column="requires_id"/>
         <result property="requiresPassword" column="requires_password"/>
         <result property="requiresCardNo" column="requires_card_no"/>
@@ -14,15 +15,16 @@
         <result property="requiresBirthDate" column="requires_birth_date"/>
     </resultMap>
 
-    <select id="findCodefPolicyByIssuerId" resultMap="codefIssuerPolicyMap">
+    <select id="findCodefPolicyByInstitutionCode" resultMap="codefIssuerPolicyMap">
         SELECT issuer_id,
                institution_code,
+               issuer_name,
                requires_id,
                requires_password,
                requires_card_no,
                requires_card_password,
                requires_birth_date
         FROM issuers
-        WHERE issuer_id = #{issuerId}
+        WHERE institution_code = #{institutionCode}
     </select>
 </mapper>

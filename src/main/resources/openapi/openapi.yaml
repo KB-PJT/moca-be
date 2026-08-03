@@ -17,6 +17,8 @@ tags:
     description: 인증 사용자 프로필과 개인 설정 관리
   - name: Card
     description: 인증 사용자의 보유 카드 관리
+  - name: CardLink
+    description: CODEF 연동과 보유 카드 선택 등록
   - name: Health
     description: 서버 상태 확인
 paths:
@@ -39,9 +41,10 @@ paths:
       tags: [CardLink]
       summary: CODEF 카드 연동(Connected ID) 생성
       description: |
-        카드사 자격정보로 CODEF Connected ID를 생성하고 연동 정보를 저장합니다.
+        카드사 자격정보로 CODEF Connected ID를 생성하고 보유카드를 조회합니다.
         비밀번호는 CODEF 공개키로 RSA 암호화해 전송하며, 저장 시 자격정보는 AES로 암호화합니다.
-        적재된 보유 카드 목록 반환은 후속 작업에서 확장합니다.
+        반환된 카드는 후보이며 아직 user_cards에 적재되지 않습니다. matched=false 카드는 추천에서 제외됩니다.
+        옵션 그룹은 파서 검증이 완료된 항목만 반환하며, 선택 카드 확정 시 그룹마다 하나를 골라야 합니다.
       operationId: createCardLink
       security:
         - MocaBearerAuth: []
@@ -51,12 +54,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [issuerId]
+              required: [institutionCode]
               properties:
-                issuerId:
+                institutionCode:
                   type: string
-                  format: uuid
-                  description: 발급사(카드사) 식별자. 서버가 CODEF 기관코드로 변환한다.
+                  description: 카드사 기관코드(issuers.institution_code, 예 "0301"). 서버가 내부 issuer_id로 변환합니다.
+                  example: "0301"
                 id:
                   type: string
                   description: 카드사 정책에 따라 필수입니다.
@@ -78,19 +81,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: object
-                    properties:
-                      linkId:
-                        type: string
-                      issuerId:
-                        type: string
-                      status:
-                        type: string
+                $ref: '#/components/schemas/CardLinkApiResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -107,6 +98,48 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: 이미 연동된 카드사 계정 또는 카드
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /card-links/{linkId}/cards:
+    patch:
+      tags: [CardLink]
+      summary: 적재된 보유카드 활성화 및 옵션 선택
+      description: 이미 적재된(비활성) 보유카드 중 지정한 카드를 활성화하고 선택형 카드의 옵션을 저장합니다. 신규 카드 적재나 원본 데이터 로딩은 하지 않습니다.
+      operationId: activateCardLinkCards
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: linkId
+          in: path
+          required: true
+          description: >-
+            연동 한 건(= 카드사 계정 자격정보)의 식별자로, codef_account_credential_id와 같습니다.
+            POST /card-links 응답의 linkId를 그대로 사용하며, 이 연동으로 적재된 user_cards만 활성화 대상이 됩니다.
+            (개별 카드 식별자 userCardId와는 다릅니다.)
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivateCardLinkCardsRequest'
+      responses:
+        '200':
+          description: 활성화 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivateCardLinkCardsApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          description: 본인 소유의 미확정 연동을 찾을 수 없음
           content:
             application/json:
               schema:
@@ -426,6 +459,155 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    CardLinkApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/CardLinkResponse'
+    CardLinkResponse:
+      type: object
+      required: [linkId, issuerId, status, cards]
+      properties:
+        linkId:
+          type: string
+          format: uuid
+          description: >-
+            이번 연동 한 건(카드사 계정 자격정보, codef_account_credential_id)의 식별자.
+            PATCH /card-links/{linkId}/cards의 경로 파라미터로 사용합니다.
+        institutionCode:
+          type: string
+          description: 카드사 기관코드(issuers.institution_code)
+          example: "0301"
+        status:
+          type: string
+          enum: [PENDING_CARD_ACTIVATION]
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardLinkCardResponse'
+    CardLinkCardResponse:
+      type: object
+      required: [userCardId, cardName, cardNo, institutionCode, issuerName, cardType, cardImageUrl,
+                 matched, supported, optionGroups]
+      properties:
+        userCardId:
+          type: string
+          format: uuid
+          nullable: true
+          description: 매칭 성공 카드만 is_active=false로 적재되어 값이 있고, 미매칭 카드는 null입니다.
+        cardId:
+          type: string
+          format: uuid
+          nullable: true
+        cardName:
+          type: string
+        cardNo:
+          type: string
+          nullable: true
+          description: CODEF resCardNo(마스킹된 카드번호, 예 "943646******1069")
+          example: "943646******1069"
+        institutionCode:
+          type: string
+          description: 카드사 기관코드(issuers.institution_code)
+        issuerName:
+          type: string
+        cardType:
+          type: string
+          enum: [CREDIT, CHECK, UNKNOWN]
+        cardImageUrl:
+          type: string
+          nullable: true
+          description: 카드고릴라 이미지 → 미매칭 시 CODEF 이미지 순. 둘 다 없으면 null이며 기본 이미지는 프론트가 처리합니다.
+        matched:
+          type: boolean
+        supported:
+          type: boolean
+          description: false이면 추천 계산에서 제외합니다.
+        optionGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardOptionGroupResponse'
+    CardOptionGroupResponse:
+      type: object
+      required: [optionGroupId, groupKey, groupName, choices]
+      properties:
+        optionGroupId:
+          type: string
+          format: uuid
+        groupKey:
+          type: string
+        groupName:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardOptionChoiceResponse'
+    CardOptionChoiceResponse:
+      type: object
+      required: [optionChoiceId, choiceKey, choiceName]
+      properties:
+        optionChoiceId:
+          type: string
+          format: uuid
+        choiceKey:
+          type: string
+        choiceName:
+          type: string
+    ActivateCardLinkCardsRequest:
+      type: object
+      required: [activeUserCardIds]
+      properties:
+        activeUserCardIds:
+          type: array
+          minItems: 1
+          description: 활성화할(이미 적재된) user_card_id 목록
+          items:
+            type: string
+            format: uuid
+        optionSelections:
+          type: array
+          description: 선택형 카드의 옵션 선택. 옵션 없는 카드만 활성화하면 생략 가능합니다.
+          items:
+            type: object
+            required: [userCardId]
+            properties:
+              userCardId:
+                type: string
+                format: uuid
+              optionSelections:
+                type: array
+                items:
+                  type: object
+                  required: [optionGroupId, optionChoiceId]
+                  properties:
+                    optionGroupId:
+                      type: string
+                      format: uuid
+                    optionChoiceId:
+                      type: string
+                      format: uuid
+    ActivateCardLinkCardsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            linkId:
+              type: string
+              format: uuid
+            activatedUserCardIds:
+              type: array
+              items:
+                type: string
+                format: uuid
+            activatedCount:
+              type: integer
     GoogleLoginRequest:
       type: object
       required: [idToken]
@@ -523,7 +705,7 @@ components:
             $ref: '#/components/schemas/MeCardItemResponse'
     MeCardItemResponse:
       type: object
-      required: [userCardId, cardName, issuerId, issuerName, cardImageUrl, memo]
+      required: [userCardId, cardName, cardNo, issuerId, issuerName, cardImageUrl, memo]
       properties:
         userCardId:
           type: string
@@ -532,6 +714,11 @@ components:
         cardName:
           type: string
           example: KB My WE:SH
+        cardNo:
+          type: string
+          nullable: true
+          description: CODEF resCardNo(마스킹된 카드번호)
+          example: "943646******1069"
         issuerId:
           type: string
           format: uuid
@@ -542,9 +729,8 @@ components:
           example: KB카드
         cardImageUrl:
           type: string
-          format: uri
           nullable: true
-          description: 카드 콘텐츠 테이블 연동 전에는 null입니다.
+          description: 카드 이미지 URL. 없으면 null이며 기본 이미지는 프론트가 처리합니다.
           example: https://example.com/card.png
         memo:
           type: string

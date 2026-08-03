@@ -5,12 +5,16 @@ import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.CodefHttpClient;
-import com.moca.mocabe.domain.codef.infra.CredentialFingerprintGenerator;
+import com.moca.mocabe.domain.codef.infra.CredentialHasher;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.infra.JdkCodefHttpClient;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
+import com.moca.mocabe.domain.codef.service.CardCatalogMatcher;
+import com.moca.mocabe.domain.codef.service.CardNameNormalizer;
+import com.moca.mocabe.domain.codef.mapper.CardCatalogMapper;
+import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
 import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
@@ -62,10 +66,10 @@ public class AppConfig {
     }
 
     @Bean
-    public CredentialFingerprintGenerator credentialFingerprintGenerator(Environment environment) {
+    public CredentialHasher credentialHasher(Environment environment) {
         byte[] key = Base64.getDecoder().decode(
-                requiredProperty(environment, "MOCA_CREDENTIAL_FINGERPRINT_KEY"));
-        return new CredentialFingerprintGenerator(key);
+                requiredProperty(environment, "MOCA_CREDENTIAL_HASH_KEY"));
+        return new CredentialHasher(key);
     }
 
     @Bean
@@ -100,15 +104,31 @@ public class AppConfig {
                                            CodefCredentialStore codefCredentialStore,
                                            IssuerMapper issuerMapper,
                                            Encryptor codefEncryptor,
-                                           CredentialFingerprintGenerator fingerprintGenerator) {
+                                           CredentialHasher credentialHasher,
+                                           CardCatalogMatcher cardCatalogMatcher,
+                                           CardCatalogMapper cardCatalogMapper,
+                                           LinkedCardMapper linkedCardMapper) {
         return new CardLinkService(
                 codefClient, codefCredentialMapper, codefCredentialStore,
-                issuerMapper, codefEncryptor, fingerprintGenerator);
+                issuerMapper, codefEncryptor, credentialHasher,
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper);
     }
 
     @Bean
-    public CodefCredentialStore codefCredentialStore(CodefCredentialMapper codefCredentialMapper) {
-        return new CodefCredentialStore(codefCredentialMapper);
+    public CodefCredentialStore codefCredentialStore(CodefCredentialMapper codefCredentialMapper,
+                                                       LinkedCardMapper linkedCardMapper) {
+        return new CodefCredentialStore(codefCredentialMapper, linkedCardMapper);
+    }
+
+    @Bean
+    public CardNameNormalizer cardNameNormalizer() {
+        return new CardNameNormalizer();
+    }
+
+    @Bean
+    public CardCatalogMatcher cardCatalogMatcher(CardCatalogMapper cardCatalogMapper,
+                                                  CardNameNormalizer cardNameNormalizer) {
+        return new CardCatalogMatcher(cardCatalogMapper, cardNameNormalizer);
     }
 
     @Bean
