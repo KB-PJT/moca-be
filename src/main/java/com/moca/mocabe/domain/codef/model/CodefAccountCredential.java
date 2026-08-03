@@ -1,0 +1,105 @@
+package com.moca.mocabe.domain.codef.model;
+
+/** codef_account_credentials 테이블의 CODEF 연동·암호화 자격정보를 나타내는 MyBatis 모델이다. */
+public class CodefAccountCredential {
+
+    private String codefAccountCredentialId;
+    private String userId;
+    private String issuerId;
+    private String connectedId;
+    private byte[] accountIdEnc;
+    private byte[] accountPasswordEnc;
+    private byte[] cardNumberEnc;
+    private byte[] cardPasswordEnc;
+    private byte[] birthDateEnc;
+    private String credentialFingerprint;
+    private String status;
+
+    public String getCodefAccountCredentialId() {
+        return codefAccountCredentialId;
+    }
+
+    public void setCodefAccountCredentialId(String codefAccountCredentialId) {
+        this.codefAccountCredentialId = codefAccountCredentialId;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public String getIssuerId() {
+        return issuerId;
+    }
+
+    public void setIssuerId(String issuerId) {
+        this.issuerId = issuerId;
+    }
+
+    public String getConnectedId() {
+        return connectedId;
+    }
+
+    public void setConnectedId(String connectedId) {
+        this.connectedId = connectedId;
+    }
+
+    public byte[] getAccountIdEnc() {
+        return accountIdEnc;
+    }
+
+    public void setAccountIdEnc(byte[] accountIdEnc) {
+        this.accountIdEnc = accountIdEnc;
+    }
+
+    public byte[] getAccountPasswordEnc() {
+        return accountPasswordEnc;
+    }
+
+    public void setAccountPasswordEnc(byte[] accountPasswordEnc) {
+        this.accountPasswordEnc = accountPasswordEnc;
+    }
+
+    public byte[] getCardNumberEnc() {
+        return cardNumberEnc;
+    }
+
+    public void setCardNumberEnc(byte[] cardNumberEnc) {
+        this.cardNumberEnc = cardNumberEnc;
+    }
+
+    public byte[] getCardPasswordEnc() {
+        return cardPasswordEnc;
+    }
+
+    public void setCardPasswordEnc(byte[] cardPasswordEnc) {
+        this.cardPasswordEnc = cardPasswordEnc;
+    }
+
+    public byte[] getBirthDateEnc() {
+        return birthDateEnc;
+    }
+
+    public void setBirthDateEnc(byte[] birthDateEnc) {
+        this.birthDateEnc = birthDateEnc;
+    }
+
+    public String getCredentialFingerprint() {
+        return credentialFingerprint;
+    }
+
+    public void setCredentialFingerprint(String credentialFingerprint) {
+        this.credentialFingerprint = credentialFingerprint;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+}

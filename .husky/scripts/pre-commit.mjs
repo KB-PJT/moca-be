@@ -15,4 +15,4 @@ if (result.status !== 0) {
     process.exit(result.status ?? 1);
 }
 
-runGradle(["checkstyleMain", "checkstyleTest"], "pre-commit");
+runGradle(["check"], "pre-commit");

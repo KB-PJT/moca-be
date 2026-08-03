@@ -8,7 +8,6 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 /** Google Discovery JWKS를 사용해 ID Token의 서명과 iss, aud, exp를 검증한다. */
@@ -41,7 +40,9 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
                 throw new InvalidGoogleIdTokenException();
             }
             return new GoogleIdTokenClaims(subject, jwt.getClaimAsString("email"), jwt.getClaimAsString("name"));
-        } catch (JwtException exception) {
+        } catch (InvalidGoogleIdTokenException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
             throw new InvalidGoogleIdTokenException();
         }
     }

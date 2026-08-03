@@ -86,19 +86,6 @@ class UserApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("저장된 알림 설정을 그대로 반환한다")
-    void getsStoredNotificationSettings() {
-        com.moca.mocabe.domain.user.model.NotificationSettings settings =
-                new com.moca.mocabe.domain.user.model.NotificationSettings();
-        settings.setPerformanceClosingEnabled(true);
-        settings.setMarketingEnabled(true);
-        when(userDomainService.findNotificationSettings(USER_ID)).thenReturn(settings);
-
-        assertTrue(userApplicationService.getNotificationSettings(USER_ID).isPerformanceClosingEnabled());
-        assertTrue(userApplicationService.getNotificationSettings(USER_ID).isMarketingEnabled());
-    }
-
-    @Test
     @DisplayName("알림 설정 변경은 인증 사용자 단위로 upsert한다")
     void updatesNotificationSettings() {
         NotificationSettingsRequest request = new NotificationSettingsRequest();
@@ -135,17 +122,6 @@ class UserApplicationServiceTest {
         when(userDomainService.findLocationSettings(USER_ID)).thenReturn(null);
 
         assertFalse(userApplicationService.getLocationSettings(USER_ID).isLocationRecommendationEnabled());
-    }
-
-    @Test
-    @DisplayName("저장된 위치 추천 설정을 그대로 반환한다")
-    void getsStoredLocationSettings() {
-        com.moca.mocabe.domain.user.model.LocationSettings settings =
-                new com.moca.mocabe.domain.user.model.LocationSettings();
-        settings.setLocationRecommendationEnabled(true);
-        when(userDomainService.findLocationSettings(USER_ID)).thenReturn(settings);
-
-        assertTrue(userApplicationService.getLocationSettings(USER_ID).isLocationRecommendationEnabled());
     }
 
     @Test

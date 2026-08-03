@@ -20,7 +20,9 @@ public class RedisConfig {
         String host = environment.getProperty("MOCA_REDIS_HOST", "localhost");
         int port = Integer.parseInt(environment.getProperty("MOCA_REDIS_PORT", "6379"));
         RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration(host, port);
-        int defaultDatabase = environment.matchesProfiles("local-test") ? 1 : 0;
+        boolean localTestProfile = environment.matchesProfiles("local-test")
+                || "local-test".equals(environment.getProperty("MOCA_PROFILE"));
+        int defaultDatabase = localTestProfile ? 1 : 0;
         int database = environment.getProperty("MOCA_REDIS_DATABASE", Integer.class, defaultDatabase);
         configuration.setDatabase(database);
         String password = environment.getProperty("MOCA_REDIS_PASSWORD", "");

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.card.mapper.UserCardMapper">
+
+    <resultMap id="userCardListRowResultMap" type="com.moca.mocabe.domain.card.model.UserCardListRow">
+        <id property="userCardId" column="user_card_id"/>
+        <result property="cardName" column="card_name"/>
+        <result property="issuerId" column="issuer_id"/>
+        <result property="issuerName" column="issuer_name"/>
+        <result property="cardImageUrl" column="card_image_url"/>
+        <result property="memo" column="memo"/>
+    </resultMap>
+
+    <sql id="userCardColumns">
+        uc.user_card_id,
+        uc.card_name_from_codef AS card_name,
+        i.issuer_id,
+        i.issuer_name,
+        <!-- FIXME: 카드 콘텐츠 테이블 연동 후 실제 카드 이미지 URL 조회로 교체한다. -->
+        NULL AS card_image_url,
+        uc.memo
+    </sql>
+
+    <sql id="userCardCondition">
+        uc.user_id = #{userId}
+    </sql>
+
+    <select id="findActiveByUserId" resultMap="userCardListRowResultMap">
+        SELECT
+            <include refid="userCardColumns"/>
+        FROM user_cards uc
+        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        WHERE
+            <include refid="userCardCondition"/>
+            AND uc.is_active = TRUE
+        ORDER BY uc.display_order ASC, uc.user_card_id ASC
+    </select>
+
+    <select id="findInactiveByUserId" resultMap="userCardListRowResultMap">
+        SELECT
+            <include refid="userCardColumns"/>
+        FROM user_cards uc
+        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        WHERE
+            <include refid="userCardCondition"/>
+            AND uc.is_active = FALSE
+        ORDER BY uc.display_order ASC, uc.user_card_id ASC
+    </select>
+</mapper>

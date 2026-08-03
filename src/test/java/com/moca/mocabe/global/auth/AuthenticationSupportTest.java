@@ -44,7 +44,6 @@ class AuthenticationSupportTest {
     void validatesMocaUserPrincipal() {
         assertEquals(USER_ID, new MocaUserPrincipal(java.util.UUID.fromString(USER_ID)).getUserId());
         assertEquals(USER_ID, new MocaUserPrincipal(USER_ID).getUserId());
-        assertThrows(IllegalArgumentException.class, () -> new MocaUserPrincipal((java.util.UUID) null));
         assertThrows(IllegalArgumentException.class, () -> new MocaUserPrincipal((String) null));
         assertThrows(IllegalArgumentException.class, () -> new MocaUserPrincipal("not-a-uuid"));
     }

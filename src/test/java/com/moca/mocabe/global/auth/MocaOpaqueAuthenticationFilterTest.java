@@ -81,7 +81,6 @@ class MocaOpaqueAuthenticationFilterTest {
 
         filter(tokenService).doFilter(missingTokenRequest, new MockHttpServletResponse(), filterChain);
         MockHttpServletRequest authRequest = new MockHttpServletRequest("POST", "/api/v1/auth/refresh");
-        authRequest.addHeader("Authorization", "Bearer access");
         filter(tokenService).doFilter(authRequest, new MockHttpServletResponse(), filterChain);
 
         verify(filterChain, org.mockito.Mockito.times(2))

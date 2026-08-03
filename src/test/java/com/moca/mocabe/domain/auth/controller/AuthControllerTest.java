@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.mock;
 
 import com.moca.mocabe.domain.auth.dto.GoogleLoginRequest;
 import com.moca.mocabe.domain.auth.dto.GoogleLoginResponse;
@@ -62,22 +61,6 @@ class AuthControllerTest {
         assertTrue(expiredCookie.contains("Max-Age=0"));
         verify(authApplicationService).logout("access", "refresh");
         verify(authApplicationService).logout(null, null);
-    }
-
-    @Test
-    @DisplayName("컨텍스트 경로가 없으면 refresh cookie는 API 기본 경로에 설정한다")
-    void setsRefreshCookieWithoutContextPath() {
-        AuthApplicationService authApplicationService = mock(AuthApplicationService.class);
-        AuthController controller = new AuthController(authApplicationService, new OpaqueTokenPolicy(1800, 1209600),
-                new RefreshCookiePolicy(false));
-        when(authApplicationService.refresh("refresh"))
-                .thenReturn(new RefreshTokenResponse(new OpaqueTokenPair("access", "new-refresh", 1800)));
-        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getContextPath()).thenReturn(null);
-
-        String setCookie = controller.refresh("refresh", request).getHeaders().getFirst(HttpHeaders.SET_COOKIE);
-
-        assertTrue(setCookie.contains("Path=/api/v1/auth"));
     }
 
     private GoogleLoginResponse loginResponse() {

@@ -1,6 +1,7 @@
 package com.moca.mocabe.global.config;
 
 import com.moca.mocabe.domain.user.mapper.UserMapper;
+import java.time.Duration;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -23,12 +24,23 @@ import org.testcontainers.utility.DockerImageName;
 @MapperScan(basePackageClasses = UserMapper.class, sqlSessionFactoryRef = "testSqlSessionFactory")
 public class TestcontainersMySqlConfig {
 
-    @Bean(initMethod = "start", destroyMethod = "stop")
+    private static final MySQLContainer MYSQL_CONTAINER = createMySqlContainer();
+
+    static {
+        MYSQL_CONTAINER.start();
+    }
+
+    @Bean(destroyMethod = "")
     public MySQLContainer mysqlContainer() {
+        return MYSQL_CONTAINER;
+    }
+
+    private static MySQLContainer createMySqlContainer() {
         return new MySQLContainer(DockerImageName.parse("mysql:8.0.36"))
                 .withDatabaseName("moca_test")
                 .withUsername("moca")
-                .withPassword("moca");
+                .withPassword("moca")
+                .withStartupTimeout(Duration.ofMinutes(3));
     }
 
     @Bean

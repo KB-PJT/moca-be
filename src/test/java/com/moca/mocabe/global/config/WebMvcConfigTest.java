@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
+import com.moca.mocabe.domain.card.service.CardQueryService;
+import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenPolicy;
@@ -91,7 +93,14 @@ class WebMvcConfigTest {
                 .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
                         .contains("/health:")))
                 .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
-                        .contains("MocaBearerAuth:")));
+                        .contains("MocaBearerAuth:")))
+                .andExpect(result -> {
+                    String specification = result.getResponse().getContentAsString();
+                    int cardLinkOperation = specification.indexOf("operationId: createCardLink");
+                    int cardLinkRequestBody = specification.indexOf("requestBody:", cardLinkOperation);
+                    String cardLinkSecurity = specification.substring(cardLinkOperation, cardLinkRequestBody);
+                    assertTrue(cardLinkSecurity.contains("- MocaBearerAuth: []"));
+                });
     }
 
     /** MVC·Swagger 단위 테스트에 필요한 Controller 의존성만 Mock으로 제공한다. */
@@ -106,6 +115,16 @@ class WebMvcConfigTest {
         @Bean
         public UserApplicationService userApplicationService() {
             return org.mockito.Mockito.mock(UserApplicationService.class);
+        }
+
+        @Bean
+        public CardQueryService cardQueryService() {
+            return org.mockito.Mockito.mock(CardQueryService.class);
+        }
+
+        @Bean
+        public CardLinkService cardLinkService() {
+            return org.mockito.Mockito.mock(CardLinkService.class);
         }
 
         @Bean
