@@ -87,13 +87,13 @@ jobs:
           cp "$COMPOSE_FILE" "$ROLLBACK_FILE"
 
           wait_for_health() {
-            for attempt in $(seq 1 30); do
-              if curl --fail --silent --show-error --connect-timeout 3 --max-time 5 \
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent --show-error --connect-timeout 5 --max-time 10 \
                   http://127.0.0.1:8080/api/v1/health; then
                 return 0
               fi
-              echo "health check 대기 중 (${attempt}/30)"
-              sleep 3
+              echo "health check 대기 중 (${attempt}/60)"
+              sleep 5
             done
             echo "health check에 실패했습니다. 컨테이너 상태와 로그를 출력합니다."
             docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps || true
@@ -148,18 +148,18 @@ jobs:
           COMMANDS="$(jq -cn --arg script "$SCRIPT_B64" --arg image "$MOCA_IMAGE" --arg commit "$GITHUB_SHA" '[
             "echo \($script) | base64 --decode | sudo -iu ec2-user env MOCA_IMAGE=\"\($image)\" COMMIT_SHA=\"\($commit)\" bash -s"
           ]')"
-          PARAMETERS="$(jq -cn --argjson commands "$COMMANDS" '{commands: $commands, executionTimeout: ["300"]}')"
+          PARAMETERS="$(jq -cn --argjson commands "$COMMANDS" '{commands: $commands, executionTimeout: ["600"]}')"
 
           COMMAND_ID="$(aws ssm send-command \
             --document-name AWS-RunShellScript \
             --instance-ids "$EC2_INSTANCE_ID" \
             --comment "Deploy MOCA ${GITHUB_SHA}" \
-            --timeout-seconds 300 \
+            --timeout-seconds 600 \
             --parameters "$PARAMETERS" \
             --query 'Command.CommandId' \
             --output text)"
 
-          for attempt in $(seq 1 120); do
+          for attempt in $(seq 1 150); do
             STATUS="$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$EC2_INSTANCE_ID" \
@@ -173,7 +173,7 @@ jobs:
                 exit 1
                 ;;
             esac
-            if [ "$attempt" -eq 120 ]; then
+            if [ "$attempt" -eq 150 ]; then
               aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID"
               exit 1
             fi
