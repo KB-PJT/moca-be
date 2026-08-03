@@ -7,6 +7,7 @@ public class MeCardItemResponse {
 
     private final String userCardId;
     private final String cardName;
+    private final String cardNo;
     private final String issuerId;
     private final String issuerName;
     private final String cardImageUrl;
@@ -15,6 +16,7 @@ public class MeCardItemResponse {
     public MeCardItemResponse(UserCardListRow cardRow) {
         this.userCardId = cardRow.getUserCardId();
         this.cardName = cardRow.getCardName();
+        this.cardNo = cardRow.getCardNo();
         this.issuerId = cardRow.getIssuerId();
         this.issuerName = cardRow.getIssuerName();
         this.cardImageUrl = cardRow.getCardImageUrl();
@@ -27,6 +29,10 @@ public class MeCardItemResponse {
 
     public String getCardName() {
         return cardName;
+    }
+
+    public String getCardNo() {
+        return cardNo;
     }
 
     public String getIssuerId() {

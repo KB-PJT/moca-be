@@ -29,6 +29,8 @@ class UserCardSchemaIntegrationTest {
     private static final String ANOTHER_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040532";
     private static final String CODEF_ACCOUNT_CREDENTIAL_ID = "01980d6a-5c0c-7aaf-9b85-010203040521";
     private static final String ISSUER_ID = "00000000-0000-4000-8000-000000000301";
+    private static final String CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040601";
+    private static final String CONTENT_VERSION_ID = "01980d6a-5c0c-7aaf-9b85-010203040611";
     private static final String CARD_KEY_HASH =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private static final String ANOTHER_CARD_KEY_HASH =
@@ -54,10 +56,21 @@ class UserCardSchemaIntegrationTest {
                         + "VALUES (?, ?, ?, TRUE, TRUE, TRUE, TRUE, TRUE, "
                         + "UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 ISSUER_ID, "0301", "KB카드");
+        jdbcTemplate.update("INSERT INTO cards "
+                        + "(card_id, issuer_id, card_type, first_seen_at, last_seen_at) "
+                        + "VALUES (?, ?, 'check', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                CARD_ID, ISSUER_ID);
+        jdbcTemplate.update("INSERT INTO card_content_versions "
+                        + "(content_version_id, card_id, content_sha256, name, image_url, "
+                        + "first_seen_at, last_seen_at) "
+                        + "VALUES (?, ?, ?, ?, NULL, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                CONTENT_VERSION_ID, CARD_ID,
+                "0000000000000000000000000000000000000000000000000000000000000000",
+                "노리2 체크카드(KB Pay)");
         jdbcTemplate.update("INSERT INTO codef_account_credentials "
                         + "(codef_account_credential_id, user_id, issuer_id, connected_id, "
-                        + "credential_fingerprint, status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, 'ACTIVE', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                        + "credential_identity_hash, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, 'active', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 CODEF_ACCOUNT_CREDENTIAL_ID, USER_ID, ISSUER_ID,
                 "01980d6a-5c0c-7aaf-9b85-010203040522", CARD_KEY_HASH);
     }
@@ -87,7 +100,7 @@ class UserCardSchemaIntegrationTest {
                 "SELECT institution_code FROM issuers WHERE issuer_id = ?",
                 String.class, ISSUER_ID));
         assertEquals(1, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '2' AND success = TRUE",
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '4' AND success = TRUE",
                 Integer.class));
     }
 
@@ -105,14 +118,16 @@ class UserCardSchemaIntegrationTest {
                         + "(user_card_id, user_id, card_id, codef_account_credential_id, "
                         + "card_name_from_codef, issuer_id, "
                         + "display_order, is_active, codef_card_key_hash, memo, created_at, updated_at) "
-                        + "VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                userCardId, USER_ID, CODEF_ACCOUNT_CREDENTIAL_ID, "KB My WE:SH",
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                userCardId, USER_ID, CARD_ID, CODEF_ACCOUNT_CREDENTIAL_ID, "KB My WE:SH",
                 ISSUER_ID, displayOrder, active, cardKeyHash);
     }
 
     private void deleteTestData() {
         jdbcTemplate.update("DELETE FROM user_cards");
         jdbcTemplate.update("DELETE FROM codef_account_credentials");
+        jdbcTemplate.update("DELETE FROM card_content_versions");
+        jdbcTemplate.update("DELETE FROM cards");
         jdbcTemplate.update("DELETE FROM issuers");
         jdbcTemplate.update("DELETE FROM user_notification_settings");
         jdbcTemplate.update("DELETE FROM users");

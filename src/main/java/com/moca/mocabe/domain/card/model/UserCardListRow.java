@@ -5,6 +5,7 @@ public class UserCardListRow {
 
     private String userCardId;
     private String cardName;
+    private String cardNo;
     private String issuerId;
     private String issuerName;
     private String cardImageUrl;
@@ -24,6 +25,14 @@ public class UserCardListRow {
 
     public void setCardName(String cardName) {
         this.cardName = cardName;
+    }
+
+    public String getCardNo() {
+        return cardNo;
+    }
+
+    public void setCardNo(String cardNo) {
+        this.cardNo = cardNo;
     }
 
     public String getIssuerId() {

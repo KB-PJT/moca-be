@@ -12,7 +12,7 @@ public class CodefAccountCredential {
     private byte[] cardNumberEnc;
     private byte[] cardPasswordEnc;
     private byte[] birthDateEnc;
-    private String credentialFingerprint;
+    private String credentialIdentityHash;
     private String status;
 
     public String getCodefAccountCredentialId() {
@@ -87,12 +87,12 @@ public class CodefAccountCredential {
         this.birthDateEnc = birthDateEnc;
     }
 
-    public String getCredentialFingerprint() {
-        return credentialFingerprint;
+    public String getCredentialIdentityHash() {
+        return credentialIdentityHash;
     }
 
-    public void setCredentialFingerprint(String credentialFingerprint) {
-        this.credentialFingerprint = credentialFingerprint;
+    public void setCredentialIdentityHash(String credentialIdentityHash) {
+        this.credentialIdentityHash = credentialIdentityHash;
     }
 
     public String getStatus() {
