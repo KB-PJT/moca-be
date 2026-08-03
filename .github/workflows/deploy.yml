@@ -148,13 +148,14 @@ jobs:
           COMMANDS="$(jq -cn --arg script "$SCRIPT_B64" --arg image "$MOCA_IMAGE" --arg commit "$GITHUB_SHA" '[
             "echo \($script) | base64 --decode | sudo -iu ec2-user env MOCA_IMAGE=\"\($image)\" COMMIT_SHA=\"\($commit)\" bash -s"
           ]')"
+          PARAMETERS="$(jq -cn --argjson commands "$COMMANDS" '{commands: $commands, executionTimeout: ["300"]}')"
 
           COMMAND_ID="$(aws ssm send-command \
             --document-name AWS-RunShellScript \
             --instance-ids "$EC2_INSTANCE_ID" \
             --comment "Deploy MOCA ${GITHUB_SHA}" \
             --timeout-seconds 300 \
-            --parameters commands="$COMMANDS" \
+            --parameters "$PARAMETERS" \
             --query 'Command.CommandId' \
             --output text)"
 
