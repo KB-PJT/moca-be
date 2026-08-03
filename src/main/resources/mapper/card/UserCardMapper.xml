@@ -7,6 +7,7 @@
     <resultMap id="userCardListRowResultMap" type="com.moca.mocabe.domain.card.model.UserCardListRow">
         <id property="userCardId" column="user_card_id"/>
         <result property="cardName" column="card_name"/>
+        <result property="cardNo" column="card_no"/>
         <result property="issuerId" column="issuer_id"/>
         <result property="issuerName" column="issuer_name"/>
         <result property="cardImageUrl" column="card_image_url"/>
@@ -15,12 +16,26 @@
 
     <sql id="userCardColumns">
         uc.user_card_id,
-        uc.card_name_from_codef AS card_name,
+        COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
+        uc.card_no,
         i.issuer_id,
         i.issuer_name,
-        <!-- FIXME: 카드 콘텐츠 테이블 연동 후 실제 카드 이미지 URL 조회로 교체한다. -->
-        NULL AS card_image_url,
+        NULLIF(cv.image_url, '') AS card_image_url,
         uc.memo
+    </sql>
+
+    <!-- 카드별 최신 콘텐츠 버전(가장 최근 last_seen_at, 동률이면 content_version_id 큰 것)만 연결한다. -->
+    <sql id="userCardJoins">
+        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        INNER JOIN cards c ON c.card_id = uc.card_id
+        LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
+            AND NOT EXISTS (
+                SELECT 1 FROM card_content_versions cv2
+                WHERE cv2.card_id = cv.card_id
+                  AND (cv2.last_seen_at > cv.last_seen_at
+                       OR (cv2.last_seen_at = cv.last_seen_at
+                           AND cv2.content_version_id > cv.content_version_id))
+            )
     </sql>
 
     <sql id="userCardCondition">
@@ -31,7 +46,7 @@
         SELECT
             <include refid="userCardColumns"/>
         FROM user_cards uc
-        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        <include refid="userCardJoins"/>
         WHERE
             <include refid="userCardCondition"/>
             AND uc.is_active = TRUE
@@ -42,7 +57,7 @@
         SELECT
             <include refid="userCardColumns"/>
         FROM user_cards uc
-        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        <include refid="userCardJoins"/>
         WHERE
             <include refid="userCardCondition"/>
             AND uc.is_active = FALSE
