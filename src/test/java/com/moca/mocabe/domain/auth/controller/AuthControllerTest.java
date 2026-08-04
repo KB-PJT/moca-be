@@ -28,8 +28,11 @@ class AuthControllerTest {
         AuthController controller = new AuthController(authApplicationService, new OpaqueTokenPolicy(1800, 1209600),
                 new RefreshCookiePolicy(false));
         GoogleLoginRequest request = new GoogleLoginRequest();
-        request.setIdToken("google-id-token");
-        when(authApplicationService.login("google-id-token")).thenReturn(loginResponse());
+        request.setCode("google-code");
+        request.setCodeVerifier("code-verifier");
+        request.setRedirectUri("http://localhost:5173/auth/callback");
+        when(authApplicationService.login("google-code", "code-verifier", "http://localhost:5173/auth/callback"))
+                .thenReturn(loginResponse());
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         servletRequest.setContextPath("/moca-be");
 

@@ -7,8 +7,8 @@ import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
-import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
+import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
 import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", exception.getMessage());
     }
 
-    @ExceptionHandler({InvalidGoogleIdTokenException.class, InvalidOpaqueTokenException.class})
+    @ExceptionHandler({InvalidOpaqueTokenException.class, GoogleAuthorizationCodeException.class})
     public ResponseEntity<ApiErrorResponse> handleInvalidToken(RuntimeException exception) {
         return error(HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", exception.getMessage());
     }
