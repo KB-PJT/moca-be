@@ -19,6 +19,8 @@ tags:
     description: 인증 사용자의 보유 카드 관리
   - name: CardLink
     description: CODEF 연동과 보유 카드 선택 등록
+  - name: Home
+    description: 인증 사용자의 홈 화면 컴포넌트 조회
   - name: Health
     description: 서버 상태 확인
 paths:
@@ -36,6 +38,88 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+  /home/greeting:
+    get:
+      tags: [Home]
+      summary: 홈 인사와 놓친 혜택 조회
+      operationId: getHomeGreeting
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/YearMonth'
+      responses:
+        '200':
+          description: 홈 상단 요약
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeGreetingApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          $ref: '#/components/responses/HomeDataNotFound'
+  /home/cards:
+    get:
+      tags: [Home]
+      summary: 홈 보유 카드 캐러셀 조회
+      operationId: getHomeCards
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/YearMonth'
+        - name: orderMode
+          in: query
+          required: false
+          description: 미전달 시 사용자가 저장한 정렬 방식을 사용합니다.
+          schema:
+            type: string
+            enum: [AUTO, MANUAL]
+      responses:
+        '200':
+          description: 보유 카드와 당월 요약
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeCardsApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          $ref: '#/components/responses/HomeDataNotFound'
+  /home/recent-benefits:
+    get:
+      tags: [Home]
+      summary: 홈 최근 혜택 내역 조회
+      operationId: getHomeRecentBenefits
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/YearMonth'
+        - name: limit
+          in: query
+          required: false
+          description: 반환할 내역 수(1~5)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+            default: 5
+      responses:
+        '200':
+          description: 최근 혜택 내역
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecentBenefitsApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          $ref: '#/components/responses/HomeDataNotFound'
   /card-links:
     post:
       tags: [CardLink]
@@ -439,6 +523,16 @@ components:
       scheme: bearer
       bearerFormat: opaque
       description: Google token이 아닌 MOCA 서버 발급 opaque access token을 입력합니다.
+  parameters:
+    YearMonth:
+      name: yearMonth
+      in: query
+      required: false
+      description: 집계 기준 월(미전달 시 Asia/Seoul 현재 월)
+      schema:
+        type: string
+        pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        example: 2026-07
   responses:
     AuthenticationError:
       description: access token이 없거나 유효하지 않음
@@ -458,7 +552,161 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    HomeDataNotFound:
+      description: 홈 화면에 표시할 데이터가 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    HomeGreetingApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/HomeGreetingResponse'
+    HomeGreetingResponse:
+      type: object
+      required: [nickname, yearMonth, missedBenefitAmount, message]
+      properties:
+        nickname:
+          type: string
+        yearMonth:
+          type: string
+          example: 2026-07
+        missedBenefitAmount:
+          type: integer
+          format: int64
+        message:
+          type: string
+    HomeCardsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/HomeCardsResponse'
+    HomeCardsResponse:
+      type: object
+      required: [yearMonth, orderMode, cards]
+      properties:
+        yearMonth:
+          type: string
+        orderMode:
+          type: string
+          enum: [AUTO, MANUAL]
+        selectedUserCardId:
+          type: string
+          format: uuid
+          nullable: true
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeCardResponse'
+    HomeCardResponse:
+      type: object
+      required: [userCardId, order, cardName, alias, cardImageUrl, highlightBenefit, summary]
+      properties:
+        userCardId:
+          type: string
+          format: uuid
+        order:
+          type: integer
+        cardName:
+          type: string
+        alias:
+          type: string
+          nullable: true
+        cardImageUrl:
+          type: string
+          nullable: true
+        autoOrderReason:
+          type: string
+          nullable: true
+        highlightBenefit:
+          $ref: '#/components/schemas/HomeBenefitHighlightResponse'
+        summary:
+          $ref: '#/components/schemas/HomeCardSummaryResponse'
+    HomeBenefitHighlightResponse:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+        monthlyLimitText:
+          type: string
+          nullable: true
+    HomeCardSummaryResponse:
+      type: object
+      required: [receivedBenefitAmount, availableBenefitAmount, maximumMonthlyBenefitAmount,
+                 performanceCurrentAmount, performanceTargetAmount, performanceRate,
+                 performanceRemainingAmount]
+      properties:
+        receivedBenefitAmount:
+          type: integer
+          format: int64
+        availableBenefitAmount:
+          type: integer
+          format: int64
+        maximumMonthlyBenefitAmount:
+          type: integer
+          format: int64
+        performanceCurrentAmount:
+          type: integer
+          format: int64
+        performanceTargetAmount:
+          type: integer
+          format: int64
+        performanceRate:
+          type: integer
+        performanceRemainingAmount:
+          type: integer
+          format: int64
+    RecentBenefitsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/RecentBenefitsResponse'
+    RecentBenefitsResponse:
+      type: object
+      required: [benefits]
+      properties:
+        benefits:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/RecentBenefitItemResponse'
+    RecentBenefitItemResponse:
+      type: object
+      required: [benefitHistoryId, merchantName, benefitType, benefitTitle, cardName,
+                 paymentAmount, benefitAmount, occurredAt]
+      properties:
+        benefitHistoryId:
+          type: string
+        merchantName:
+          type: string
+        benefitType:
+          type: string
+          enum: [DISCOUNT, CASHBACK, POINT]
+        benefitTitle:
+          type: string
+        cardName:
+          type: string
+        paymentAmount:
+          type: integer
+          format: int64
+        benefitAmount:
+          type: integer
+          format: int64
+        occurredAt:
+          type: string
+          format: date-time
     CardLinkApiResponse:
       type: object
       properties:
