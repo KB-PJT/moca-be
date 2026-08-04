@@ -4,7 +4,7 @@ info:
   description: |
     결제 전 최적 카드 추천을 위한 MOCA Backend REST API입니다.
 
-    Google PKCE 로그인은 PWA가 수행합니다. PWA는 PKCE 교환 후 받은 Google ID Token을 로그인 API에 전달하고,
+    Google PKCE 로그인은 PWA가 authorization code를 받은 뒤 MOCA 서버가 Client Secret으로 교환합니다.
     이후 MOCA API는 서버가 발급한 opaque access token으로 인증합니다.
   version: 1.0.0
 servers:
@@ -12,7 +12,7 @@ servers:
     description: MOCA API v1
 tags:
   - name: Auth
-    description: Google ID Token 검증 및 MOCA opaque 세션 관리
+    description: Google authorization code 검증 및 MOCA opaque 세션 관리
   - name: User
     description: 인증 사용자 프로필과 개인 설정 관리
   - name: Card
@@ -231,9 +231,10 @@ paths:
   /auth/google/login:
     post:
       tags: [Auth]
-      summary: Google ID Token으로 MOCA 로그인
+      summary: Google authorization code로 MOCA 로그인
       description: |
-        PWA가 PKCE S256 교환 뒤 받은 Google ID Token을 검증하고 MOCA opaque token을 발급합니다.
+        PWA는 callback에서 받은 authorization code와 code verifier를 전달합니다.
+        서버는 Google access token을 교환하고 tokeninfo의 audience, 만료, scope, user_id를 검증합니다.
         refresh token은 JSON이 아닌 HttpOnly cookie로만 반환합니다.
       operationId: loginWithGoogle
       security: []
@@ -258,7 +259,7 @@ paths:
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
-          description: Google ID Token 검증 실패
+          description: Google authorization code 또는 access token 검증 실패
           content:
             application/json:
               schema:
@@ -858,11 +859,14 @@ components:
               type: integer
     GoogleLoginRequest:
       type: object
-      required: [idToken]
+      required: [code, codeVerifier]
       properties:
-        idToken:
+        code:
           type: string
-          description: PWA PKCE 교환 후 받은 Google ID Token
+          description: Google callback에서 받은 authorization code
+        codeVerifier:
+          type: string
+          description: PWA가 PKCE 생성 시 보관한 code verifier
     GoogleLoginApiResponse:
       type: object
       properties:

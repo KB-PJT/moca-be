@@ -80,7 +80,9 @@ docs(github-flow): 이슈 템플릿 보완
 ## Basic verification
 
 - Java 변경은 컴파일과 핵심 정상 경로만 확인한다.
-- API 변경은 계층 구조와 요청·응답 형태를 확인한다.
+- API 변경 시 `src/main/resources/openapi/openapi.yaml`의 경로, HTTP 메서드, 인증 요구사항,
+  요청·응답 스키마, 상태 코드와 설명을 반드시 함께 갱신한다.
+- API 변경은 계층 구조와 요청·응답 형태, Swagger/OpenAPI 계약 반영 여부를 확인한다.
 - MyBatis 변경은 Mapper 연결과 파라미터 바인딩을 확인한다.
 - 문서와 YAML 변경은 문법과 `git diff --check`를 확인한다.
 - 기본 Java 검증 명령은 `./gradlew test`이다.

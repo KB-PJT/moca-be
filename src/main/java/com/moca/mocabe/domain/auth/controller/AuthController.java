@@ -41,7 +41,7 @@ public class AuthController {
     @PostMapping("/google/login")
     public ResponseEntity<ApiResponse<GoogleLoginResponse>> googleLogin(
             @Valid @RequestBody GoogleLoginRequest request, HttpServletRequest servletRequest) {
-        GoogleLoginResponse response = authApplicationService.login(request.getIdToken());
+        GoogleLoginResponse response = authApplicationService.login(request.getCode(), request.getCodeVerifier());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(response, servletRequest.getContextPath()).toString())
                 .body(ApiResponse.success(response));

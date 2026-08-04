@@ -3,6 +3,7 @@ package com.moca.mocabe.global.config;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,6 +53,24 @@ class WebMvcConfigTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(result -> assertEquals("{\"status\":\"UP\"}",
                         result.getResponse().getContentAsString()));
+    }
+
+    @Test
+    void allowsConfiguredFrontendOriginsForApiRequests() throws Exception {
+        mockMvc.perform(options("/api/v1/auth/google/login")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertEquals("http://localhost:5173",
+                        result.getResponse().getHeader("Access-Control-Allow-Origin")))
+                .andExpect(result -> assertEquals("true",
+                        result.getResponse().getHeader("Access-Control-Allow-Credentials")));
+        mockMvc.perform(options("/api/v1/auth/google/login")
+                        .header("Origin", "https://moca-fe-rho.vercel.app")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertEquals("https://moca-fe-rho.vercel.app",
+                        result.getResponse().getHeader("Access-Control-Allow-Origin")));
     }
 
     @Test
