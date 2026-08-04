@@ -82,7 +82,7 @@ public class AuthConfig {
         return new GoogleAuthorizationCodeClient(googleOAuthHttpClient,
                 requiredProperty(environment, "MOCA_GOOGLE_CLIENT_ID"),
                 requiredProperty(environment, "MOCA_GOOGLE_CLIENT_SECRET"),
-                requiredProperty(environment, "MOCA_GOOGLE_REDIRECT_URI"),
+                Arrays.asList(requiredProperty(environment, "MOCA_GOOGLE_ALLOWED_REDIRECT_URIS").split(",")),
                 Arrays.asList(environment.getProperty("MOCA_GOOGLE_REQUIRED_SCOPES",
                         "openid,https://www.googleapis.com/auth/userinfo.email").split(",")), new ObjectMapper());
     }

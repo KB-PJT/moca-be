@@ -233,7 +233,7 @@ paths:
       tags: [Auth]
       summary: Google authorization code로 MOCA 로그인
       description: |
-        PWA는 callback에서 받은 authorization code와 code verifier를 전달합니다.
+        PWA는 callback에서 받은 authorization code, code verifier, redirect URI를 전달합니다.
         서버는 Google access token을 교환하고 tokeninfo의 audience, 만료, scope, user_id를 검증합니다.
         refresh token은 JSON이 아닌 HttpOnly cookie로만 반환합니다.
       operationId: loginWithGoogle
@@ -859,7 +859,7 @@ components:
               type: integer
     GoogleLoginRequest:
       type: object
-      required: [code, codeVerifier]
+      required: [code, codeVerifier, redirectUri]
       properties:
         code:
           type: string
@@ -867,6 +867,10 @@ components:
         codeVerifier:
           type: string
           description: PWA가 PKCE 생성 시 보관한 code verifier
+        redirectUri:
+          type: string
+          format: uri
+          description: Google 로그인 요청에 사용한 callback URI
     GoogleLoginApiResponse:
       type: object
       properties:

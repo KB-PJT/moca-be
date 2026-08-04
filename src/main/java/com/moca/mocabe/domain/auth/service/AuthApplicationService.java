@@ -29,8 +29,9 @@ public class AuthApplicationService {
     }
 
     @Transactional
-    public GoogleLoginResponse login(String code, String codeVerifier) {
-        GoogleUserIdentity identity = googleAuthorizationCodeExchanger.exchangeAndVerify(code, codeVerifier);
+    public GoogleLoginResponse login(String code, String codeVerifier, String redirectUri) {
+        GoogleUserIdentity identity = googleAuthorizationCodeExchanger.exchangeAndVerify(code, codeVerifier,
+                redirectUri);
         UserDomainService.GoogleUserResult userResult = userDomainService.findOrCreateGoogleUser(
                 identity.getSubject(), identity.getEmail(), DEFAULT_NICKNAME);
         UserProfile userProfile = userResult.getUserProfile();

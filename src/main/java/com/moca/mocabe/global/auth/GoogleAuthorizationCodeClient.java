@@ -19,23 +19,31 @@ public class GoogleAuthorizationCodeClient implements GoogleAuthorizationCodeExc
     private final GoogleOAuthHttpClient httpClient;
     private final String clientId;
     private final String clientSecret;
-    private final String redirectUri;
+    private final Set<String> allowedRedirectUris;
     private final Set<String> requiredScopes;
     private final ObjectMapper objectMapper;
 
     public GoogleAuthorizationCodeClient(GoogleOAuthHttpClient httpClient, String clientId, String clientSecret,
-                                         String redirectUri, List<String> requiredScopes, ObjectMapper objectMapper) {
+                                         List<String> allowedRedirectUris, List<String> requiredScopes,
+                                         ObjectMapper objectMapper) {
         this.httpClient = httpClient;
         this.clientId = requireValue(clientId, "MOCA_GOOGLE_CLIENT_ID");
         this.clientSecret = requireValue(clientSecret, "MOCA_GOOGLE_CLIENT_SECRET");
-        this.redirectUri = requireValue(redirectUri, "MOCA_GOOGLE_REDIRECT_URI");
+        this.allowedRedirectUris = allowedRedirectUris.stream().map(String::trim).filter(value -> !value.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
+        if (this.allowedRedirectUris.isEmpty()) {
+            throw new IllegalArgumentException("MOCA_GOOGLE_ALLOWED_REDIRECT_URIS는 필수입니다.");
+        }
         this.requiredScopes = requiredScopes.stream().map(String::trim).filter(value -> !value.isEmpty())
                 .collect(Collectors.toUnmodifiableSet());
         this.objectMapper = objectMapper;
     }
 
     @Override
-    public GoogleUserIdentity exchangeAndVerify(String code, String codeVerifier) {
+    public GoogleUserIdentity exchangeAndVerify(String code, String codeVerifier, String redirectUri) {
+        if (!allowedRedirectUris.contains(redirectUri)) {
+            throw new GoogleAuthorizationCodeException();
+        }
         GoogleOAuthHttpResponse tokenResponse = httpClient.postForm(TOKEN_URL,
                 tokenExchangeForm(code, codeVerifier, redirectUri));
         if (!isSuccess(tokenResponse)) {

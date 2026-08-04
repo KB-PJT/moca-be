@@ -44,14 +44,14 @@ class AuthApplicationServiceTest {
     @DisplayName("기존 Google 회원은 검증된 user_id로 찾아 MOCA opaque token을 발급한다")
     void logsInExistingGoogleMember() {
         UserProfile user = user();
-        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier"))
+        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
                 .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
         when(userDomainService.findOrCreateGoogleUser(GOOGLE_SUBJECT, "moca@example.com", "MOCA 회원"))
                 .thenReturn(new UserDomainService.GoogleUserResult(user, false));
         when(opaqueTokenService.issue(USER_ID, "user"))
                 .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
 
-        GoogleLoginResponse response = authApplicationService.login("google-code", "code-verifier");
+        GoogleLoginResponse response = authApplicationService.login("google-code", "code-verifier", "redirect-uri");
 
         assertFalse(response.isNewMember());
         assertEquals("access", response.getAccessToken());
@@ -63,14 +63,14 @@ class AuthApplicationServiceTest {
     @DisplayName("처음 로그인한 Google 회원은 UUID 사용자 계정을 생성한 뒤 token을 발급한다")
     void createsNewGoogleMember() {
         UserProfile user = user();
-        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier"))
+        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
                 .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
         when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), anyString()))
                 .thenReturn(new UserDomainService.GoogleUserResult(user, true));
         when(opaqueTokenService.issue(USER_ID, "user"))
                 .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
 
-        GoogleLoginResponse response = authApplicationService.login("google-code", "code-verifier");
+        GoogleLoginResponse response = authApplicationService.login("google-code", "code-verifier", "redirect-uri");
 
         assertTrue(response.isNewMember());
         verify(userDomainService).findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"),
@@ -82,14 +82,14 @@ class AuthApplicationServiceTest {
     @DisplayName("access token 정보에는 이름이 없으므로 최초 회원은 기본 닉네임으로 생성한다")
     void createsNewMemberWithDefaultNickname() {
         UserProfile user = user();
-        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier"))
+        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
                 .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
         when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), anyString()))
                 .thenReturn(new UserDomainService.GoogleUserResult(user, true));
         when(opaqueTokenService.issue(USER_ID, "user"))
                 .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
 
-        authApplicationService.login("google-code", "code-verifier");
+        authApplicationService.login("google-code", "code-verifier", "redirect-uri");
 
         verify(userDomainService).findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"),
                 eq("MOCA 회원"));
@@ -98,13 +98,13 @@ class AuthApplicationServiceTest {
     @Test
     @DisplayName("사용자 도메인 서비스의 사용자 조회 오류를 로그인 흐름에 전달한다")
     void propagatesMissingGoogleMember() {
-        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier"))
+        when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
                 .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
         when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), anyString(), anyString()))
                 .thenThrow(new com.moca.mocabe.global.exception.user.UserNotFoundException());
         org.junit.jupiter.api.Assertions.assertThrows(
                 com.moca.mocabe.global.exception.user.UserNotFoundException.class,
-                () -> authApplicationService.login("google-code", "code-verifier"));
+                () -> authApplicationService.login("google-code", "code-verifier", "redirect-uri"));
     }
 
     @Test

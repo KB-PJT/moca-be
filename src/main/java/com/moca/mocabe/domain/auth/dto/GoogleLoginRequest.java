@@ -11,6 +11,9 @@ public class GoogleLoginRequest {
     @NotBlank(message = "PKCE code verifier는 필수입니다.")
     private String codeVerifier;
 
+    @NotBlank(message = "Google redirect URI는 필수입니다.")
+    private String redirectUri;
+
     public String getCode() {
         return code;
     }
@@ -25,6 +28,14 @@ public class GoogleLoginRequest {
 
     public void setCodeVerifier(String codeVerifier) {
         this.codeVerifier = codeVerifier;
+    }
+
+    public String getRedirectUri() {
+        return redirectUri;
+    }
+
+    public void setRedirectUri(String redirectUri) {
+        this.redirectUri = redirectUri;
     }
 
 }

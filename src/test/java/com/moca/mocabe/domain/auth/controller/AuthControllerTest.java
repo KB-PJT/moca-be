@@ -30,7 +30,9 @@ class AuthControllerTest {
         GoogleLoginRequest request = new GoogleLoginRequest();
         request.setCode("google-code");
         request.setCodeVerifier("code-verifier");
-        when(authApplicationService.login("google-code", "code-verifier")).thenReturn(loginResponse());
+        request.setRedirectUri("http://localhost:5173/auth/callback");
+        when(authApplicationService.login("google-code", "code-verifier", "http://localhost:5173/auth/callback"))
+                .thenReturn(loginResponse());
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         servletRequest.setContextPath("/moca-be");
 

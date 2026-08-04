@@ -86,7 +86,8 @@ class AuthConfigTest {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("MOCA_GOOGLE_CLIENT_ID", "client-id")
                 .withProperty("MOCA_GOOGLE_CLIENT_SECRET", "client-secret")
-                .withProperty("MOCA_GOOGLE_REDIRECT_URI", "http://localhost:5173/auth/callback");
+                .withProperty("MOCA_GOOGLE_ALLOWED_REDIRECT_URIS",
+                        "http://localhost:5173/auth/callback,https://moca-fe-rho.vercel.app/auth/callback");
 
         assertNotNull(authConfig.googleAuthorizationCodeExchanger(Mockito.mock(
                 com.moca.mocabe.global.auth.GoogleOAuthHttpClient.class), environment));

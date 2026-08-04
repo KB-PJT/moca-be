@@ -28,7 +28,8 @@ class GoogleAuthorizationCodeClientTest {
                         + "\"scope\":\"openid https://www.googleapis.com/auth/userinfo.email\","
                         + "\"user_id\":\"google-user-id\",\"email\":\"moca@example.com\"}"));
 
-        GoogleUserIdentity identity = client.exchangeAndVerify("authorization-code", "code-verifier");
+        GoogleUserIdentity identity = client.exchangeAndVerify("authorization-code", "code-verifier",
+                "https://moca.example.com/auth/callback");
 
         assertEquals("google-user-id", identity.getSubject());
         assertEquals("moca@example.com", identity.getEmail());
@@ -55,6 +56,17 @@ class GoogleAuthorizationCodeClientTest {
     }
 
     @Test
+    @DisplayName("허용 목록에 없는 redirect URI는 Google token 교환 전에 거절한다")
+    void rejectsRedirectUriOutsideAllowlist() {
+        GoogleOAuthHttpClient httpClient = org.mockito.Mockito.mock(GoogleOAuthHttpClient.class);
+        GoogleAuthorizationCodeClient client = client(httpClient);
+
+        assertThrows(GoogleAuthorizationCodeException.class,
+                () -> client.exchangeAndVerify("code", "verifier", "https://untrusted.example.com/callback"));
+        org.mockito.Mockito.verifyNoInteractions(httpClient);
+    }
+
+    @Test
     @DisplayName("Google token 교환 또는 tokeninfo가 실패하면 로그인을 거절한다")
     void rejectsFailedGoogleResponses() {
         GoogleOAuthHttpClient httpClient = org.mockito.Mockito.mock(GoogleOAuthHttpClient.class);
@@ -63,7 +75,7 @@ class GoogleAuthorizationCodeClientTest {
                 .thenReturn(new GoogleOAuthHttpResponse(400, "{\"error\":\"invalid_grant\"}"));
 
         assertThrows(GoogleAuthorizationCodeException.class,
-                () -> client.exchangeAndVerify("code", "verifier"));
+                () -> client.exchangeAndVerify("code", "verifier", "https://moca.example.com/auth/callback"));
     }
 
     @Test
@@ -76,10 +88,10 @@ class GoogleAuthorizationCodeClientTest {
         when(httpClient.get(anyString())).thenReturn(new GoogleOAuthHttpResponse(401, "{}"));
 
         assertThrows(GoogleAuthorizationCodeException.class,
-                () -> client.exchangeAndVerify("code", "verifier"));
+                () -> client.exchangeAndVerify("code", "verifier", "https://moca.example.com/auth/callback"));
         when(httpClient.get(anyString())).thenReturn(new GoogleOAuthHttpResponse(200, "not-json"));
         assertThrows(GoogleAuthorizationCodeException.class,
-                () -> client.exchangeAndVerify("code", "verifier"));
+                () -> client.exchangeAndVerify("code", "verifier", "https://moca.example.com/auth/callback"));
     }
 
     @Test
@@ -88,13 +100,13 @@ class GoogleAuthorizationCodeClientTest {
         GoogleOAuthHttpClient httpClient = org.mockito.Mockito.mock(GoogleOAuthHttpClient.class);
 
         assertThrows(IllegalArgumentException.class,
-                () -> new GoogleAuthorizationCodeClient(httpClient, " ", "secret", "redirect", List.of(),
+                () -> new GoogleAuthorizationCodeClient(httpClient, " ", "secret", List.of("redirect"), List.of(),
                         new ObjectMapper()));
         assertThrows(IllegalArgumentException.class,
-                () -> new GoogleAuthorizationCodeClient(httpClient, "client", " ", "redirect", List.of(),
+                () -> new GoogleAuthorizationCodeClient(httpClient, "client", " ", List.of("redirect"), List.of(),
                         new ObjectMapper()));
         assertThrows(IllegalArgumentException.class,
-                () -> new GoogleAuthorizationCodeClient(httpClient, "client", "secret", " ", List.of(),
+                () -> new GoogleAuthorizationCodeClient(httpClient, "client", "secret", List.of(" "), List.of(),
                         new ObjectMapper()));
     }
 
@@ -106,12 +118,12 @@ class GoogleAuthorizationCodeClientTest {
         when(httpClient.get(anyString())).thenReturn(new GoogleOAuthHttpResponse(200, tokenInfo));
 
         assertThrows(GoogleAuthorizationCodeException.class,
-                () -> client.exchangeAndVerify("code", "verifier"));
+                () -> client.exchangeAndVerify("code", "verifier", "https://moca.example.com/auth/callback"));
     }
 
     private GoogleAuthorizationCodeClient client(GoogleOAuthHttpClient httpClient) {
         return new GoogleAuthorizationCodeClient(httpClient, "google-client-id", "google-client-secret",
-                "https://moca.example.com/auth/callback",
+                List.of("http://localhost:5173/auth/callback", "https://moca.example.com/auth/callback"),
                 List.of("openid", "https://www.googleapis.com/auth/userinfo.email"), new ObjectMapper());
     }
 }
