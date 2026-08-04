@@ -63,4 +63,22 @@
             AND uc.is_active = FALSE
         ORDER BY uc.display_order ASC, uc.user_card_id ASC
     </select>
+
+    <select id="findHomeCardsByUserId" resultMap="userCardListRowResultMap">
+        SELECT
+            <include refid="userCardColumns"/>
+        FROM user_cards uc
+        <include refid="userCardJoins"/>
+        WHERE
+            <include refid="userCardCondition"/>
+            AND uc.is_active = TRUE
+        <choose>
+            <when test="orderMode == 'AUTO'">
+                ORDER BY uc.display_order ASC, uc.user_card_id ASC
+            </when>
+            <otherwise>
+                ORDER BY uc.display_order ASC, uc.user_card_id ASC
+            </otherwise>
+        </choose>
+    </select>
 </mapper>
