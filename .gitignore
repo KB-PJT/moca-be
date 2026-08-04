@@ -39,5 +39,19 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-/outputs/
-/docs/
+### Local documentation and generated outputs ###
+docs/
+outputs/
+
+### Local environment secrets ###
+.env
+.env.local
+deploy/.env.production
+
+### Node.js and Husky local artifacts ###
+node_modules/
+.husky/_/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

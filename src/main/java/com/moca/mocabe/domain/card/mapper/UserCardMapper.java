@@ -1,0 +1,18 @@
+package com.moca.mocabe.domain.card.mapper;
+
+import com.moca.mocabe.domain.card.model.UserCardListRow;
+import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+/** 사용자 보유 카드 조회 영속성 접근을 담당한다. */
+@Mapper
+public interface UserCardMapper {
+
+    List<UserCardListRow> findActiveByUserId(@Param("userId") String userId);
+
+    List<UserCardListRow> findInactiveByUserId(@Param("userId") String userId);
+
+    List<UserCardListRow> findHomeCardsByUserId(@Param("userId") String userId,
+                                                @Param("orderMode") String orderMode);
+}

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.user.mapper.UserMapper">
+
+    <resultMap id="userProfileResultMap" type="com.moca.mocabe.domain.user.model.UserProfile">
+        <id property="userId" column="user_id"/>
+        <result property="nickname" column="nickname"/>
+        <result property="email" column="email"/>
+        <result property="userType" column="user_type"/>
+        <result property="cardSortMode" column="card_sort_mode"/>
+    </resultMap>
+
+    <resultMap id="notificationSettingsResultMap"
+               type="com.moca.mocabe.domain.user.model.NotificationSettings">
+        <result property="performanceClosingEnabled" column="performance_closing_enabled"/>
+        <result property="nearbyBenefitEnabled" column="nearby_benefit_enabled"/>
+        <result property="benefitLimitEnabled" column="benefit_limit_enabled"/>
+        <result property="marketingEnabled" column="marketing_enabled"/>
+    </resultMap>
+
+    <resultMap id="locationSettingsResultMap" type="com.moca.mocabe.domain.user.model.LocationSettings">
+        <result property="locationRecommendationEnabled" column="location_recommendation_enabled"/>
+    </resultMap>
+
+    <select id="findProfileById" resultMap="userProfileResultMap">
+        SELECT user_id, nickname, email, user_type, card_sort_mode
+        FROM users
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="findProfileByGoogleSubject" resultMap="userProfileResultMap">
+        SELECT user_id, nickname, email, user_type, card_sort_mode
+        FROM users
+        WHERE google_subject = #{googleSubject}
+    </select>
+
+    <insert id="insertGoogleUser">
+        INSERT INTO users (
+            user_id,
+            google_subject,
+            nickname,
+            email,
+            user_type,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{userId},
+            #{googleSubject},
+            #{nickname},
+            #{email},
+            'user',
+            UTC_TIMESTAMP(6),
+            UTC_TIMESTAMP(6)
+        )
+    </insert>
+
+    <update id="updateNickname">
+        UPDATE users
+        SET nickname = #{nickname},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateCardSortMode">
+        UPDATE users
+        SET card_sort_mode = #{cardSortMode},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_id = #{userId}
+    </update>
+
+    <select id="findNotificationSettingsByUserId" resultMap="notificationSettingsResultMap">
+        SELECT performance_closing_enabled,
+               nearby_benefit_enabled,
+               benefit_limit_enabled,
+               marketing_enabled
+        FROM user_notification_settings
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="upsertNotificationSettings">
+        INSERT INTO user_notification_settings (
+            user_id,
+            performance_closing_enabled,
+            nearby_benefit_enabled,
+            benefit_limit_enabled,
+            marketing_enabled,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{userId},
+            #{settings.performanceClosingEnabled},
+            #{settings.nearbyBenefitEnabled},
+            #{settings.benefitLimitEnabled},
+            #{settings.marketingEnabled},
+            UTC_TIMESTAMP(6),
+            UTC_TIMESTAMP(6)
+        ) ON DUPLICATE KEY UPDATE
+            performance_closing_enabled = VALUES(performance_closing_enabled),
+            nearby_benefit_enabled = VALUES(nearby_benefit_enabled),
+            benefit_limit_enabled = VALUES(benefit_limit_enabled),
+            marketing_enabled = VALUES(marketing_enabled),
+            updated_at = UTC_TIMESTAMP(6)
+    </insert>
+
+    <select id="findLocationSettingsByUserId" resultMap="locationSettingsResultMap">
+        SELECT location_recommendation_enabled
+        FROM users
+        WHERE user_id = #{userId}
+    </select>
+
+    <update id="updateLocationRecommendationEnabled">
+        UPDATE users
+        SET location_recommendation_enabled = #{enabled},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_id = #{userId}
+    </update>
+
+    <delete id="deleteNotificationSettings">
+        DELETE FROM user_notification_settings
+        WHERE user_id = #{userId}
+    </delete>
+
+    <delete id="deleteUser">
+        DELETE FROM users
+        WHERE user_id = #{userId}
+    </delete>
+</mapper>

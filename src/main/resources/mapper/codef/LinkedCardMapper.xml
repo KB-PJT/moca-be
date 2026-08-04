@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.codef.mapper.LinkedCardMapper">
+
+    <resultMap id="linkedCardRowMap" type="com.moca.mocabe.domain.codef.model.LinkedCardRow">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="card_id" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findNextDisplayOrder" resultType="int">
+        SELECT COALESCE(MAX(display_order), -1) + 1
+        FROM user_cards
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- 매칭된 보유카드를 처음에는 비활성(is_active=false)으로 적재한다. -->
+    <insert id="insertLinkedCard">
+        INSERT INTO user_cards (
+            user_card_id, user_id, card_id, codef_account_credential_id,
+            card_name_from_codef, card_no, issuer_id, display_order, is_active,
+            codef_card_key_hash, created_at, updated_at
+        ) VALUES (
+            #{userCardId}, #{userId}, #{cardId}, #{linkId},
+            #{cardNameFromCodef}, #{cardNo}, #{issuerId}, #{displayOrder}, FALSE,
+            #{codefCardKeyHash}, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+        )
+    </insert>
+
+    <select id="findByLinkIdAndUserId" resultMap="linkedCardRowMap">
+        SELECT user_card_id, card_id
+        FROM user_cards
+        WHERE codef_account_credential_id = #{linkId}
+          AND user_id = #{userId}
+        ORDER BY display_order ASC, user_card_id ASC
+    </select>
+
+    <!-- 넘어온 user_card_id만 이 연동 범위 안에서 활성화한다. -->
+    <update id="activateCards">
+        UPDATE user_cards
+        SET is_active = TRUE, updated_at = UTC_TIMESTAMP(6)
+        WHERE codef_account_credential_id = #{linkId}
+          AND user_id = #{userId}
+          AND user_card_id IN
+        <foreach collection="userCardIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- 재활성화 시 같은 그룹은 최신 선택으로 덮어쓴다. -->
+    <insert id="upsertOptionSelection">
+        INSERT INTO user_card_option_selections (
+            user_card_id, option_group_id, card_id, option_choice_id, selected_at
+        ) VALUES (
+            #{userCardId}, #{optionGroupId}, #{cardId}, #{optionChoiceId}, UTC_TIMESTAMP(6)
+        )
+        ON DUPLICATE KEY UPDATE
+            card_id = VALUES(card_id),
+            option_choice_id = VALUES(option_choice_id),
+            selected_at = UTC_TIMESTAMP(6)
+    </insert>
+</mapper>
