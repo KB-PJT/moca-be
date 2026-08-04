@@ -7,9 +7,11 @@ import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
-import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
+import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
+import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
+import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -45,7 +47,7 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", exception.getMessage());
     }
 
-    @ExceptionHandler({InvalidGoogleIdTokenException.class, InvalidOpaqueTokenException.class})
+    @ExceptionHandler({InvalidOpaqueTokenException.class, GoogleAuthorizationCodeException.class})
     public ResponseEntity<ApiErrorResponse> handleInvalidToken(RuntimeException exception) {
         return error(HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", exception.getMessage());
     }
@@ -68,6 +70,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCardSelectionException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidCardSelection(InvalidCardSelectionException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_CARD_SELECTION", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidHomeQueryException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidHomeQuery(InvalidHomeQueryException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_HOME_QUERY", exception.getMessage());
+    }
+
+    @ExceptionHandler(HomeDataNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleHomeDataNotFound(HomeDataNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "HOME_DATA_NOT_FOUND", exception.getMessage());
     }
 
     @ExceptionHandler(CodefCredentialRequiredException.class)

@@ -7,10 +7,12 @@ import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
-import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
+import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
+import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
+import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -77,11 +79,25 @@ class GlobalExceptionHandlerTest {
     void handlesAuthenticationAndUserErrors() {
         assertError(handler.handleAuthenticationRequired(new AuthenticationRequiredException()),
                 HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED");
-        assertError(handler.handleInvalidToken(new InvalidGoogleIdTokenException()),
+        assertError(handler.handleInvalidToken(new GoogleAuthorizationCodeException()),
                 HttpStatus.UNAUTHORIZED, "INVALID_TOKEN");
         assertError(handler.handleInvalidToken(new InvalidOpaqueTokenException()),
                 HttpStatus.UNAUTHORIZED, "INVALID_TOKEN");
         assertError(handler.handleUserNotFound(new UserNotFoundException()), HttpStatus.NOT_FOUND, "USER_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("홈 조회 조건 오류를 공통 JSON 400 응답으로 변환한다")
+    void handlesInvalidHomeQuery() {
+        assertError(handler.handleInvalidHomeQuery(new InvalidHomeQueryException("invalid")),
+                HttpStatus.BAD_REQUEST, "INVALID_HOME_QUERY");
+    }
+
+    @Test
+    @DisplayName("홈 데이터가 없으면 공통 JSON 404 응답으로 변환한다")
+    void handlesHomeDataNotFound() {
+        assertError(handler.handleHomeDataNotFound(new HomeDataNotFoundException("empty")),
+                HttpStatus.NOT_FOUND, "HOME_DATA_NOT_FOUND");
     }
 
     @Test

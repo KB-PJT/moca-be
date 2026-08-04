@@ -12,6 +12,7 @@ import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 class AuthConfigTest {
 
@@ -72,9 +73,35 @@ class AuthConfigTest {
     }
 
     @Test
-    @DisplayName("Google Client ID가 없으면 인증 검증기를 생성하지 않는다")
-    void rejectsMissingGoogleClientId() {
+    @DisplayName("Google OAuth client 설정이 없으면 authorization code 교환기를 생성하지 않는다")
+    void rejectsMissingGoogleOAuthClientConfiguration() {
         assertThrows(IllegalStateException.class,
-                () -> authConfig.googleIdTokenVerifier(new MockEnvironment()));
+                () -> authConfig.googleAuthorizationCodeExchanger(Mockito.mock(
+                        com.moca.mocabe.global.auth.GoogleOAuthHttpClient.class), new MockEnvironment()));
+    }
+
+    @Test
+    @DisplayName("Google Client ID와 Secret을 설정하면 authorization code 교환기를 생성한다")
+    void createsGoogleAuthorizationCodeExchanger() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("MOCA_GOOGLE_CLIENT_ID", "client-id")
+                .withProperty("MOCA_GOOGLE_CLIENT_SECRET", "client-secret")
+                .withProperty("MOCA_GOOGLE_ALLOWED_REDIRECT_URIS",
+                        "http://localhost:5173/auth/callback,https://moca-fe-rho.vercel.app/auth/callback");
+
+        assertNotNull(authConfig.googleAuthorizationCodeExchanger(Mockito.mock(
+                com.moca.mocabe.global.auth.GoogleOAuthHttpClient.class), environment));
+    }
+
+    @Test
+    @DisplayName("루트 Security 컨텍스트도 프론트 origin의 credential CORS 설정을 사용한다")
+    void configuresCorsForFrontendOrigins() {
+        org.springframework.web.cors.CorsConfiguration configuration = authConfig.corsConfigurationSource()
+                .getCorsConfiguration(new MockHttpServletRequest("OPTIONS", "/api/v1/auth/refresh"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                java.util.Arrays.asList("http://localhost:5173", "https://moca-fe-rho.vercel.app"),
+                configuration.getAllowedOrigins());
+        org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, configuration.getAllowCredentials());
     }
 }
