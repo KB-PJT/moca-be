@@ -1,21 +1,19 @@
 package com.moca.mocabe.domain.merchant.mapper;
 
+import com.moca.mocabe.domain.merchant.model.MerchantNameCandidate;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
-/** 가맹점 조회 영속성 접근을 담당한다. */
+/**
+ * 가맹점 후보 데이터 조회만 담당한다. 접두사 판정·최장일치·동률 해소 같은 매칭 규칙은
+ * 도메인 계층({@link com.moca.mocabe.domain.merchant.service.MerchantLookup})에서 수행한다.
+ */
 @Mapper
 public interface MerchantMapper {
 
-    /**
-     * 정규화된 저장 가맹점명이 정규화된 승인 가맹점명의 접두사인 활성 가맹점 중,
-     * 가장 긴(=가장 구체적인) 것의 merchant_id를 반환한다. 없으면 null.
-     */
-    String findMerchantIdByNamePrefix(@Param("normalizedApprovalName") String normalizedApprovalName);
+    /** 활성 가맹점의 (merchant_id, normalized_name) 후보 목록을 조회한다. */
+    List<MerchantNameCandidate> findActiveMerchantNameCandidates();
 
-    /**
-     * merchants에서 접두사 매칭이 없을 때 사용한다. 정규화된 별칭이 승인 가맹점명의 접두사인
-     * 활성 가맹점의 별칭 중 가장 긴 것의 merchant_id를 반환한다. 없으면 null.
-     */
-    String findMerchantIdByAliasPrefix(@Param("normalizedApprovalName") String normalizedApprovalName);
+    /** 활성 가맹점에 속한 별칭의 (merchant_id, normalized_alias_name) 후보 목록을 조회한다. */
+    List<MerchantNameCandidate> findActiveMerchantAliasCandidates();
 }
