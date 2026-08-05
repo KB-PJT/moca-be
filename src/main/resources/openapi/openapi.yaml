@@ -186,6 +186,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/CodefUnavailableError'
   /card-links/{linkId}/cards:
     patch:
       tags: [CardLink]
@@ -449,6 +451,8 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
+        '503':
+          $ref: '#/components/responses/CodefUnavailableError'
   /me/card-sort-mode:
     patch:
       tags: [User]
@@ -596,6 +600,13 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     HomeDataNotFound:
       description: 홈 화면에 표시할 데이터가 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    CodefUnavailableError:
+      description: >-
+        CODEF 상류 타임아웃·연결 실패·비2xx 응답으로 처리하지 못함(재시도 가능, code=CODEF_UNAVAILABLE).
       content:
         application/json:
           schema:
