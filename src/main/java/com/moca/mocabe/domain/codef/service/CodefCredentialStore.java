@@ -22,9 +22,15 @@ public class CodefCredentialStore {
         this.linkedCardMapper = linkedCardMapper;
     }
 
+    /** connectedId 발급 직후 자격정보만 우선 커밋한다. 이후 보유카드 조회가 실패해도 이 저장은 보존된다. */
     @Transactional
-    public void save(CodefAccountCredential credential, List<LinkedCardInsert> cards) {
+    public void saveCredential(CodefAccountCredential credential) {
         insertCredential(credential);
+    }
+
+    /** 자격정보와 별도 트랜잭션으로 매칭된 보유카드만 적재한다. */
+    @Transactional
+    public void saveCards(List<LinkedCardInsert> cards) {
         for (LinkedCardInsert card : cards) {
             insertCard(card);
         }

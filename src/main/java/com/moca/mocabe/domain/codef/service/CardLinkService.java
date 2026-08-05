@@ -9,8 +9,11 @@ import com.moca.mocabe.domain.codef.dto.CardOptionGroupResponse;
 import com.moca.mocabe.domain.codef.dto.CardOptionSelectionRequest;
 import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
 import com.moca.mocabe.domain.codef.dto.OptionSelectionRequest;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
@@ -24,10 +27,12 @@ import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
 import com.moca.mocabe.domain.codef.model.CardCatalogEntry;
 import com.moca.mocabe.domain.codef.model.CardOptionRow;
 import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
+import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefIssuerPolicy;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import com.moca.mocabe.domain.codef.model.LinkedCardInsert;
+import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,12 +44,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Connected ID 생성·보유카드 적재(비활성)와 사용자 활성화·옵션 선택 유스케이스를 담당한다. */
 public class CardLinkService {
 
+    private static final Logger LOGGER = Logger.getLogger(CardLinkService.class.getName());
     private static final String STATUS_PENDING = "PENDING_CARD_ACTIVATION";
     private static final String HASH_TYPE_CARD_NO = "CARD_NO";
     private static final String HASH_TYPE_ACCOUNT_ID = "ACCOUNT_ID";
@@ -96,9 +104,79 @@ public class CardLinkService {
                 policy.getInstitutionCode(), request.getId(), request.getPassword(),
                 request.getCardNo(), request.getCardPassword(), request.getBirthDate());
         String connectedId = codefClient.createConnectedId(command);
-        List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(connectedId, policy.getInstitutionCode());
 
+        // connectedId 발급 직후 자격정보부터 커밋한다. 뒤이은 보유카드 조회가 실패해도
+        // 이미 발급받은 connectedId는 버려지지 않고, 사용자는 자격정보 재입력 없이
+        // POST /card-links/cards/sync로 보유카드만 다시 조회할 수 있다.
         String linkId = UUID.randomUUID().toString();
+        codefCredentialStore.saveCredential(buildCredential(
+                userId, request, policy.getIssuerId(), connectedId, linkId, credentialIdentityHash));
+
+        List<CardLinkCardResponse> cards = List.of();
+        try {
+            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(connectedId, policy.getInstitutionCode());
+            cards = matchAndPersistOwnedCards(userId, linkId, policy, ownedCards);
+        } catch (RuntimeException exception) {
+            LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
+                    + describeException(exception));
+        }
+        return new CardLinkResponse(linkId, policy.getInstitutionCode(), STATUS_PENDING, cards);
+    }
+
+    /**
+     * 사용자의 활성 연동(카드사 계정)별로 보유카드를 다시 조회해 새로 매칭된 카드만 추가 적재한다.
+     * institutionCode를 주면 그 카드사 연동만, 생략하면 모든 활성 연동을 대상으로 한다.
+     * 연동 하나가 CODEF 조회 실패로 재시도가 필요한 상태와, 정상 조회했지만 매칭된 카드가 0건인
+     * 상태는 서로 다르므로(전자는 success=false, 후자는 cards가 빈 배열인 success=true) 구분해 응답한다.
+     */
+    public SyncOwnedCardsResponse syncOwnedCards(String userId, String institutionCode) {
+        List<CodefConnection> connections = codefCredentialMapper.findActiveConnectionsByUserId(userId);
+        if (institutionCode != null) {
+            connections = connections.stream()
+                    .filter(connection -> institutionCode.equals(connection.institutionCode()))
+                    .toList();
+            if (connections.isEmpty()) {
+                throw new CodefConnectionNotFoundException(institutionCode);
+            }
+        }
+
+        List<SyncOwnedCardsResult> results = new ArrayList<>();
+        for (CodefConnection connection : connections) {
+            results.add(syncOwnedCardsForConnection(userId, connection));
+        }
+        return new SyncOwnedCardsResponse(results);
+    }
+
+    private SyncOwnedCardsResult syncOwnedCardsForConnection(String userId, CodefConnection connection) {
+        try {
+            // findActiveConnectionsByUserId가 issuers와 INNER JOIN하므로 정책은 항상 존재한다.
+            CodefIssuerPolicy policy = issuerMapper.findCodefPolicyByInstitutionCode(connection.institutionCode());
+            List<CodefOwnedCard> ownedCards =
+                    codefClient.getOwnedCards(connection.connectedId(), connection.institutionCode());
+            List<CardLinkCardResponse> cards = matchAndPersistOwnedCards(
+                    userId, connection.codefAccountCredentialId(), policy, ownedCards);
+            return new SyncOwnedCardsResult(
+                    connection.codefAccountCredentialId(), connection.institutionCode(), true, cards);
+        } catch (RuntimeException exception) {
+            LOGGER.log(Level.WARNING, "보유카드 재조회에 실패했습니다. institutionCode="
+                    + connection.institutionCode() + " " + describeException(exception));
+            return new SyncOwnedCardsResult(
+                    connection.codefAccountCredentialId(), connection.institutionCode(), false, List.of());
+        }
+    }
+
+    /**
+     * CODEF 보유카드를 카탈로그와 매칭해 아직 적재되지 않은 카드만 새로 저장하고, 이미 적재된 카드는
+     * 기존 user_card_id를 그대로 재사용한다(재조회 시 중복 INSERT 방지). 매칭된 카드가 0건이어도
+     * 예외를 던지지 않고 빈 목록을 정상 반환한다.
+     */
+    private List<CardLinkCardResponse> matchAndPersistOwnedCards(String userId, String linkId,
+                                                                  CodefIssuerPolicy policy,
+                                                                  List<CodefOwnedCard> ownedCards) {
+        // (user_id, codef_card_key_hash)가 DB에서 UNIQUE라 해시 충돌은 발생할 수 없다.
+        Map<String, String> existingUserCardIdByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
+                .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, LinkedCardKeyRow::userCardId));
+
         List<LinkedCardInsert> inserts = new ArrayList<>();
         List<CardLinkCardResponse> cards = new ArrayList<>();
         Set<String> cardKeyHashes = new HashSet<>();
@@ -114,8 +192,8 @@ public class CardLinkService {
             if (!cardKeyHashes.add(cardKeyHash)) {
                 continue;
             }
-            String userCardId = null;
-            if (matched != null) {
+            String userCardId = existingUserCardIdByHash.get(cardKeyHash);
+            if (userCardId == null && matched != null) {
                 userCardId = UUID.randomUUID().toString();
                 inserts.add(new LinkedCardInsert(userCardId, linkId, userId, policy.getIssuerId(),
                         matched.cardId(), ownedCard.cardName(), blankToNull(ownedCard.cardNumber()),
@@ -124,9 +202,18 @@ public class CardLinkService {
             cards.add(toResponse(userCardId, matched, ownedCard, policy));
         }
 
-        codefCredentialStore.save(buildCredential(
-                userId, request, policy.getIssuerId(), connectedId, linkId, credentialIdentityHash), inserts);
-        return new CardLinkResponse(linkId, policy.getInstitutionCode(), STATUS_PENDING, cards);
+        codefCredentialStore.saveCards(inserts);
+        return cards;
+    }
+
+    /** 로그에 안전하게 남길 수 있는 예외 요약이다(CWE-532). 메시지 원문 대신 클래스명만 남긴다. */
+    private String describeException(Throwable exception) {
+        StringBuilder description = new StringBuilder(exception.getClass().getSimpleName());
+        Throwable cause = exception.getCause();
+        if (cause != null) {
+            description.append(" <- ").append(cause.getClass().getSimpleName());
+        }
+        return description.toString();
     }
 
     @Transactional

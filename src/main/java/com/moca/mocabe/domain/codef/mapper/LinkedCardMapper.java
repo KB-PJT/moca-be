@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.codef.mapper;
 
+import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -10,6 +11,10 @@ import org.apache.ibatis.annotations.Param;
 public interface LinkedCardMapper {
 
     int findNextDisplayOrder(@Param("userId") String userId);
+
+    /** 보유카드 재조회 시 이미 적재된 카드를 재판별해 중복 INSERT를 피하는 데 쓰인다. */
+    List<LinkedCardKeyRow> findLinkedCardKeysByLinkId(@Param("linkId") String linkId,
+                                                       @Param("userId") String userId);
 
     void insertLinkedCard(@Param("userCardId") String userCardId,
                           @Param("linkId") String linkId,

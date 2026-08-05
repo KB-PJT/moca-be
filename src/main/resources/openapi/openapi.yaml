@@ -129,6 +129,9 @@ paths:
         비밀번호는 CODEF 공개키로 RSA 암호화해 전송하며, 저장 시 자격정보는 AES로 암호화합니다.
         반환된 카드는 후보이며 아직 user_cards에 적재되지 않습니다. matched=false 카드는 추천에서 제외됩니다.
         옵션 그룹은 파서 검증이 완료된 항목만 반환하며, 선택 카드 확정 시 그룹마다 하나를 골라야 합니다.
+        connectedId 발급 이후 자격정보는 먼저 저장되므로, 뒤이은 보유카드 조회가 실패해도 연동 생성
+        자체는 201로 성공하고 cards는 빈 배열로 내려갑니다. 이 경우 POST /card-links/cards/sync로
+        보유카드만 다시 조회할 수 있습니다.
       operationId: createCardLink
       security:
         - MocaBearerAuth: []
@@ -226,6 +229,43 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '404':
           description: 본인 소유의 미확정 연동을 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /card-links/cards/sync:
+    post:
+      tags: [CardLink]
+      summary: 보유카드 재조회
+      description: |
+        사용자의 활성 CODEF 연동(카드사 계정)별로 보유카드를 다시 조회해 새로 매칭된 카드만 추가로
+        적재합니다. institutionCode를 주면 그 카드사 연동만, 생략하면 모든 활성 연동을 대상으로 합니다.
+        이미 적재된 카드는 다시 적재하지 않고 기존 카드를 그대로 응답합니다.
+        연동 하나가 CODEF 조회 자체에 실패하면 그 연동만 success=false로 응답하고 다른 연동에는
+        영향을 주지 않습니다(전체 요청은 200). 정상 조회했지만 매칭된 카드가 0건인 경우는 실패가
+        아니라 success=true에 cards가 빈 배열로 내려갑니다.
+      operationId: syncOwnedCards
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: institutionCode
+          in: query
+          required: false
+          description: 카드사 기관코드(issuers.institution_code). 생략하면 모든 활성 연동을 재조회합니다.
+          schema:
+            type: string
+            example: "0301"
+      responses:
+        '200':
+          description: 재조회 성공(연동별 결과 포함)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncOwnedCardsApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          description: 지정한 기관코드로 연동된 활성 계정이 없음(code=CODEF_CONNECTION_NOT_FOUND)
           content:
             application/json:
               schema:
@@ -890,6 +930,40 @@ components:
                     optionChoiceId:
                       type: string
                       format: uuid
+    SyncOwnedCardsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/SyncOwnedCardsResponse'
+    SyncOwnedCardsResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncOwnedCardsResult'
+    SyncOwnedCardsResult:
+      type: object
+      required: [linkId, institutionCode, success, cards]
+      properties:
+        linkId:
+          type: string
+          format: uuid
+          description: 이 결과가 속한 연동(codef_account_credential_id)의 식별자
+        institutionCode:
+          type: string
+          example: "0301"
+        success:
+          type: boolean
+          description: false면 CODEF 조회 자체가 실패해 재시도가 필요합니다. cards가 빈 배열인 것과는 다릅니다.
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardLinkCardResponse'
     ActivateCardLinkCardsApiResponse:
       type: object
       properties:

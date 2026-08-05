@@ -2,6 +2,7 @@ package com.moca.mocabe.global.exception;
 
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
@@ -68,6 +69,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CardLinkNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleCardLinkNotFound(CardLinkNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, "CARD_LINK_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(CodefConnectionNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefConnectionNotFound(
+            CodefConnectionNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "CODEF_CONNECTION_NOT_FOUND", exception.getMessage());
     }
 
     @ExceptionHandler(InvalidCardSelectionException.class)

@@ -38,6 +38,20 @@
         ORDER BY display_order ASC, user_card_id ASC
     </select>
 
+    <resultMap id="linkedCardKeyRowMap" type="com.moca.mocabe.domain.codef.model.LinkedCardKeyRow">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="codef_card_key_hash" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findLinkedCardKeysByLinkId" resultMap="linkedCardKeyRowMap">
+        SELECT user_card_id, codef_card_key_hash
+        FROM user_cards
+        WHERE codef_account_credential_id = #{linkId}
+          AND user_id = #{userId}
+    </select>
+
     <!-- 넘어온 user_card_id만 이 연동 범위 안에서 활성화한다. -->
     <update id="activateCards">
         UPDATE user_cards

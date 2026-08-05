@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -22,9 +23,13 @@ import com.moca.mocabe.domain.codef.dto.CardLinkResponse;
 import com.moca.mocabe.domain.codef.dto.CardOptionSelectionRequest;
 import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
 import com.moca.mocabe.domain.codef.dto.OptionSelectionRequest;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
@@ -37,10 +42,12 @@ import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
 import com.moca.mocabe.domain.codef.model.CardCatalogEntry;
 import com.moca.mocabe.domain.codef.model.CardOptionRow;
 import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
+import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefIssuerPolicy;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import com.moca.mocabe.domain.codef.model.LinkedCardInsert;
+import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,6 +92,9 @@ class CardLinkServiceTest {
                 codefClient, codefCredentialMapper, codefCredentialStore,
                 issuerMapper, encryptor, credentialHasher,
                 cardCatalogMatcher, cardCatalogMapper, linkedCardMapper);
+        // 대부분의 테스트는 재조회 중복 방지 조회 결과에 관심이 없으므로 기본값(빈 목록)을 lenient로 깔아둔다.
+        lenient().when(linkedCardMapper.findLinkedCardKeysByLinkId(anyString(), anyString()))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -104,7 +114,8 @@ class CardLinkServiceTest {
 
         ArgumentCaptor<CodefAccountCredential> credentialCaptor =
                 ArgumentCaptor.forClass(CodefAccountCredential.class);
-        verify(codefCredentialStore).save(credentialCaptor.capture(), eq(List.of()));
+        verify(codefCredentialStore).saveCredential(credentialCaptor.capture());
+        verify(codefCredentialStore).saveCards(List.of());
         CodefAccountCredential credential = credentialCaptor.getValue();
         assertEquals(response.getLinkId(), credential.getCodefAccountCredentialId());
         assertEquals("hash-1", credential.getCredentialIdentityHash());
@@ -248,7 +259,8 @@ class CardLinkServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<LinkedCardInsert>> insertsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(codefCredentialStore).save(any(CodefAccountCredential.class), insertsCaptor.capture());
+        verify(codefCredentialStore).saveCredential(any(CodefAccountCredential.class));
+        verify(codefCredentialStore).saveCards(insertsCaptor.capture());
         List<LinkedCardInsert> inserts = insertsCaptor.getValue();
         assertEquals(1, inserts.size());
         assertEquals("card-1", inserts.get(0).cardId());
@@ -274,6 +286,136 @@ class CardLinkServiceTest {
         CardLinkResponse response = cardLinkService.createLink(USER_ID, accountRequest());
 
         assertEquals(1, response.cards().size());
+    }
+
+    @Test
+    @DisplayName("보유카드 조회가 실패해도 connectedId·자격정보 저장은 유지하고 연동 생성은 성공한다")
+    void keepsCredentialWhenOwnedCardFetchFails() {
+        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
+        when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
+        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        when(codefClient.getOwnedCards("cid-1", "0301"))
+                .thenThrow(new CodefUnavailableException("upstream timeout"));
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
+
+        CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
+
+        assertNotNull(response.getLinkId());
+        assertEquals("PENDING_CARD_ACTIVATION", response.getStatus());
+        assertTrue(response.cards().isEmpty());
+        verify(codefCredentialStore).saveCredential(any(CodefAccountCredential.class));
+        verify(codefCredentialStore, never()).saveCards(any());
+        verifyNoInteractions(cardCatalogMapper);
+    }
+
+    @Test
+    @DisplayName("institutionCode 없이 재조회하면 모든 활성 연동을 순회해 결과를 모은다")
+    void syncsAllActiveConnectionsWhenInstitutionCodeOmitted() {
+        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection shinhanConnection =
+                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", new byte[0]);
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+                .thenReturn(List.of(kbConnection, shinhanConnection));
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
+        CodefIssuerPolicy shinhanPolicy = basePolicy();
+        shinhanPolicy.setIssuerId("issuer-shinhan");
+        shinhanPolicy.setInstitutionCode("0302");
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0302")).thenReturn(shinhanPolicy);
+        // 매칭되는 카드가 하나도 없어도(카탈로그가 비어 있어도) 실패가 아니라 빈 배열로 성공 처리돼야 한다.
+        when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of());
+        when(codefClient.getOwnedCards("cid-shinhan", "0302")).thenReturn(List.of());
+
+        SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
+
+        assertEquals(2, response.results().size());
+        for (SyncOwnedCardsResult result : response.results()) {
+            assertTrue(result.success());
+            assertTrue(result.cards().isEmpty());
+        }
+    }
+
+    @Test
+    @DisplayName("institutionCode를 주면 그 카드사 연동만 재조회한다")
+    void syncsOnlyMatchingInstitutionCode() {
+        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection shinhanConnection =
+                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", new byte[0]);
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+                .thenReturn(List.of(kbConnection, shinhanConnection));
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
+        when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of());
+
+        SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, "0301");
+
+        assertEquals(1, response.results().size());
+        assertEquals("link-kb", response.results().get(0).linkId());
+        verify(codefClient, never()).getOwnedCards("cid-shinhan", "0302");
+    }
+
+    @Test
+    @DisplayName("지정한 기관코드로 연동된 활성 계정이 없으면 예외를 던진다")
+    void rejectsSyncWhenInstitutionCodeHasNoConnection() {
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of());
+
+        assertThrows(CodefConnectionNotFoundException.class,
+                () -> cardLinkService.syncOwnedCards(USER_ID, "0301"));
+        verifyNoInteractions(codefClient);
+    }
+
+    @Test
+    @DisplayName("한 연동의 재조회 실패는 다른 연동 결과에 영향을 주지 않는다")
+    void isolatesFailureOfOneConnectionDuringSync() {
+        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection shinhanConnection =
+                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", new byte[0]);
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+                .thenReturn(List.of(kbConnection, shinhanConnection));
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
+        CodefIssuerPolicy shinhanPolicy = basePolicy();
+        shinhanPolicy.setIssuerId("issuer-shinhan");
+        shinhanPolicy.setInstitutionCode("0302");
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0302")).thenReturn(shinhanPolicy);
+        when(codefClient.getOwnedCards("cid-kb", "0301"))
+                .thenThrow(new CodefUnavailableException("timeout", new java.io.IOException("connection reset")));
+        when(codefClient.getOwnedCards("cid-shinhan", "0302")).thenReturn(List.of());
+
+        SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
+
+        assertEquals(2, response.results().size());
+        SyncOwnedCardsResult kbResult = response.results().stream()
+                .filter(result -> "link-kb".equals(result.linkId())).findFirst().orElseThrow();
+        SyncOwnedCardsResult shinhanResult = response.results().stream()
+                .filter(result -> "link-shinhan".equals(result.linkId())).findFirst().orElseThrow();
+        assertFalse(kbResult.success());
+        assertTrue(kbResult.cards().isEmpty());
+        assertTrue(shinhanResult.success());
+    }
+
+    @Test
+    @DisplayName("이미 적재된 카드는 재조회해도 다시 적재하지 않고 기존 userCardId를 재사용한다")
+    void reusesExistingUserCardIdOnResync() {
+        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
+        CodefIssuerPolicy policy = cardPolicy();
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(policy);
+        when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of(
+                new CodefOwnedCard("매칭 카드", "1111****2222", "신용", null)));
+        when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("existing-key");
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(linkedCardMapper.findLinkedCardKeysByLinkId("link-kb", USER_ID))
+                .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key")));
+
+        SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
+
+        assertEquals(1, response.results().size());
+        CardLinkCardResponse card = response.results().get(0).cards().get(0);
+        assertEquals("existing-uc-1", card.userCardId());
+        assertTrue(card.matched());
+        verify(codefCredentialStore).saveCards(List.of());
     }
 
     @Test
