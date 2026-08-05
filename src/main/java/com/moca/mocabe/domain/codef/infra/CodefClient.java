@@ -65,8 +65,10 @@ public class CodefClient {
         // CODEF는 응답 본문을 URL 인코딩해서 주므로 디코드 후 파싱한다
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
         // HTTP 200이어도 result.code로 실패를 반환할 수 있어 connectedId 유무보다 먼저 확인한다.
+        // 이는 우리 쪽 버그가 아니라 CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내한다.
         if (!"CF-00000".equals(root.path("result").path("code").asText())) {
-            throw new IllegalStateException("CODEF Connected ID 발급 실패: " + root.path("result"));
+            throw new CodefUnavailableException(
+                    "CODEF Connected ID 발급에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
         String connectedId = root.path("data").path("connectedId").asText("");
         if (connectedId.isBlank()) {
@@ -91,7 +93,8 @@ public class CodefClient {
                 baseUrl + "/v1/kr/card/p/account/card-list", headers, request.toString());
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
         if (!"CF-00000".equals(root.path("result").path("code").asText())) {
-            throw new IllegalStateException("CODEF 보유카드 조회에 실패했습니다.");
+            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내한다.
+            throw new CodefUnavailableException("CODEF 보유카드 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
 
         List<CodefOwnedCard> cards = new ArrayList<>();
@@ -137,7 +140,8 @@ public class CodefClient {
                 baseUrl + "/v1/kr/card/p/account/approval-list", headers, request.toString());
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
         if (!"CF-00000".equals(root.path("result").path("code").asText())) {
-            throw new IllegalStateException("CODEF 승인내역 조회에 실패했습니다.");
+            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내한다.
+            throw new CodefUnavailableException("CODEF 승인내역 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
 
         List<CodefApproval> approvals = new ArrayList<>();

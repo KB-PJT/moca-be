@@ -59,25 +59,25 @@ class CodefClientTest {
     }
 
     @Test
-    @DisplayName("HTTP는 200이어도 result.code가 실패면 connectedId가 있어도 예외를 던진다")
+    @DisplayName("HTTP는 200이어도 result.code가 실패면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
     void throwsWhenResultCodeIsFailureEvenIfConnectedIdPresent() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
         when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-94002\",\"message\":\"실패\"},"
                         + "\"data\":{\"connectedId\":\"cid-xyz\"}}")));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(CodefUnavailableException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
     }
 
     @Test
-    @DisplayName("result.code가 실패면 응답에 connectedId가 없어도 그 자체로 예외를 던진다")
+    @DisplayName("result.code가 실패면 응답에 connectedId가 없어도 CODEF 일시 장애 오류로 변환한다")
     void throwsWhenConnectedIdMissing() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
         when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-12345\",\"message\":\"실패\"}}")));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(CodefUnavailableException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
     }
 
@@ -200,7 +200,7 @@ class CodefClientTest {
         when(httpClient.post(eq(CARD_LIST_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(CodefUnavailableException.class,
                 () -> codefClient.getOwnedCards("cid-1", "0301"));
     }
 
@@ -279,13 +279,13 @@ class CodefClientTest {
     }
 
     @Test
-    @DisplayName("승인내역 결과 코드가 실패면 예외를 던진다")
+    @DisplayName("승인내역 결과 코드가 실패면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
     void rejectsFailedApprovalResult() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
         when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(CodefUnavailableException.class,
                 () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803"));
     }
 
