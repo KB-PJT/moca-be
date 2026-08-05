@@ -82,11 +82,18 @@ CREATE TABLE card_payment_approvals (
     approval_status VARCHAR(20) NOT NULL,
     source_payload JSON NOT NULL,
     created_at DATETIME(6) NOT NULL,
-    -- NULLIF로 빈 문자열도 NULL과 동일하게 취급한다. COALESCE만 쓰면 approval_number가 ''(빈 문자열,
-    -- NULL 아님)일 때 fallback으로 넘어가지 않아 같은 카드의 서로 다른 승인건이 모두 dedupe_key=''가
-    -- 되고, 두 번째 승인건이 UNIQUE 제약에 걸려 유실된다.
+    -- CardSyncService.dedupeKey()의 "approvalNumber == null || approvalNumber.isBlank()" 판정과
+    -- 정확히 같은 규칙을 SQL에서도 적용한다. TRIM()으로 공백만 있는 값(" " 등)도 빈 값으로 판정하되,
+    -- 판정에만 쓰고 실제 저장값은 원문 approval_number를 그대로 쓴다(트림된 값으로 바뀌지 않도록).
+    -- NULLIF(approval_number, '')만 쓰면 ''(빈 문자열)만 잡고 " "(공백)는 못 잡아 서비스 판정과
+    -- 어긋나므로(그 결과 서로 다른 자연키를 가진 두 승인건이 dedupe_key=" "로 충돌할 수 있었다), 아예
+    -- CASE로 서비스와 동일한 조건을 명시한다.
     dedupe_key VARCHAR(320) AS (
-        COALESCE(NULLIF(approval_number, ''), CONCAT('N|', approved_at, '|', amount, '|', merchant_name))
+        CASE
+            WHEN approval_number IS NULL OR TRIM(approval_number) = '' THEN
+                CONCAT('N|', approved_at, '|', amount, '|', merchant_name)
+            ELSE approval_number
+        END
     ) STORED NOT NULL,
     PRIMARY KEY (approval_id),
     CONSTRAINT uk_card_payment_approvals_card_dedupe

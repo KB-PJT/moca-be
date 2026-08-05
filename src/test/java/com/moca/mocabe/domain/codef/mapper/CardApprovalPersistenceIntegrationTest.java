@@ -127,8 +127,8 @@ class CardApprovalPersistenceIntegrationTest {
     @Test
     @DisplayName("승인번호가 빈 문자열(NULL 아님)이어도 같은 자연키면 UNIQUE 제약으로 막힌다")
     void rejectsDuplicateFallbackKeyWhenApprovalNumberBlank() {
-        // COALESCE만 쓰면 ''(NULL 아님)일 때 fallback으로 넘어가지 않아 두 건 모두 dedupe_key=''가 되어
-        // 중복 판정이 무력화된다. NULLIF(approval_number, '')로 빈 문자열도 NULL과 동일하게 취급해야 잡힌다.
+        // CASE의 TRIM(approval_number) = '' 조건으로 ''(빈 문자열, NULL 아님)도 fallback으로 넘어가야
+        // 한다. 이 조건이 없으면 두 건 모두 dedupe_key=''가 되어 중복 판정이 무력화된다.
         LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 4, 15, 0, 0);
         cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
                 "", approvedAt, "노포", 7000, "{}");
@@ -145,6 +145,38 @@ class CardApprovalPersistenceIntegrationTest {
                 "", LocalDateTime.of(2026, 8, 4, 15, 0, 0), "노포1", 1000, "{}");
         cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
                 "", LocalDateTime.of(2026, 8, 4, 16, 0, 0), "노포2", 2000, "{}");
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM card_payment_approvals WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID);
+        assertEquals(2, count);
+    }
+
+    @Test
+    @DisplayName("승인번호가 공백(\" \")이어도 같은 자연키면 UNIQUE 제약으로 막힌다")
+    void rejectsDuplicateFallbackKeyWhenApprovalNumberWhitespace() {
+        // CardSyncService.dedupeKey()는 String.isBlank()로 " "도 fallback 대상으로 본다. DB의
+        // TRIM(approval_number) = '' 조건이 이와 어긋나면(예: ''만 비교) 서로 다른 자연키를 가진 두
+        // 승인건이 dedupe_key=" "로 동일해져 두 번째 건이 잘못 거부되거나, 반대로 같은 자연키인데
+        // dedupe_key가 " "로 남아 진짜 중복을 못 잡을 수 있다. 여기서는 같은 자연키 케이스를 검증한다.
+        LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 4, 15, 0, 0);
+        cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
+                " ", approvedAt, "노포", 7000, "{}");
+
+        assertThrows(org.springframework.dao.DuplicateKeyException.class, () ->
+                cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID,
+                        null, " ", approvedAt, "노포", 7000, "{}"));
+    }
+
+    @Test
+    @DisplayName("승인번호가 공백이어도 자연키가 다른 승인건은 서로 다른 행으로 적재된다")
+    void insertsDistinctRowsWithWhitespaceApprovalNumberWhenNaturalKeyDiffers() {
+        // 서비스는 " "를 fallback(자연키) 대상으로 보므로, 자연키가 다른 두 건은 별개로 적재돼야 한다.
+        // TRIM 없이 원문 " "만 비교하면 두 건 모두 dedupe_key=" "가 되어 두 번째 건이 잘못 거부된다.
+        cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
+                " ", LocalDateTime.of(2026, 8, 4, 15, 0, 0), "노포1", 1000, "{}");
+        cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
+                " ", LocalDateTime.of(2026, 8, 4, 16, 0, 0), "노포2", 2000, "{}");
 
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM card_payment_approvals WHERE user_card_id = ?",
