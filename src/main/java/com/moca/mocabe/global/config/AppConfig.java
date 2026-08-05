@@ -2,6 +2,13 @@ package com.moca.mocabe.global.config;
 
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.service.CardQueryService;
+import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
+import com.moca.mocabe.domain.codef.service.ApprovalCardMatcher;
+import com.moca.mocabe.domain.codef.service.ApprovalIngestStore;
+import com.moca.mocabe.domain.codef.service.CardSyncService;
+import com.moca.mocabe.domain.merchant.mapper.MerchantMapper;
+import com.moca.mocabe.domain.merchant.service.MerchantLookup;
+import com.moca.mocabe.domain.merchant.service.MerchantNameNormalizer;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.CodefHttpClient;
@@ -125,6 +132,39 @@ public class AppConfig {
     @Bean
     public CardNameNormalizer cardNameNormalizer() {
         return new CardNameNormalizer();
+    }
+
+    @Bean
+    public ApprovalCardMatcher approvalCardMatcher(CardNameNormalizer cardNameNormalizer) {
+        return new ApprovalCardMatcher(cardNameNormalizer);
+    }
+
+    @Bean
+    public MerchantNameNormalizer merchantNameNormalizer() {
+        return new MerchantNameNormalizer();
+    }
+
+    @Bean
+    public MerchantLookup merchantLookup(MerchantMapper merchantMapper,
+                                         MerchantNameNormalizer merchantNameNormalizer) {
+        return new MerchantLookup(merchantMapper, merchantNameNormalizer);
+    }
+
+    @Bean
+    public ApprovalIngestStore approvalIngestStore(CardApprovalMapper cardApprovalMapper) {
+        return new ApprovalIngestStore(cardApprovalMapper);
+    }
+
+    @Bean
+    public CardSyncService cardSyncService(CodefClient codefClient,
+                                           CodefCredentialMapper codefCredentialMapper,
+                                           CardApprovalMapper cardApprovalMapper,
+                                           ApprovalCardMatcher approvalCardMatcher,
+                                           MerchantLookup merchantLookup,
+                                           ApprovalIngestStore approvalIngestStore,
+                                           Encryptor codefEncryptor) {
+        return new CardSyncService(codefClient, codefCredentialMapper, cardApprovalMapper,
+                approvalCardMatcher, merchantLookup, approvalIngestStore, codefEncryptor);
     }
 
     @Bean

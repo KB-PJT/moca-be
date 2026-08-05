@@ -323,6 +323,47 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
+  /me/cards/sync:
+    post:
+      tags: [Card]
+      summary: 승인내역 동기화
+      description: |
+        연결된 카드사의 승인내역(거래내역)을 CODEF에서 조회해 새로 발견한 정상 국내 승인건만 중복 없이 적재합니다.
+        취소·부분취소·거절 및 해외결제는 적재하지 않습니다.
+        startDate/endDate를 생략하면 이번 달 1일부터 오늘까지(KST) 조회합니다.
+      operationId: syncMyCardApprovals
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: false
+          description: 조회 시작일(KST, YYYY-MM-DD). 생략 시 이번 달 1일.
+          schema:
+            type: string
+            format: date
+            example: "2026-08-01"
+        - name: endDate
+          in: query
+          required: false
+          description: 조회 종료일(KST, YYYY-MM-DD). 생략 시 오늘.
+          schema:
+            type: string
+            format: date
+            example: "2026-08-03"
+      responses:
+        '200':
+          description: 승인내역 동기화 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncMyCardsApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
   /me/card-sort-mode:
     patch:
       tags: [User]
@@ -703,6 +744,31 @@ components:
           description: includeInactive=true이면 필드 자체를 생략합니다.
           items:
             $ref: '#/components/schemas/MeCardItemResponse'
+    SyncMyCardsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/SyncMyCardsResponse'
+    SyncMyCardsResponse:
+      type: object
+      required: [syncedCardCount, syncedApprovalCount, syncedAt]
+      properties:
+        syncedCardCount:
+          type: integer
+          description: 동기화 대상 보유 카드 수.
+          example: 3
+        syncedApprovalCount:
+          type: integer
+          description: 이번 동기화로 새로 적재된 승인내역 건수.
+          example: 42
+        syncedAt:
+          type: string
+          format: date-time
+          description: 동기화 완료 시각(KST 오프셋 포함).
+          example: "2026-08-03T10:30:00+09:00"
     MeCardItemResponse:
       type: object
       required: [userCardId, cardName, cardNo, issuerId, issuerName, cardImageUrl, memo]

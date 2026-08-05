@@ -6,6 +6,7 @@ import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
+import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
@@ -107,6 +108,17 @@ class GlobalExceptionHandlerTest {
 
         assertError(response, HttpStatus.SERVICE_UNAVAILABLE, "CODEF_UNAVAILABLE");
         assertEquals("CODEF 응답이 지연되어 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("잘못된 동기화 조회 기간은 400 오류로 변환한다")
+    void handlesInvalidSyncPeriod() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleInvalidSyncPeriod(
+                new InvalidSyncPeriodException("조회 시작일이 종료일보다 늦을 수 없습니다."));
+
+        assertError(response, HttpStatus.BAD_REQUEST, "INVALID_SYNC_PERIOD");
+        assertEquals("조회 시작일이 종료일보다 늦을 수 없습니다.",
                 response.getBody().getError().getMessage());
     }
 

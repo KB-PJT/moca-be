@@ -7,6 +7,7 @@ import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
+import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -69,6 +70,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCardSelectionException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidCardSelection(InvalidCardSelectionException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_CARD_SELECTION", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidSyncPeriodException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidSyncPeriod(InvalidSyncPeriodException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_SYNC_PERIOD", exception.getMessage());
     }
 
     @ExceptionHandler(CodefCredentialRequiredException.class)
@@ -156,11 +162,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        // 어떤 제약을 위반했는지 추적할 수 있도록 원인을 로그로 남긴다(응답에는 세부 정보를 노출하지 않는다).
+        LOGGER.log(Level.WARNING, "데이터 제약 위반으로 409를 반환합니다.", exception);
         return error(HttpStatus.CONFLICT, "DATA_INTEGRITY_VIOLATION", "데이터 제약 조건을 위반했습니다.");
     }
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiErrorResponse> handleDataAccess(DataAccessException exception) {
+        // SQL 오류·매핑 오류 등이 503으로 뭉뚱그려지면 원인을 알 수 없으므로 스택트레이스를 로그로 남긴다.
+        LOGGER.log(Level.WARNING, "데이터 접근 오류로 503을 반환합니다.", exception);
         return error(HttpStatus.SERVICE_UNAVAILABLE, "DATA_STORE_UNAVAILABLE",
                 "데이터 저장소에 일시적으로 연결할 수 없습니다.");
     }
