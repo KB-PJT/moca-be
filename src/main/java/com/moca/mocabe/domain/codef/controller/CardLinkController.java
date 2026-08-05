@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsRequest;
 import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsResponse;
 import com.moca.mocabe.domain.codef.dto.CardLinkResponse;
 import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.response.ApiResponse;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** CODEF 카드 연동(Connected ID 생성) API를 제공한다. */
@@ -43,5 +45,12 @@ public class CardLinkController {
             @Valid @RequestBody ActivateCardLinkCardsRequest request) {
         return ApiResponse.success(cardLinkService.activateCards(
                 currentUserProvider.getCurrentUserId(), linkId, request));
+    }
+
+    @PostMapping("/cards/sync")
+    public ApiResponse<SyncOwnedCardsResponse> syncOwnedCards(
+            @RequestParam(name = "institutionCode", required = false) String institutionCode) {
+        return ApiResponse.success(cardLinkService.syncOwnedCards(
+                currentUserProvider.getCurrentUserId(), institutionCode));
     }
 }
