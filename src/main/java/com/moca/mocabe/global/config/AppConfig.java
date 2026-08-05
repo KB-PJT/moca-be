@@ -31,9 +31,13 @@ import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
 import com.moca.mocabe.global.exception.GlobalExceptionHandler;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Locale;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -46,6 +50,12 @@ public class AppConfig {
     // CODEF(특히 개발계)는 카드사 인증 콜백을 기다려 응답이 느릴 수 있어 응답 대기를 넉넉히 둔다.
     // 필요 시 MOCA_CODEF_REQUEST_TIMEOUT_MS 환경변수로 재정의한다.
     private static final long DEFAULT_CODEF_REQUEST_TIMEOUT_MS = 20_000L;
+
+    // CODEF baseUrl/tokenUrl은 환경변수로 주입되므로, 설정 실수(오타·오설정)로 Bearer 토큰이나
+    // Basic 자격증명이 CODEF가 아닌 외부 host로 전송되는 것을 막기 위해 host를 고정 허용목록으로 제한한다.
+    // 이 목록 자체는 환경변수로 재정의할 수 없게 해야 검증의 의미가 있다.
+    private static final Set<String> ALLOWED_CODEF_HOSTS =
+            Set.of("development.codef.io", "api.codef.io", "oauth.codef.io");
 
     @Bean
     public CurrentUserProvider currentUserProvider() {
@@ -92,6 +102,9 @@ public class AppConfig {
         return HttpClient.newBuilder()
                 .connectTimeout(timeoutProperty(
                         environment, "MOCA_CODEF_CONNECT_TIMEOUT_MS", DEFAULT_CODEF_CONNECT_TIMEOUT_MS))
+                // 리다이렉트를 자동으로 따라가면 Authorization 헤더(Bearer/Basic)가 서드파티 host로
+                // 그대로 전달될 수 있다. CODEF 호출에는 리다이렉트가 필요하지 않으므로 명시적으로 막는다.
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
     }
 
@@ -109,8 +122,8 @@ public class AppConfig {
                 requiredProperty(environment, "MOCA_CODEF_CLIENT_ID"),
                 requiredProperty(environment, "MOCA_CODEF_CLIENT_SECRET"),
                 requiredProperty(environment, "MOCA_CODEF_PUBLIC_KEY"),
-                requiredProperty(environment, "MOCA_CODEF_BASE_URL"),
-                requiredProperty(environment, "MOCA_CODEF_TOKEN_URL"));
+                requiredCodefUrl(environment, "MOCA_CODEF_BASE_URL"),
+                requiredCodefUrl(environment, "MOCA_CODEF_TOKEN_URL"));
     }
 
     @Bean
@@ -187,6 +200,29 @@ public class AppConfig {
         String value = environment.getProperty(name);
         if (value == null || value.isBlank()) {
             throw new IllegalStateException(name + " 환경변수가 필요합니다.");
+        }
+        return value;
+    }
+
+    /**
+     * CODEF 호출 URL(baseUrl/tokenUrl) 환경변수를 https + 승인된 CODEF host로 제한한다.
+     * Bearer 토큰·Basic 자격증명이 설정 실수로 외부 endpoint에 전송되는 것을 막기 위한 방어다.
+     */
+    private static String requiredCodefUrl(Environment environment, String name) {
+        String value = requiredProperty(environment, name);
+        URI uri;
+        try {
+            uri = new URI(value);
+        } catch (URISyntaxException exception) {
+            throw new IllegalStateException(name + "이(가) 올바른 URL 형식이 아닙니다.", exception);
+        }
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IllegalStateException(name + "은(는) https URL이어야 합니다.");
+        }
+        String host = uri.getHost();
+        if (host == null || !ALLOWED_CODEF_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+            throw new IllegalStateException(
+                    name + "의 host가 승인된 CODEF host가 아닙니다: " + host);
         }
         return value;
     }
