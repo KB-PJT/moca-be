@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.merchant.mapper.MerchantMapper">
+
+    <resultMap id="merchantNameCandidateMap" type="com.moca.mocabe.domain.merchant.model.MerchantNameCandidate">
+        <constructor>
+            <arg column="merchant_id" javaType="java.lang.String"/>
+            <arg column="normalized_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 매칭 규칙(접두사 판정·최장일치·동률 해소)은 여기서 하지 않는다. 활성 가맹점 후보만 그대로 반환한다. -->
+    <select id="findActiveMerchantNameCandidates" resultMap="merchantNameCandidateMap">
+        SELECT merchant_id, normalized_name
+        FROM merchants
+        WHERE status = 'active'
+        ORDER BY merchant_id ASC
+    </select>
+
+    <select id="findActiveMerchantAliasCandidates" resultMap="merchantNameCandidateMap">
+        SELECT a.merchant_id, a.normalized_alias_name AS normalized_name
+        FROM merchant_aliases a
+        INNER JOIN merchants m ON m.merchant_id = a.merchant_id AND m.status = 'active'
+        ORDER BY a.merchant_alias_id ASC
+    </select>
+</mapper>

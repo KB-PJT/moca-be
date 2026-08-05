@@ -12,6 +12,7 @@ import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
+import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenPolicy;
@@ -150,6 +151,11 @@ class WebMvcConfigTest {
         @Bean
         public HomeQueryService homeQueryService() {
             return org.mockito.Mockito.mock(HomeQueryService.class);
+        }
+
+        @Bean
+        public CardSyncService cardSyncService() {
+            return org.mockito.Mockito.mock(CardSyncService.class);
         }
 
         @Bean

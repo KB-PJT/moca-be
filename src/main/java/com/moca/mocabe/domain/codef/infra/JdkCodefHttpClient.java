@@ -1,10 +1,12 @@
 package com.moca.mocabe.domain.codef.infra;
 
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
@@ -31,8 +33,13 @@ public class JdkCodefHttpClient implements CodefHttpClient {
             HttpResponse<String> response = httpClient.send(
                     builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             return new CodefHttpResponse(response.statusCode(), response.body());
+        } catch (HttpTimeoutException exception) {
+            // CODEF(특히 개발계)는 카드사 인증 콜백을 기다리느라 응답이 느릴 수 있다. 상류 지연은 503으로 안내한다.
+            throw new CodefUnavailableException(
+                    "CODEF 응답이 지연되어 처리하지 못했습니다. 잠시 후 다시 시도해주세요.", exception);
         } catch (IOException exception) {
-            throw new IllegalStateException("CODEF 요청에 실패했습니다.", exception);
+            throw new CodefUnavailableException(
+                    "CODEF 연동 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.", exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("CODEF 요청이 중단되었습니다.", exception);
