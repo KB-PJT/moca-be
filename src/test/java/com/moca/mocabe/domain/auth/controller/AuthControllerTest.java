@@ -42,6 +42,7 @@ class AuthControllerTest {
         assertTrue(setCookie.contains("Path=/moca-be/api/v1/auth"));
         assertFalse(setCookie.contains("Secure"));
         assertTrue(setCookie.contains("HttpOnly"));
+        assertTrue(setCookie.contains("SameSite=Lax"));
     }
 
     @Test
@@ -61,6 +62,7 @@ class AuthControllerTest {
 
         assertTrue(refreshedCookie.contains("new-refresh"));
         assertTrue(refreshedCookie.contains("Secure"));
+        assertTrue(refreshedCookie.contains("SameSite=None"));
         assertTrue(expiredCookie.contains("Max-Age=0"));
         verify(authApplicationService).logout("access", "refresh");
         verify(authApplicationService).logout(null, null);

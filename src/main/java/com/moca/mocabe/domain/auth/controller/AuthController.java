@@ -81,7 +81,7 @@ public class AuthController {
         return ResponseCookie.from(REFRESH_COOKIE, refreshToken)
                 .httpOnly(true)
                 .secure(refreshCookiePolicy.isSecure())
-                .sameSite("Lax")
+                .sameSite(refreshCookiePolicy.getSameSite())
                 .path(refreshCookiePath(contextPath))
                 .maxAge(maxAge)
                 .build();
