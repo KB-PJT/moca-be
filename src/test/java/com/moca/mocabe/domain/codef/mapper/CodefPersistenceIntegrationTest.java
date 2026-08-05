@@ -17,6 +17,7 @@ import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.CredentialHasher;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
+import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
@@ -66,6 +67,9 @@ class CodefPersistenceIntegrationTest {
 
     @Autowired
     private Encryptor encryptor;
+
+    @Autowired
+    private CodefCredentialMapper codefCredentialMapper;
 
     @BeforeEach
     void setUpDatabase() {
@@ -173,6 +177,35 @@ class CodefPersistenceIntegrationTest {
                 "SELECT is_active FROM user_cards WHERE user_card_id = ?", Boolean.class, userCardId));
         assertEquals(OPTION_CHOICE_ID, jdbcTemplate.queryForObject(
                 "SELECT option_choice_id FROM user_card_option_selections", String.class));
+    }
+
+    @Test
+    @DisplayName("승인내역 조회용으로 활성 연동만 기관코드·birth_date_enc와 함께 조회한다")
+    void findsActiveConnectionsWithInstitutionCode() {
+        insertCredential("01980d6a-5c0c-7aaf-9b85-0102030405a1", CONNECTED_ID, "active",
+                "1000000000000000000000000000000000000000000000000000000000000001",
+                encryptor.encrypt("900101"));
+        insertCredential("01980d6a-5c0c-7aaf-9b85-0102030405a2", "revoked-connected-id", "revoked",
+                "1000000000000000000000000000000000000000000000000000000000000002",
+                encryptor.encrypt("880220"));
+
+        List<CodefConnection> connections =
+                codefCredentialMapper.findActiveConnectionsByUserId(USER_ID);
+
+        assertEquals(1, connections.size());
+        assertEquals(CONNECTED_ID, connections.get(0).connectedId());
+        assertEquals("0301", connections.get(0).institutionCode());
+        assertEquals(ISSUER_ID, connections.get(0).issuerId());
+        assertEquals("900101", encryptor.decrypt(connections.get(0).birthDateEnc()));
+    }
+
+    private void insertCredential(String credentialId, String connectedId, String status,
+                                  String identityHash, byte[] birthDateEnc) {
+        jdbcTemplate.update("INSERT INTO codef_account_credentials "
+                        + "(codef_account_credential_id, user_id, issuer_id, connected_id, "
+                        + "birth_date_enc, credential_identity_hash, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                credentialId, USER_ID, ISSUER_ID, connectedId, birthDateEnc, identityHash, status);
     }
 
     private CreateCardLinkRequest request() {

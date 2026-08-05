@@ -1,23 +1,29 @@
 package com.moca.mocabe.domain.card.controller;
 
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
+import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.card.service.CardQueryService;
+import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.response.ApiResponse;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 인증 사용자의 보유 카드 목록 API를 제공한다. */
+/** 인증 사용자의 보유 카드 목록·승인내역 동기화 API를 제공한다. */
 @RestController
 @RequestMapping("/me/cards")
 @RequiredArgsConstructor
 public class MeCardController {
 
     private final CardQueryService cardQueryService;
+    private final CardSyncService cardSyncService;
     private final CurrentUserProvider currentUserProvider;
 
     @GetMapping
@@ -28,6 +34,19 @@ public class MeCardController {
         boolean activeOnly = includeInactive;
         MeCardsResponse response = cardQueryService.getMyCards(
                 currentUserProvider.getCurrentUserId(), activeOnly);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/sync")
+    public ResponseEntity<ApiResponse<SyncMyCardsResponse>> sync(
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        // startDate/endDate를 생략하면 이번 달 1일~오늘 범위로 승인내역을 조회·적재한다.
+        SyncMyCardsResponse response = cardSyncService.sync(
+                currentUserProvider.getCurrentUserId(), startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
