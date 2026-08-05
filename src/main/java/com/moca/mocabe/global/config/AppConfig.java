@@ -48,8 +48,8 @@ public class AppConfig {
 
     private static final long DEFAULT_CODEF_CONNECT_TIMEOUT_MS = 3_000L;
     // CODEF(특히 개발계)는 카드사 인증 콜백을 기다려 응답이 느릴 수 있어 응답 대기를 넉넉히 둔다.
-    // 필요 시 MOCA_CODEF_REQUEST_TIMEOUT_MS 환경변수로 재정의한다.
-    private static final long DEFAULT_CODEF_REQUEST_TIMEOUT_MS = 20_000L;
+    // .env.example 기본값과 일치시킨다. 필요 시 MOCA_CODEF_REQUEST_TIMEOUT_MS 환경변수로 재정의한다.
+    private static final long DEFAULT_CODEF_REQUEST_TIMEOUT_MS = 30_000L;
 
     // CODEF baseUrl/tokenUrl은 환경변수로 주입되므로, 설정 실수(오타·오설정)로 Bearer 토큰이나
     // Basic 자격증명이 CODEF가 아닌 외부 host로 전송되는 것을 막기 위해 host를 고정 허용목록으로 제한한다.
