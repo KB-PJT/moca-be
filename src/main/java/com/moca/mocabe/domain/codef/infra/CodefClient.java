@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
+import com.moca.mocabe.domain.codef.model.CodefApproval;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.io.IOException;
@@ -108,6 +109,82 @@ public class CodefClient {
             throw new IllegalStateException("CODEF 보유카드 응답 형식이 올바르지 않습니다.");
         }
         return cards;
+    }
+
+    /**
+     * Connected ID로 개인 카드 승인내역(거래내역)을 조회한다.
+     *
+     * inquiryType="1"(전체조회)로 카드사 전체 카드의 승인내역을 한 번에 받아 카드 매칭은 호출자가 수행한다.
+     * 가맹점 상세는 요청하지 않으며(memberStoreInfoType="0"), 날짜는 CODEF 규격인 YYYYMMDD로 전달한다.
+     */
+    public List<CodefApproval> getApprovals(String connectedId, String organization,
+                                            String birthDate, String startDate, String endDate) {
+        String accessToken = requestAccessToken();
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put("connectedId", connectedId);
+        request.put("organization", organization);
+        request.put("birthDate", birthDate == null ? "" : birthDate);
+        request.put("startDate", startDate);
+        request.put("endDate", endDate);
+        request.put("orderBy", "0");
+        request.put("inquiryType", "1");
+        request.put("memberStoreInfoType", "0");
+
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Authorization", "Bearer " + accessToken);
+        headers.put("Content-Type", "application/json");
+        String responseBody = postSuccessful(
+                baseUrl + "/v1/kr/card/p/account/approval-list", headers, request.toString());
+        JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
+        if (!"CF-00000".equals(root.path("result").path("code").asText())) {
+            throw new IllegalStateException("CODEF 승인내역 조회에 실패했습니다.");
+        }
+
+        List<CodefApproval> approvals = new ArrayList<>();
+        JsonNode data = root.path("data");
+        // 승인내역이 0건으로 보일 때 CODEF 응답 형태(배열/객체/필드)를 바로 확인할 수 있도록 남긴다(FINE).
+        LOGGER.fine("CODEF 승인내역 응답 dataType=" + data.getNodeType()
+                + ", size=" + data.size() + ", fields=" + fieldNames(data));
+        if (data.isArray()) {
+            for (JsonNode item : data) {
+                approvals.add(toApproval(item));
+            }
+        } else if (data.isObject() && data.hasNonNull("resUsedDate")) {
+            // 승인내역이 1건이면 CODEF는 배열이 아닌 단일 객체로 응답한다.
+            approvals.add(toApproval(data));
+        } else if (data.isObject() && data.size() == 0) {
+            // 조회 기간에 승인내역이 없으면 빈 객체({})로 응답할 수 있다.
+            return approvals;
+        } else {
+            LOGGER.warning("CODEF 승인내역 data 형식을 해석할 수 없습니다. result=" + root.path("result")
+                    + ", dataType=" + data.getNodeType() + ", fields=" + fieldNames(data));
+            throw new IllegalStateException("CODEF 승인내역 응답 형식이 올바르지 않습니다.");
+        }
+        return approvals;
+    }
+
+    /** 진단 로그용으로 객체 노드의 필드명 목록을 만든다(값은 남기지 않아 민감정보 노출을 피한다). */
+    private String fieldNames(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return "[]";
+        }
+        List<String> names = new ArrayList<>();
+        node.fieldNames().forEachRemaining(names::add);
+        return names.toString();
+    }
+
+    private CodefApproval toApproval(JsonNode item) {
+        return new CodefApproval(
+                item.path("resUsedDate").asText(""),
+                item.path("resUsedTime").asText(""),
+                item.path("resCardNo").asText(""),
+                item.path("resCardName").asText("").trim(),
+                item.path("resMemberStoreName").asText(""),
+                item.path("resUsedAmount").asText(""),
+                blankToNull(item.path("resApprovalNo").asText("")),
+                item.path("resHomeForeignType").asText(""),
+                item.path("resCancelYN").asText(""),
+                item.toString());
     }
 
     private CodefOwnedCard toOwnedCard(JsonNode item) {
