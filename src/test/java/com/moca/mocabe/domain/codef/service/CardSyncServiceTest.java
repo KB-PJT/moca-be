@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,6 +23,7 @@ import com.moca.mocabe.domain.codef.model.CodefApproval;
 import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.ExistingApprovalKey;
 import com.moca.mocabe.domain.codef.model.UserCardMatchRow;
+import com.moca.mocabe.domain.merchant.service.MerchantCandidateSnapshot;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -40,6 +42,7 @@ class CardSyncServiceTest {
     private CardApprovalMapper cardApprovalMapper;
     private ApprovalCardMatcher approvalCardMatcher;
     private MerchantLookup merchantLookup;
+    private MerchantCandidateSnapshot merchantCandidates;
     private ApprovalIngestStore approvalIngestStore;
     private Encryptor encryptor;
     private CardSyncService service;
@@ -51,8 +54,10 @@ class CardSyncServiceTest {
         cardApprovalMapper = mock(CardApprovalMapper.class);
         approvalCardMatcher = mock(ApprovalCardMatcher.class);
         merchantLookup = mock(MerchantLookup.class);
+        merchantCandidates = mock(MerchantCandidateSnapshot.class);
         approvalIngestStore = mock(ApprovalIngestStore.class);
         encryptor = mock(Encryptor.class);
+        when(merchantLookup.loadCandidates()).thenReturn(merchantCandidates);
         service = new CardSyncService(codefClient, codefCredentialMapper, cardApprovalMapper,
                 approvalCardMatcher, merchantLookup, approvalIngestStore, encryptor);
     }
@@ -125,7 +130,7 @@ class CardSyncServiceTest {
             CodefApproval approval = invocation.getArgument(1);
             return "미매칭".equals(approval.memberStoreName()) ? null : "uc-1";
         });
-        when(merchantLookup.resolveMerchantId("스타벅스")).thenReturn("m-1");
+        when(merchantCandidates.resolveMerchantId("스타벅스")).thenReturn("m-1");
         when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(List.of(
                         approval("20260801", "120000", "카드A", "스타벅스", "5,000", "100", "1", "0"),
@@ -165,6 +170,8 @@ class CardSyncServiceTest {
         assertEquals(null, second.merchantId());
         assertEquals(null, second.approvalNumber());
         assertTrue(response.getSyncedAt().contains("+09:00"));
+        // 승인건이 14개(가맹점 매칭 대상만 여럿)여도 가맹점 후보 스냅샷은 동기화당 한 번만 조회해야 한다.
+        verify(merchantLookup, times(1)).loadCandidates();
     }
 
     private CodefApproval approval(String usedDate, String usedTime, String cardName, String store,

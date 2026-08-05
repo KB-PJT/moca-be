@@ -11,6 +11,7 @@ import com.moca.mocabe.domain.codef.model.CodefApproval;
 import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.ExistingApprovalKey;
 import com.moca.mocabe.domain.codef.model.UserCardMatchRow;
+import com.moca.mocabe.domain.merchant.service.MerchantCandidateSnapshot;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -95,6 +96,8 @@ public class CardSyncService {
         for (UserCardMatchRow card : userCards) {
             LOGGER.fine("동기화 대상 보유카드: name='" + card.cardName() + "' cardNo='" + card.cardNo() + "'");
         }
+        // 가맹점 후보를 승인건마다 다시 조회하면 비용이 승인건 수만큼 반복되므로 이 회차 시작 시 한 번만 읽는다.
+        MerchantCandidateSnapshot merchantCandidates = merchantLookup.loadCandidates();
         IngestStats stats = new IngestStats();
         List<ApprovalInsert> inserts = new ArrayList<>();
         for (CodefConnection connection : connections) {
@@ -102,7 +105,8 @@ public class CardSyncService {
             List<CodefApproval> approvals = codefClient.getApprovals(
                     connection.connectedId(), connection.institutionCode(), birthDate, startStr, endStr);
             for (CodefApproval approval : approvals) {
-                ApprovalInsert insert = toInsert(userId, userCards, approval, connection.issuerId(), seenKeys, stats);
+                ApprovalInsert insert = toInsert(userId, userCards, approval, connection.issuerId(),
+                        merchantCandidates, seenKeys, stats);
                 if (insert != null) {
                     inserts.add(insert);
                 }
@@ -118,8 +122,9 @@ public class CardSyncService {
     }
 
     private ApprovalInsert toInsert(String userId, List<UserCardMatchRow> userCards,
-                                    CodefApproval approval, String issuerId, Set<String> seenKeys,
-                                    IngestStats stats) {
+                                    CodefApproval approval, String issuerId,
+                                    MerchantCandidateSnapshot merchantCandidates,
+                                    Set<String> seenKeys, IngestStats stats) {
         stats.fetched++;
         // 취소/부분취소/거절·해외결제는 적재하지 않는다.
         if (!approval.isNormalApproval() || !approval.isDomestic()) {
@@ -146,7 +151,7 @@ public class CardSyncService {
             stats.duplicate++;
             return null;
         }
-        String merchantId = merchantLookup.resolveMerchantId(approval.memberStoreName());
+        String merchantId = merchantCandidates.resolveMerchantId(approval.memberStoreName());
         return new ApprovalInsert(UUID.randomUUID().toString(), userId, userCardId, merchantId,
                 approval.approvalNo(), approvedAt, approval.memberStoreName(), amount, approval.sourcePayload());
     }
