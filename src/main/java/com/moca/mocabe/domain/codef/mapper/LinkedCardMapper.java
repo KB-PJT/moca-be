@@ -16,6 +16,13 @@ public interface LinkedCardMapper {
     List<LinkedCardKeyRow> findLinkedCardKeysByLinkId(@Param("linkId") String linkId,
                                                        @Param("userId") String userId);
 
+    /**
+     * (user_id, codef_card_key_hash) UNIQUE 충돌 시, 동시 재조회로 다른 요청이 먼저 적재한
+     * 카드의 user_card_id를 찾는 데 쓰인다.
+     */
+    String findUserCardIdByUserIdAndCardKeyHash(@Param("userId") String userId,
+                                                 @Param("codefCardKeyHash") String codefCardKeyHash);
+
     void insertLinkedCard(@Param("userCardId") String userCardId,
                           @Param("linkId") String linkId,
                           @Param("userId") String userId,

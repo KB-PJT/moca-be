@@ -20,11 +20,19 @@ import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
+import com.moca.mocabe.domain.codef.model.LinkedCardInsert;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.codef.service.CardCatalogMatcher;
 import com.moca.mocabe.domain.codef.service.CardNameNormalizer;
 import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
@@ -64,6 +72,9 @@ class CodefPersistenceIntegrationTest {
 
     @Autowired
     private CardLinkService cardLinkService;
+
+    @Autowired
+    private CodefCredentialStore codefCredentialStore;
 
     @Autowired
     private Encryptor encryptor;
@@ -197,6 +208,53 @@ class CodefPersistenceIntegrationTest {
         assertEquals("0301", connections.get(0).institutionCode());
         assertEquals(ISSUER_ID, connections.get(0).issuerId());
         assertEquals("900101", encryptor.decrypt(connections.get(0).birthDateEnc()));
+    }
+
+    @Test
+    @DisplayName("동시 재조회로 같은 카드를 두 요청이 함께 적재하면 하나의 user_card_id로 수렴한다")
+    void concurrentSaveCardConvergesToSingleUserCardId() throws Exception {
+        String linkId = "01980d6a-5c0c-7aaf-9b85-0102030405b1";
+        insertCredential(linkId, CONNECTED_ID, "active",
+                "3000000000000000000000000000000000000000000000000000000000000001",
+                encryptor.encrypt("900101"));
+        jdbcTemplate.update("INSERT INTO cards "
+                        + "(card_id, issuer_id, card_type, first_seen_at, last_seen_at) "
+                        + "VALUES (?, ?, 'credit', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                CARD_ID, ISSUER_ID);
+        String cardKeyHash = "concurrent-resync-card-key-hash";
+        LinkedCardInsert first = new LinkedCardInsert(UUID.randomUUID().toString(), linkId, USER_ID, ISSUER_ID,
+                CARD_ID, "동시성 테스트 카드", "1111****2222", cardKeyHash, 0);
+        LinkedCardInsert second = new LinkedCardInsert(UUID.randomUUID().toString(), linkId, USER_ID, ISSUER_ID,
+                CARD_ID, "동시성 테스트 카드", "1111****2222", cardKeyHash, 1);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+            Callable<String> saveFirst = () -> {
+                ready.countDown();
+                start.await();
+                return codefCredentialStore.saveCard(first);
+            };
+            Callable<String> saveSecond = () -> {
+                ready.countDown();
+                start.await();
+                return codefCredentialStore.saveCard(second);
+            };
+            Future<String> resultOne = executor.submit(saveFirst);
+            Future<String> resultTwo = executor.submit(saveSecond);
+            ready.await();
+            start.countDown();
+
+            String userCardIdOne = resultOne.get(10, TimeUnit.SECONDS);
+            String userCardIdTwo = resultTwo.get(10, TimeUnit.SECONDS);
+
+            assertEquals(userCardIdOne, userCardIdTwo);
+            assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM user_cards WHERE codef_card_key_hash = ?", Integer.class, cardKeyHash));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private void insertCredential(String credentialId, String connectedId, String status,

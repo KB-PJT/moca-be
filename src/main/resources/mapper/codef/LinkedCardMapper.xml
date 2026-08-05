@@ -52,6 +52,13 @@
           AND user_id = #{userId}
     </select>
 
+    <select id="findUserCardIdByUserIdAndCardKeyHash" resultType="string">
+        SELECT user_card_id
+        FROM user_cards
+        WHERE user_id = #{userId}
+          AND codef_card_key_hash = #{codefCardKeyHash}
+    </select>
+
     <!-- 넘어온 user_card_id만 이 연동 범위 안에서 활성화한다. -->
     <update id="activateCards">
         UPDATE user_cards

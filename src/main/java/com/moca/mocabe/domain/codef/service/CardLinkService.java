@@ -173,11 +173,11 @@ public class CardLinkService {
     private List<CardLinkCardResponse> matchAndPersistOwnedCards(String userId, String linkId,
                                                                   CodefIssuerPolicy policy,
                                                                   List<CodefOwnedCard> ownedCards) {
-        // (user_id, codef_card_key_hash)가 DB에서 UNIQUE라 해시 충돌은 발생할 수 없다.
+        // (user_id, codef_card_key_hash)가 DB에서 UNIQUE라 이 조회 이후 실제 적재 시점 사이에 다른
+        // 요청이 끼어들 수 있다(동시 재조회). 그 경우는 saveCard가 UNIQUE 충돌을 잡아 처리한다.
         Map<String, String> existingUserCardIdByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
                 .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, LinkedCardKeyRow::userCardId));
 
-        List<LinkedCardInsert> inserts = new ArrayList<>();
         List<CardLinkCardResponse> cards = new ArrayList<>();
         Set<String> cardKeyHashes = new HashSet<>();
         int displayOrder = linkedCardMapper.findNextDisplayOrder(userId);
@@ -194,15 +194,15 @@ public class CardLinkService {
             }
             String userCardId = existingUserCardIdByHash.get(cardKeyHash);
             if (userCardId == null && matched != null) {
-                userCardId = UUID.randomUUID().toString();
-                inserts.add(new LinkedCardInsert(userCardId, linkId, userId, policy.getIssuerId(),
-                        matched.cardId(), ownedCard.cardName(), blankToNull(ownedCard.cardNumber()),
-                        cardKeyHash, displayOrder++));
+                LinkedCardInsert insert = new LinkedCardInsert(UUID.randomUUID().toString(), linkId, userId,
+                        policy.getIssuerId(), matched.cardId(), ownedCard.cardName(),
+                        blankToNull(ownedCard.cardNumber()), cardKeyHash, displayOrder++);
+                // 동시 재조회로 다른 요청이 먼저 적재했다면 새로 만든 ID 대신 그 요청의 user_card_id를 받는다.
+                userCardId = codefCredentialStore.saveCard(insert);
             }
             cards.add(toResponse(userCardId, matched, ownedCard, policy));
         }
 
-        codefCredentialStore.saveCards(inserts);
         return cards;
     }
 
