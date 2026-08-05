@@ -93,3 +93,7 @@ CREATE TABLE card_payment_approvals (
     INDEX idx_card_payment_approvals_user_card_approved_at (user_card_id, approved_at),
     INDEX idx_card_payment_approvals_user_approved_at (user_id, approved_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- card_content_versions.source_payload(V4에서 추가)는 애플리케이션 코드에서 한 번도 쓰이지 않아 제거한다.
+ALTER TABLE card_content_versions
+    DROP COLUMN source_payload;
