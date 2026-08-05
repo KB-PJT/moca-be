@@ -125,6 +125,34 @@ class CardApprovalPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("승인번호가 빈 문자열(NULL 아님)이어도 같은 자연키면 UNIQUE 제약으로 막힌다")
+    void rejectsDuplicateFallbackKeyWhenApprovalNumberBlank() {
+        // COALESCE만 쓰면 ''(NULL 아님)일 때 fallback으로 넘어가지 않아 두 건 모두 dedupe_key=''가 되어
+        // 중복 판정이 무력화된다. NULLIF(approval_number, '')로 빈 문자열도 NULL과 동일하게 취급해야 잡힌다.
+        LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 4, 15, 0, 0);
+        cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
+                "", approvedAt, "노포", 7000, "{}");
+
+        assertThrows(org.springframework.dao.DuplicateKeyException.class, () ->
+                cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID,
+                        null, "", approvedAt, "노포", 7000, "{}"));
+    }
+
+    @Test
+    @DisplayName("승인번호가 빈 문자열이어도 자연키가 다른 승인건은 서로 다른 행으로 적재된다")
+    void insertsDistinctRowsWithBlankApprovalNumberWhenNaturalKeyDiffers() {
+        cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
+                "", LocalDateTime.of(2026, 8, 4, 15, 0, 0), "노포1", 1000, "{}");
+        cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
+                "", LocalDateTime.of(2026, 8, 4, 16, 0, 0), "노포2", 2000, "{}");
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM card_payment_approvals WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID);
+        assertEquals(2, count);
+    }
+
+    @Test
     @DisplayName("매칭 후보 보유카드를 카드사·카드명·마스킹 카드번호로 조회한다")
     void findsUserCardsForMatching() {
         List<UserCardMatchRow> cards = cardApprovalMapper.findUserCardsForMatching(USER_ID);

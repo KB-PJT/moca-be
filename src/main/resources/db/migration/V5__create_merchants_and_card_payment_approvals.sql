@@ -82,8 +82,11 @@ CREATE TABLE card_payment_approvals (
     approval_status VARCHAR(20) NOT NULL,
     source_payload JSON NOT NULL,
     created_at DATETIME(6) NOT NULL,
+    -- NULLIF로 빈 문자열도 NULL과 동일하게 취급한다. COALESCE만 쓰면 approval_number가 ''(빈 문자열,
+    -- NULL 아님)일 때 fallback으로 넘어가지 않아 같은 카드의 서로 다른 승인건이 모두 dedupe_key=''가
+    -- 되고, 두 번째 승인건이 UNIQUE 제약에 걸려 유실된다.
     dedupe_key VARCHAR(320) AS (
-        COALESCE(approval_number, CONCAT('N|', approved_at, '|', amount, '|', merchant_name))
+        COALESCE(NULLIF(approval_number, ''), CONCAT('N|', approved_at, '|', amount, '|', merchant_name))
     ) STORED NOT NULL,
     PRIMARY KEY (approval_id),
     CONSTRAINT uk_card_payment_approvals_card_dedupe
