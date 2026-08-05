@@ -170,7 +170,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/CardLinkApiResponse'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED), 카드사 필수 자격정보 누락
+            (code=CODEF_CREDENTIAL_REQUIRED), 또는 카드사 로그인 아이디·비밀번호 오류
+            (code=CODEF_INVALID_CREDENTIALS — 재시도 안내가 아니라 정보를 다시 확인하라는 뜻입니다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: 인증 필요
           content:

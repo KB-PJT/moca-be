@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.codef.infra;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
@@ -32,6 +33,8 @@ public class CodefClient {
 
     private static final String RSA_TRANSFORMATION = "RSA/ECB/PKCS1Padding";
     private static final String LOGIN_TYPE_ID_PASSWORD = "1";
+    private static final String RESULT_CODE_SUCCESS = "CF-00000";
+    private static final String ERROR_CODE_INVALID_CREDENTIALS = "CF-12803";
     private static final Logger LOGGER = Logger.getLogger(CodefClient.class.getName());
 
     private final CodefHttpClient httpClient;
@@ -65,8 +68,15 @@ public class CodefClient {
         // CODEF는 응답 본문을 URL 인코딩해서 주므로 디코드 후 파싱한다
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
         // HTTP 200이어도 result.code로 실패를 반환할 수 있어 connectedId 유무보다 먼저 확인한다.
-        // 이는 우리 쪽 버그가 아니라 CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내한다.
-        if (!"CF-00000".equals(root.path("result").path("code").asText())) {
+        if (!RESULT_CODE_SUCCESS.equals(root.path("result").path("code").asText())) {
+            // result.code(예 CF-04000)는 "계정 등록 실패"라는 요약일 뿐 원인은 data.errorList[].code에
+            // 있다. 그중 아이디/비밀번호 오류(CF-12803)는 CODEF 상류 문제가 아니라 사용자 입력 오류이므로
+            // 재시도 안내(503)가 아니라 400으로 구분해 알려준다. 그 외는 CODEF 상류 문제로 본다.
+            if (hasErrorCode(root.path("data").path("errorList"), ERROR_CODE_INVALID_CREDENTIALS)) {
+                throw new CodefInvalidCredentialsException();
+            }
+            // 사용자 입력 오류로 특정하지 못한 나머지는 원인 진단을 위해 CODEF result 코드를 로그로 남긴다.
+            logResultFailure("Connected ID 발급", root);
             throw new CodefUnavailableException(
                     "CODEF Connected ID 발급에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
@@ -92,8 +102,9 @@ public class CodefClient {
         String responseBody = postSuccessful(
                 baseUrl + "/v1/kr/card/p/account/card-list", headers, request.toString());
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
-        if (!"CF-00000".equals(root.path("result").path("code").asText())) {
-            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내한다.
+        if (!RESULT_CODE_SUCCESS.equals(root.path("result").path("code").asText())) {
+            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내하고, 원인 진단을 위해 로그를 남긴다.
+            logResultFailure("보유카드 조회", root);
             throw new CodefUnavailableException("CODEF 보유카드 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
 
@@ -139,8 +150,9 @@ public class CodefClient {
         String responseBody = postSuccessful(
                 baseUrl + "/v1/kr/card/p/account/approval-list", headers, request.toString());
         JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
-        if (!"CF-00000".equals(root.path("result").path("code").asText())) {
-            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내한다.
+        if (!RESULT_CODE_SUCCESS.equals(root.path("result").path("code").asText())) {
+            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내하고, 원인 진단을 위해 로그를 남긴다.
+            logResultFailure("승인내역 조회", root);
             throw new CodefUnavailableException("CODEF 승인내역 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
 
@@ -165,6 +177,33 @@ public class CodefClient {
             throw new IllegalStateException("CODEF 승인내역 응답 형식이 올바르지 않습니다.");
         }
         return approvals;
+    }
+
+    /** CODEF result 코드/메시지(값은 고정 안내문이라 민감정보 없음)를 남겨 어떤 CF-코드로 실패했는지 진단할 수 있게 한다. */
+    private void logResultFailure(String operation, JsonNode root) {
+        LOGGER.warning("CODEF " + operation + " 실패 code=" + root.path("result").path("code").asText()
+                + " message=" + root.path("result").path("message").asText());
+    }
+
+    /** errorList에 지정한 코드가 있는지 확인한다. 계정 1건만 요청해도 CODEF 관례상 배열/단일객체 둘 다 올 수 있다. */
+    private boolean hasErrorCode(JsonNode errorListNode, String code) {
+        for (JsonNode error : asNodeList(errorListNode)) {
+            if (code.equals(error.path("code").asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** CODEF는 항목이 1개면 배열 대신 단일 객체로 응답하는 경우가 있어 배열/단일객체/없음을 모두 흡수한다. */
+    private List<JsonNode> asNodeList(JsonNode node) {
+        List<JsonNode> nodes = new ArrayList<>();
+        if (node.isArray()) {
+            node.forEach(nodes::add);
+        } else if (node.isObject() && node.size() > 0) {
+            nodes.add(node);
+        }
+        return nodes;
     }
 
     /** 진단 로그용으로 객체 노드의 필드명 목록을 만든다(값은 남기지 않아 민감정보 노출을 피한다). */

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
@@ -67,6 +68,46 @@ class CodefClientTest {
                         + "\"data\":{\"connectedId\":\"cid-xyz\"}}")));
 
         assertThrows(CodefUnavailableException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("errorList에 아이디/비밀번호 오류 코드가 있으면 CODEF 장애가 아니라 사용자 입력 오류로 변환한다")
+    void throwsInvalidCredentialsWhenErrorListHasWrongIdOrPassword() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\",\"message\":\"사용자 계정정보 등록에 실패했습니다.\"},"
+                        + "\"data\":{\"successList\":[],\"errorList\":["
+                        + "{\"code\":\"CF-12803\",\"message\":\"아이디 또는 비밀번호 오류입니다.\"}"
+                        + "]}}")));
+
+        assertThrows(CodefInvalidCredentialsException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("errorList에 아이디/비밀번호 오류가 아닌 다른 코드만 있으면 CODEF 일시 장애 오류로 남긴다")
+    void throwsUnavailableWhenErrorListHasOtherCode() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\"},"
+                        + "\"data\":{\"errorList\":["
+                        + "{\"code\":\"CF-03001\",\"message\":\"사이트 점검중입니다.\"}"
+                        + "]}}")));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("errorList가 배열이 아니라 단일 객체로 와도 아이디/비밀번호 오류를 인식한다")
+    void throwsInvalidCredentialsWhenErrorListIsSingleObject() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\"},"
+                        + "\"data\":{\"errorList\":{\"code\":\"CF-12803\",\"message\":\"오류\"}}}")));
+
+        assertThrows(CodefInvalidCredentialsException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
     }
 
