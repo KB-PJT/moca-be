@@ -216,6 +216,18 @@ class CardLinkControllerTest {
     }
 
     @Test
+    @DisplayName("인증 정보가 없으면 서비스를 호출하지 않고 401을 반환한다")
+    void rejectsUnauthenticatedSyncRequest() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
+
+        mockMvc.perform(post("/card-links/cards/sync")
+                        .param("institutionCode", INSTITUTION_CODE))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(cardLinkService);
+    }
+
+    @Test
     @DisplayName("institutionCode 없이 재조회하면 null로 서비스에 전달한다")
     void syncsOwnedCardsWithoutInstitutionCode() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
