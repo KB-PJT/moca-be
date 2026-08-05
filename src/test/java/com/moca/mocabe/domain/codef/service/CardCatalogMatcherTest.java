@@ -36,6 +36,32 @@ class CardCatalogMatcherTest {
     }
 
     @Test
+    @DisplayName("카탈로그명이 캐릭터 에디션 등 수식어를 뒤에 더 붙여도 유일하면 접두사로 매칭한다")
+    void matchesUniquePrefixWhenCatalogNameHasExtraSuffix() {
+        CardCatalogEntry expected = card("card-1", "신한카드 Point Plan 체크 캐릭터형(짱구)");
+
+        assertEquals(expected, matcher.match(List.of(expected), "신한카드 Point Plan"));
+    }
+
+    @Test
+    @DisplayName("괄호 수식어만 붙은 카탈로그명도 접두사로 매칭한다")
+    void matchesPrefixWithParenthesizedSuffixOnly() {
+        CardCatalogEntry expected = card("card-1", "신한카드 Deep Dream 체크(미니언즈)");
+
+        assertEquals(expected, matcher.match(List.of(expected), "신한카드 Deep Dream 체크"));
+    }
+
+    @Test
+    @DisplayName("같은 기본카드의 캐릭터 에디션이 여러 개면 어느 것인지 알 수 없어 미매칭 처리한다")
+    void rejectsAmbiguousPrefixMatch() {
+        List<CardCatalogEntry> catalog = List.of(
+                card("card-1", "신한카드 Point Plan 체크 캐릭터형(짱구)"),
+                card("card-2", "신한카드 Point Plan 체크 캐릭터형(라이언)"));
+
+        assertNull(matcher.match(catalog, "신한카드 Point Plan"));
+    }
+
+    @Test
     @DisplayName("정규화 결과가 둘 이상이면 오매칭하지 않고 미매칭 처리한다")
     void rejectsAmbiguousMatch() {
         List<CardCatalogEntry> catalog = List.of(
