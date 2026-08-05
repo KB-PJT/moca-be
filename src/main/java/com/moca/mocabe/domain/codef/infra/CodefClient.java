@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.codef.infra;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.io.IOException;
@@ -142,9 +143,12 @@ public class CodefClient {
 
     private String postSuccessful(String url, Map<String, String> headers, String body) {
         CodefHttpResponse response = httpClient.post(url, headers, body);
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException(
-                    "CODEF HTTP 요청에 실패했습니다. status=" + response.statusCode());
+        int statusCode = response.statusCode();
+        if (statusCode < 200 || statusCode >= 300) {
+            // 404·401·5xx 등 CODEF가 준 비2xx 상태는 우리 쪽 500이 아니라 재시도 가능한 503으로 안내한다.
+            // (URLTimeout/연결 실패는 JdkCodefHttpClient에서 이미 같은 예외로 변환한다.)
+            throw new CodefUnavailableException(
+                    "CODEF 요청이 실패했습니다(HTTP " + statusCode + "). 잠시 후 다시 시도해주세요.");
         }
         return response.body();
     }

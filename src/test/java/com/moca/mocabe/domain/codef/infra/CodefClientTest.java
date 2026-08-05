@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.net.URLEncoder;
@@ -133,15 +134,27 @@ class CodefClientTest {
     }
 
     @Test
-    @DisplayName("CODEF가 비 2xx 상태를 반환하면 상태 코드를 포함해 실패한다")
+    @DisplayName("CODEF가 비 2xx 상태를 반환하면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
     void throwsWhenHttpStatusIsNotSuccessful() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString()))
                 .thenReturn(new CodefHttpResponse(401, "{\"error\":\"unauthorized\"}"));
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class,
+        CodefUnavailableException exception = assertThrows(CodefUnavailableException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
 
-        assertEquals("CODEF HTTP 요청에 실패했습니다. status=401", exception.getMessage());
+        assertEquals("CODEF 요청이 실패했습니다(HTTP 401). 잠시 후 다시 시도해주세요.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("CODEF가 404를 반환해도 동일하게 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void throwsCodefUnavailableWhenNotFound() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString()))
+                .thenReturn(new CodefHttpResponse(404, "{\"error\":\"not found\"}"));
+
+        CodefUnavailableException exception = assertThrows(CodefUnavailableException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+
+        assertEquals("CODEF 요청이 실패했습니다(HTTP 404). 잠시 후 다시 시도해주세요.", exception.getMessage());
     }
 
     @Test

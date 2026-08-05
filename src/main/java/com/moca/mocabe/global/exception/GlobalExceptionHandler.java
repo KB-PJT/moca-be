@@ -3,6 +3,7 @@ package com.moca.mocabe.global.exception;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
@@ -75,6 +76,13 @@ public class GlobalExceptionHandler {
             CodefCredentialRequiredException exception) {
         return error(HttpStatus.BAD_REQUEST, "CODEF_CREDENTIAL_REQUIRED",
                 exception.getMessage(), exception.getFields());
+    }
+
+    @ExceptionHandler(CodefUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefUnavailable(CodefUnavailableException exception) {
+        // 상류(CODEF) 일시 장애·지연이므로 500이 아니라 재시도 가능한 503으로 안내한다. 원인은 로그로 남긴다.
+        LOGGER.log(Level.WARNING, "CODEF 연동 상류 오류로 503을 반환합니다.", exception);
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "CODEF_UNAVAILABLE", exception.getMessage());
     }
 
     @ExceptionHandler(CodefAccountAlreadyLinkedException.class)

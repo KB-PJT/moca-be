@@ -35,7 +35,9 @@ import org.springframework.core.env.Environment;
 public class AppConfig {
 
     private static final long DEFAULT_CODEF_CONNECT_TIMEOUT_MS = 3_000L;
-    private static final long DEFAULT_CODEF_REQUEST_TIMEOUT_MS = 10_000L;
+    // CODEF(특히 개발계)는 카드사 인증 콜백을 기다려 응답이 느릴 수 있어 응답 대기를 넉넉히 둔다.
+    // 필요 시 MOCA_CODEF_REQUEST_TIMEOUT_MS 환경변수로 재정의한다.
+    private static final long DEFAULT_CODEF_REQUEST_TIMEOUT_MS = 20_000L;
 
     @Bean
     public CurrentUserProvider currentUserProvider() {

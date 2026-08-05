@@ -7,10 +7,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,15 +54,27 @@ class JdkCodefHttpClientTest {
     }
 
     @Test
-    @DisplayName("네트워크 입출력 오류를 CODEF 요청 오류로 변환한다")
+    @DisplayName("응답 타임아웃은 재시도 안내가 담긴 CODEF 일시 장애 오류로 변환한다")
+    void convertsTimeoutToUnavailable() throws Exception {
+        when(httpClient.send(any(HttpRequest.class), anyStringBodyHandler()))
+                .thenThrow(new HttpTimeoutException("timeout"));
+
+        CodefUnavailableException exception = assertThrows(CodefUnavailableException.class,
+                () -> codefHttpClient.post("https://codef.example.com", Map.of(), "body"));
+
+        assertTrue(exception.getMessage().contains("지연"));
+    }
+
+    @Test
+    @DisplayName("네트워크 입출력 오류를 CODEF 일시 장애 오류로 변환한다")
     void convertsIOException() throws Exception {
         when(httpClient.send(any(HttpRequest.class), anyStringBodyHandler()))
                 .thenThrow(new IOException("network"));
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class,
+        CodefUnavailableException exception = assertThrows(CodefUnavailableException.class,
                 () -> codefHttpClient.post("https://codef.example.com", Map.of(), "body"));
 
-        assertEquals("CODEF 요청에 실패했습니다.", exception.getMessage());
+        assertTrue(exception.getMessage().contains("연결"));
     }
 
     @Test

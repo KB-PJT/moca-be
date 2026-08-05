@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidGoogleIdTokenException;
@@ -94,6 +95,18 @@ class GlobalExceptionHandlerTest {
 
         assertError(response, HttpStatus.NOT_FOUND, "ISSUER_NOT_FOUND");
         assertEquals("등록되지 않은 발급사입니다: " + issuerId,
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("CODEF 상류 타임아웃·연결 실패는 재시도 가능한 503으로 변환한다")
+    void handlesCodefUnavailable() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleCodefUnavailable(
+                new CodefUnavailableException("CODEF 응답이 지연되어 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
+                        new java.net.http.HttpTimeoutException("timeout")));
+
+        assertError(response, HttpStatus.SERVICE_UNAVAILABLE, "CODEF_UNAVAILABLE");
+        assertEquals("CODEF 응답이 지연되어 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
                 response.getBody().getError().getMessage());
     }
 
