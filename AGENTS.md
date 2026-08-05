@@ -48,8 +48,8 @@ MOCA Backend 초기 개발을 위한 기본 협업 규칙이다.
 ## Collaboration workflow
 
 1. 작업 전에 현재 브랜치와 `git status`를 확인한다.
-2. `dev`에서 작업을 시작하거나 `dev` 기반 브랜치를 만들기 전에는 반드시 `git pull --ff-only origin dev`로 최신 변경사항을 먼저 동기화한다.
-3. 새 기능은 최신 `dev`에서 `feature/<feature-name>` 브랜치를 만든 후 작업한다.
+2. 모든 새 작업은 현재 브랜치와 무관하게 반드시 최신 `dev`에서 시작한다. 먼저 `git pull --ff-only origin dev`로 동기화한 뒤 `dev` 기반 작업 브랜치를 만든다.
+3. 새 기능은 `feature/<feature-name>`, 수정 작업은 `fix/<fix-name>` 또는 `hotfix/<hotfix-name>` 브랜치를 최신 `dev`에서 만든 후 작업한다.
 4. `main`과 `dev`에 기능을 직접 커밋하지 않는다.
 5. 하나의 부모 이슈와 이에 연결된 하위 이슈 묶음은 하나의 기능 브랜치와 하나의 Pull Request로 진행한다.
 6. Pull Request 본문에는 완료한 모든 하위 이슈를 `Closes #번호`로 연결하고, 부모 이슈는 모든 하위 이슈와 Pull Request가 완료된 뒤 직접 종료한다.
