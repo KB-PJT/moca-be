@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.merchant.mapper.MerchantMapper">
+
+    <!--
+      승인 가맹점명 앞에서부터 저장 가맹점명이 일치(접두사)하는지로 매칭한다.
+      가맹점명은 "브랜드 + 지점명" 순서라 지점명은 꼬리에 오므로, 접두사로 고정하면
+      꼬리에 들어있는 다른 가맹점명이 매칭을 가로채는 것을 막는다.
+      정규화 단계에서 %, _ 같은 LIKE 특수문자는 제거되므로 별도 이스케이프는 필요 없다.
+    -->
+    <select id="findMerchantIdByNamePrefix" resultType="string">
+        SELECT merchant_id
+        FROM merchants
+        WHERE status = 'active'
+          AND #{normalizedApprovalName} LIKE CONCAT(normalized_name, '%')
+        ORDER BY CHAR_LENGTH(normalized_name) DESC, merchant_id ASC
+        LIMIT 1
+    </select>
+
+    <select id="findMerchantIdByAliasPrefix" resultType="string">
+        SELECT a.merchant_id
+        FROM merchant_aliases a
+        INNER JOIN merchants m ON m.merchant_id = a.merchant_id AND m.status = 'active'
+        WHERE #{normalizedApprovalName} LIKE CONCAT(a.normalized_alias_name, '%')
+        ORDER BY CHAR_LENGTH(a.normalized_alias_name) DESC, a.merchant_alias_id ASC
+        LIMIT 1
+    </select>
+</mapper>
