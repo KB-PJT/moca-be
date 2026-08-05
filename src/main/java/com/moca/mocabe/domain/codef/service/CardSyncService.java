@@ -102,7 +102,7 @@ public class CardSyncService {
             List<CodefApproval> approvals = codefClient.getApprovals(
                     connection.connectedId(), connection.institutionCode(), birthDate, startStr, endStr);
             for (CodefApproval approval : approvals) {
-                ApprovalInsert insert = toInsert(userId, userCards, approval, seenKeys, stats);
+                ApprovalInsert insert = toInsert(userId, userCards, approval, connection.issuerId(), seenKeys, stats);
                 if (insert != null) {
                     inserts.add(insert);
                 }
@@ -118,14 +118,15 @@ public class CardSyncService {
     }
 
     private ApprovalInsert toInsert(String userId, List<UserCardMatchRow> userCards,
-                                    CodefApproval approval, Set<String> seenKeys, IngestStats stats) {
+                                    CodefApproval approval, String issuerId, Set<String> seenKeys,
+                                    IngestStats stats) {
         stats.fetched++;
         // 취소/부분취소/거절·해외결제는 적재하지 않는다.
         if (!approval.isNormalApproval() || !approval.isDomestic()) {
             stats.filtered++;
             return null;
         }
-        String userCardId = approvalCardMatcher.match(userCards, approval);
+        String userCardId = approvalCardMatcher.match(userCards, approval, issuerId);
         if (userCardId == null) {
             // 보유카드와 매칭되지 않는 승인건은 적재하지 않고 미매칭으로 남긴다.
             stats.unmatched++;

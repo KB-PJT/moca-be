@@ -195,6 +195,7 @@ class CodefPersistenceIntegrationTest {
         assertEquals(1, connections.size());
         assertEquals(CONNECTED_ID, connections.get(0).connectedId());
         assertEquals("0301", connections.get(0).institutionCode());
+        assertEquals(ISSUER_ID, connections.get(0).issuerId());
         assertEquals("900101", encryptor.decrypt(connections.get(0).birthDateEnc()));
     }
 

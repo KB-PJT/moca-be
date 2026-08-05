@@ -66,8 +66,10 @@ CREATE TABLE kakao_category_maps (
 
 -- 카드 결제 승인내역. 취소/부분취소/거절 및 해외결제는 적재 대상이 아니므로 approval_status는 'approved' 고정이다.
 -- merchant_id는 가맹점명 완전일치 매칭에 성공한 경우에만 채워지며, 실패 시 NULL로 둔다.
--- approval_number가 NULL일 수 있어 (user_card_id, approval_number) UNIQUE만으로는 중복을 완전히 막지 못하므로
--- 애플리케이션에서 (user_card_id, approved_at, amount, merchant_name) 조합으로 추가 중복 판정을 수행한다.
+-- approval_number가 NULL이면 (user_card_id, approval_number) UNIQUE는 MySQL에서 NULL을 서로 다른 값으로 취급해
+-- 중복을 막지 못한다. 그래서 승인번호가 있으면 그 값, 없으면 (승인시각·금액·가맹점명) 조합을 담는
+-- non-null 생성 컬럼(dedupe_key)을 두고 여기에 UNIQUE 제약을 걸어, 동시 요청이 같은 승인건을 동시에
+-- 조회해도 DB가 원자적으로 중복 INSERT를 막게 한다(애플리케이션의 사전 조회는 최적화일 뿐 유일한 방어선이 아니다).
 CREATE TABLE card_payment_approvals (
     approval_id CHAR(36) NOT NULL,
     user_id CHAR(36) NOT NULL,
@@ -80,9 +82,12 @@ CREATE TABLE card_payment_approvals (
     approval_status VARCHAR(20) NOT NULL,
     source_payload JSON NOT NULL,
     created_at DATETIME(6) NOT NULL,
+    dedupe_key VARCHAR(320) AS (
+        COALESCE(approval_number, CONCAT('N|', approved_at, '|', amount, '|', merchant_name))
+    ) STORED NOT NULL,
     PRIMARY KEY (approval_id),
-    CONSTRAINT uk_card_payment_approvals_card_approval_no
-        UNIQUE (user_card_id, approval_number),
+    CONSTRAINT uk_card_payment_approvals_card_dedupe
+        UNIQUE (user_card_id, dedupe_key),
     CONSTRAINT fk_card_payment_approvals_user
         FOREIGN KEY (user_id) REFERENCES users (user_id),
     CONSTRAINT fk_card_payment_approvals_user_card

@@ -121,7 +121,7 @@ class CardSyncServiceTest {
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of(
                 new ExistingApprovalKey("uc-1", "999", LocalDateTime.of(2026, 8, 2, 0, 0), 100, "x"),
                 new ExistingApprovalKey("uc-1", null, LocalDateTime.of(2026, 8, 4, 15, 0), 7000, "노포")));
-        when(approvalCardMatcher.match(any(), any())).thenAnswer(invocation -> {
+        when(approvalCardMatcher.match(any(), any(), eq("issuer-1"))).thenAnswer(invocation -> {
             CodefApproval approval = invocation.getArgument(1);
             return "미매칭".equals(approval.memberStoreName()) ? null : "uc-1";
         });
@@ -174,10 +174,10 @@ class CardSyncServiceTest {
     }
 
     private CodefConnection connection() {
-        return new CodefConnection("cid", "0301", new byte[]{1, 2, 3});
+        return new CodefConnection("cid", "0301", "issuer-1", new byte[]{1, 2, 3});
     }
 
     private UserCardMatchRow userCard() {
-        return new UserCardMatchRow("uc-1", "카드A", "1234****5678");
+        return new UserCardMatchRow("uc-1", "issuer-1", "카드A", "1234****5678");
     }
 }

@@ -112,12 +112,26 @@ class CardApprovalPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("매칭 후보 보유카드를 카드명·마스킹 카드번호로 조회한다")
+    @DisplayName("승인번호가 NULL이어도 같은 자연키(시각·금액·가맹점명)를 다시 적재하면 UNIQUE 제약으로 막힌다")
+    void rejectsDuplicateFallbackKeyWhenApprovalNumberNull() {
+        LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 4, 15, 0, 0);
+        cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID, null,
+                null, approvedAt, "노포", 7000, "{}");
+
+        // 두 동시 요청이 승인번호 없는 같은 승인건을 각각 신규로 판단해 INSERT를 시도하는 상황을 재현한다.
+        assertThrows(org.springframework.dao.DuplicateKeyException.class, () ->
+                cardApprovalMapper.insertApproval(UUID.randomUUID().toString(), USER_ID, USER_CARD_ID,
+                        null, null, approvedAt, "노포", 7000, "{}"));
+    }
+
+    @Test
+    @DisplayName("매칭 후보 보유카드를 카드사·카드명·마스킹 카드번호로 조회한다")
     void findsUserCardsForMatching() {
         List<UserCardMatchRow> cards = cardApprovalMapper.findUserCardsForMatching(USER_ID);
 
         assertEquals(1, cards.size());
         assertEquals(USER_CARD_ID, cards.get(0).userCardId());
+        assertEquals(ISSUER_ID, cards.get(0).issuerId());
         assertEquals("노리2 체크카드(KB Pay)_비교통", cards.get(0).cardName());
         assertEquals("943646******1069", cards.get(0).cardNo());
     }

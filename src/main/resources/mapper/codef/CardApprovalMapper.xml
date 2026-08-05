@@ -7,6 +7,7 @@
     <resultMap id="userCardMatchRowMap" type="com.moca.mocabe.domain.codef.model.UserCardMatchRow">
         <constructor>
             <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="issuer_id" javaType="java.lang.String"/>
             <arg column="card_name_from_codef" javaType="java.lang.String"/>
             <arg column="card_no" javaType="java.lang.String"/>
         </constructor>
@@ -26,7 +27,7 @@
 
     <!-- 활성(is_active=TRUE) 카드만 매칭 후보로 둔다. 비활성 카드로 매칭될 승인건은 미매칭 처리되어 적재되지 않는다. -->
     <select id="findUserCardsForMatching" resultMap="userCardMatchRowMap">
-        SELECT user_card_id, card_name_from_codef, card_no
+        SELECT user_card_id, issuer_id, card_name_from_codef, card_no
         FROM user_cards
         WHERE user_id = #{userId}
           AND is_active = TRUE
