@@ -26,6 +26,7 @@ import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.domain.user.service.UserDomainService;
+import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
@@ -54,6 +55,11 @@ public class AppConfig {
     @Bean
     public CardQueryService cardQueryService(UserCardMapper userCardMapper) {
         return new CardQueryService(userCardMapper);
+    }
+
+    @Bean
+    public HomeQueryService homeQueryService(UserMapper userMapper, UserCardMapper userCardMapper) {
+        return new HomeQueryService(userMapper, userCardMapper);
     }
 
     @Bean

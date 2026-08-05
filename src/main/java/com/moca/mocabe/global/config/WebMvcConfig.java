@@ -5,6 +5,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
@@ -23,6 +24,19 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private static final String API_V1_PREFIX = "/api/v1";
     private static final String SWAGGER_ASSET_LOCATION =
             "classpath:/META-INF/resources/webjars/swagger-ui/5.32.8/";
+    private static final String[] ALLOWED_ORIGINS = {
+            "http://localhost:5173",
+            "https://moca-fe-rho.vercel.app"
+    };
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+                .allowedOrigins(ALLOWED_ORIGINS)
+                .allowedMethods("GET", "POST", "PATCH", "DELETE", "OPTIONS")
+                .allowedHeaders("Authorization", "Content-Type")
+                .allowCredentials(true);
+    }
 
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {

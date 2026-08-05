@@ -12,4 +12,7 @@ public interface UserCardMapper {
     List<UserCardListRow> findActiveByUserId(@Param("userId") String userId);
 
     List<UserCardListRow> findInactiveByUserId(@Param("userId") String userId);
+
+    List<UserCardListRow> findHomeCardsByUserId(@Param("userId") String userId,
+                                                @Param("orderMode") String orderMode);
 }
