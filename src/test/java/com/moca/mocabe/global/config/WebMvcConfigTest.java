@@ -13,6 +13,7 @@ import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
+import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
@@ -162,6 +163,11 @@ class WebMvcConfigTest {
         @Bean
         public MerchantCategoryQueryService merchantCategoryQueryService() {
             return org.mockito.Mockito.mock(MerchantCategoryQueryService.class);
+        }
+
+        @Bean
+        public MerchantQueryService merchantQueryService() {
+            return org.mockito.Mockito.mock(MerchantQueryService.class);
         }
 
         @Bean

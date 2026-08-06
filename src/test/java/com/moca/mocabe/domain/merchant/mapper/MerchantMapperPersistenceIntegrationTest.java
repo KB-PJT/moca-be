@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.merchant.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.moca.mocabe.domain.merchant.model.MerchantListRow;
 import com.moca.mocabe.domain.merchant.model.MerchantNameCandidate;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
 import java.util.List;
@@ -33,9 +34,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 class MerchantMapperPersistenceIntegrationTest {
 
     private static final String CATEGORY_ID = "c0000000-0000-4000-8000-000000000001";
+    private static final String OTHER_CATEGORY_ID = "c0000000-0000-4000-8000-000000000002";
     private static final String MEGA_ID = "10000000-0000-4000-8000-000000000001";
     private static final String MEGA_COFFEE_ID = "10000000-0000-4000-8000-000000000002";
     private static final String INACTIVE_ID = "10000000-0000-4000-8000-000000000003";
+    private static final String OTHER_CATEGORY_MERCHANT_ID = "10000000-0000-4000-8000-000000000004";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -50,6 +53,10 @@ class MerchantMapperPersistenceIntegrationTest {
                         + "(merchant_category_id, category_name, display_order, created_at, updated_at) "
                         + "VALUES (?, '미분류', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 CATEGORY_ID);
+        jdbcTemplate.update("INSERT INTO merchant_categories "
+                        + "(merchant_category_id, category_name, display_order, created_at, updated_at) "
+                        + "VALUES (?, '기타', 1, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                OTHER_CATEGORY_ID);
     }
 
     @AfterEach
@@ -103,12 +110,41 @@ class MerchantMapperPersistenceIntegrationTest {
         assertEquals(0, merchantMapper.findActiveMerchantAliasCandidates().size());
     }
 
+    @Test
+    @DisplayName("카테고리에 속한 활성 가맹점을 이름 순으로 반환한다")
+    void findsActiveMerchantsByCategoryId() {
+        insertMerchant(MEGA_COFFEE_ID, "메가커피", "메가커피", "active");
+        insertMerchant(MEGA_ID, "매머드커피", "매머드커피", "active");
+        insertMerchant(INACTIVE_ID, "폐업가맹점", "폐업가맹점", "inactive");
+        insertMerchant(OTHER_CATEGORY_MERCHANT_ID, OTHER_CATEGORY_ID, "이마트", "이마트", "active");
+
+        List<MerchantListRow> rows = merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID);
+
+        assertEquals(2, rows.size());
+        assertEquals("매머드커피", rows.get(0).name());
+        assertEquals(MEGA_ID, rows.get(0).merchantId());
+        assertEquals("메가커피", rows.get(1).name());
+    }
+
+    @Test
+    @DisplayName("해당 카테고리에 활성 가맹점이 없으면 빈 목록을 반환한다")
+    void returnsEmptyListWhenNoActiveMerchantsInCategory() {
+        insertMerchant(INACTIVE_ID, "폐업가맹점", "폐업가맹점", "inactive");
+
+        assertEquals(0, merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID).size());
+    }
+
     private void insertMerchant(String merchantId, String name, String normalizedName, String status) {
+        insertMerchant(merchantId, CATEGORY_ID, name, normalizedName, status);
+    }
+
+    private void insertMerchant(String merchantId, String categoryId, String name, String normalizedName,
+                                String status) {
         jdbcTemplate.update("INSERT INTO merchants "
                         + "(merchant_id, merchant_category_id, name, normalized_name, status, "
                         + "created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                merchantId, CATEGORY_ID, name, normalizedName, status);
+                merchantId, categoryId, name, normalizedName, status);
     }
 
     private void insertAlias(String aliasId, String merchantId, String normalizedAlias) {

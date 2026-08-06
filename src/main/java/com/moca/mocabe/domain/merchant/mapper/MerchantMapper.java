@@ -1,8 +1,10 @@
 package com.moca.mocabe.domain.merchant.mapper;
 
+import com.moca.mocabe.domain.merchant.model.MerchantListRow;
 import com.moca.mocabe.domain.merchant.model.MerchantNameCandidate;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * 가맹점 후보 데이터 조회만 담당한다. 접두사 판정·최장일치·동률 해소 같은 매칭 규칙은
@@ -16,4 +18,7 @@ public interface MerchantMapper {
 
     /** 활성 가맹점에 속한 별칭의 (merchant_id, normalized_alias_name) 후보 목록을 조회한다. */
     List<MerchantNameCandidate> findActiveMerchantAliasCandidates();
+
+    /** 카테고리에 속한 활성 가맹점 목록을 이름 순으로 조회한다. */
+    List<MerchantListRow> findActiveMerchantsByCategoryId(@Param("merchantCategoryId") String merchantCategoryId);
 }

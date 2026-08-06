@@ -12,6 +12,7 @@ import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantMapper;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
+import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNameNormalizer;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
@@ -176,6 +177,11 @@ public class AppConfig {
     @Bean
     public MerchantCategoryQueryService merchantCategoryQueryService(MerchantCategoryMapper merchantCategoryMapper) {
         return new MerchantCategoryQueryService(merchantCategoryMapper);
+    }
+
+    @Bean
+    public MerchantQueryService merchantQueryService(MerchantMapper merchantMapper) {
+        return new MerchantQueryService(merchantMapper);
     }
 
     @Bean
