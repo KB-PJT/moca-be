@@ -15,8 +15,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsRequest;
 import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsResponse;
+import com.moca.mocabe.domain.codef.dto.CardLinkCardResponse;
 import com.moca.mocabe.domain.codef.dto.CardLinkResponse;
 import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
+import com.moca.mocabe.domain.codef.dto.SubmitCardCredentialsRequest;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
@@ -253,5 +255,26 @@ class CardLinkControllerTest {
 
         assertEquals("CODEF_CONNECTION_NOT_FOUND",
                 new ObjectMapper().readTree(response).path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("카드정보 추가 입력 요청을 현재 사용자·userCardId 기준으로 서비스에 전달한다")
+    void submitsCardCredentials() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardLinkService.submitCardCredentials(
+                eq(USER_ID), eq("uc-1"), any(SubmitCardCredentialsRequest.class)))
+                .thenReturn(new CardLinkCardResponse("uc-1", "card-1", "정식 카드명", "9999****6666",
+                        INSTITUTION_CODE, "KB국민카드", "CREDIT", null, true, true, List.of()));
+
+        String response = mockMvc.perform(patch("/card-links/cards/uc-1/credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cardNo\":\"9999888877776666\",\"cardPassword\":\"1234\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode root = new ObjectMapper().readTree(response);
+        assertEquals("uc-1", root.path("data").path("userCardId").asText());
+        verify(cardLinkService).submitCardCredentials(
+                eq(USER_ID), eq("uc-1"), any(SubmitCardCredentialsRequest.class));
     }
 }

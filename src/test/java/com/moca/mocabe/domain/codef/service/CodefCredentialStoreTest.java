@@ -64,13 +64,15 @@ class CodefCredentialStoreTest {
     @DisplayName("매칭 카드 INSERT를 매퍼에 위임하고 이번에 적재한 user_card_id를 반환한다")
     void savesCard() {
         LinkedCardInsert card = new LinkedCardInsert(
-                "uc-1", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+                "uc-1", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0,
+                null, null, false);
 
         String userCardId = store.saveCard(card);
 
         assertEquals("uc-1", userCardId);
         verify(linkedCardMapper).insertLinkedCard(
-                "uc-1", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+                "uc-1", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0,
+                null, null, false);
         verifyNoInteractions(mapper);
     }
 
@@ -78,10 +80,12 @@ class CodefCredentialStoreTest {
     @DisplayName("동시 재조회로 다른 요청이 먼저 적재했다면(UNIQUE 충돌) 새로 적재하지 않고 기존 user_card_id를 반환한다")
     void returnsExistingUserCardIdWhenConcurrentRequestWinsRace() {
         LinkedCardInsert card = new LinkedCardInsert(
-                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0,
+                null, null, false);
         DuplicateKeyException cause = new DuplicateKeyException("duplicate");
         org.mockito.Mockito.doThrow(cause).when(linkedCardMapper).insertLinkedCard(
-                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0,
+                null, null, false);
         when(linkedCardMapper.findUserCardIdByUserIdAndCardKeyHash("user-1", "hash-1")).thenReturn("uc-winner");
 
         String userCardId = store.saveCard(card);
@@ -93,10 +97,12 @@ class CodefCredentialStoreTest {
     @DisplayName("UNIQUE 충돌인데 기존 행을 찾지 못하면 카드 중복 오류로 알린다")
     void throwsWhenDuplicateKeyButNoExistingRowFound() {
         LinkedCardInsert card = new LinkedCardInsert(
-                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0,
+                null, null, false);
         DuplicateKeyException cause = new DuplicateKeyException("duplicate");
         org.mockito.Mockito.doThrow(cause).when(linkedCardMapper).insertLinkedCard(
-                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0);
+                "uc-new", "link-1", "user-1", "issuer-1", "card-1", "노리2 체크카드", "1234****5678", "hash-1", 0,
+                null, null, false);
         when(linkedCardMapper.findUserCardIdByUserIdAndCardKeyHash("user-1", "hash-1")).thenReturn(null);
 
         CardAlreadyLinkedException exception = assertThrows(

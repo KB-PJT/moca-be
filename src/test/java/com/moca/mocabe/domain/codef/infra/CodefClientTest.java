@@ -231,7 +231,7 @@ class CodefClientTest {
                         + "\"resCardType\":\"신용/본인\",\"resImageLink\":\"https://codef/a.png\"},"
                         + "{\"resCardName\":\"카드 B\",\"resImageLink\":\"\"}]}")));
 
-        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301");
+        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301", null, null, null);
 
         assertEquals(2, cards.size());
         assertEquals("카드 A", cards.get(0).cardName());
@@ -248,7 +248,7 @@ class CodefClientTest {
                         + "\"resCardName\":\"노리2 체크카드(KB Pay)_비교통\",\"resCardNo\":\"943646******1069\","
                         + "\"resCardType\":\"\",\"resImageLink\":\"\"}}")));
 
-        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301");
+        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301", null, null, null);
 
         assertEquals(1, cards.size());
         assertEquals("노리2 체크카드(KB Pay)_비교통", cards.get(0).cardName());
@@ -263,7 +263,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
 
         assertThrows(CodefUnavailableException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards("cid-1", "0301", null, null, null));
     }
 
     @Test
@@ -274,7 +274,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards("cid-1", "0301", null, null, null));
     }
 
     @Test
@@ -285,7 +285,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":[{\"resCardName\":\" \"}]}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards("cid-1", "0301", null, null, null));
     }
 
     @Test
@@ -301,7 +301,7 @@ class CodefClientTest {
                         + "\"resApprovalNo\":\"\",\"resHomeForeignType\":\"1\",\"resCancelYN\":\"0\"}]}")));
 
         List<CodefApproval> approvals =
-                codefClient.getApprovals("cid-1", "0301", "900101", "20260801", "20260803");
+                codefClient.getApprovals("cid-1", "0301", "900101", "20260801", "20260803", null, null);
 
         assertEquals(2, approvals.size());
         assertEquals("온라인예매", approvals.get(0).memberStoreName());
@@ -321,7 +321,7 @@ class CodefClientTest {
                         + "\"resApprovalNo\":\"1\",\"resHomeForeignType\":\"1\",\"resCancelYN\":\"0\"}}")));
 
         List<CodefApproval> approvals =
-                codefClient.getApprovals("cid-1", "0301", null, "20260801", "20260803");
+                codefClient.getApprovals("cid-1", "0301", null, "20260801", "20260803", null, null);
 
         assertEquals(1, approvals.size());
         assertEquals("편의점", approvals.get(0).memberStoreName());
@@ -335,7 +335,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
 
         List<CodefApproval> approvals =
-                codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803");
+                codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803", null, null);
 
         assertEquals(0, approvals.size());
     }
@@ -348,7 +348,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
 
         assertThrows(CodefUnavailableException.class,
-                () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803"));
+                () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803", null, null));
     }
 
     @Test
@@ -359,7 +359,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":{\"unexpected\":\"x\"}}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803"));
+                () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803", null, null));
     }
 
     @Test
@@ -441,6 +441,41 @@ class CodefClientTest {
         codefClient.getPerformance("cid-1", "0301", "900101", "1234567890123456", "12", "202608");
 
         verify(httpClient).post(eq(PERFORMANCE_URL), any(), bodyCaptor.capture());
+        String body = bodyCaptor.getValue();
+        assertTrue(body.contains("\"cardNo\":\"1234567890123456\""));
+        assertTrue(body.contains("\"cardPassword\""));
+        assertFalse(body.contains("\"cardPassword\":\"12\""));
+    }
+
+    @Test
+    @DisplayName("보유카드 조회에 cardNo가 있으면 그대로, cardPassword가 있으면 RSA 암호화해 요청에 담는다")
+    void includesCardNoAndEncryptedCardPasswordInOwnedCardsRequestWhenPresent() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CARD_LIST_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")));
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+
+        codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+
+        verify(httpClient).post(eq(CARD_LIST_URL), any(), bodyCaptor.capture());
+        String body = bodyCaptor.getValue();
+        assertTrue(body.contains("\"cardNo\":\"1234567890123456\""));
+        assertTrue(body.contains("\"cardPassword\""));
+        assertFalse(body.contains("\"cardPassword\":\"12\""));
+    }
+
+    @Test
+    @DisplayName("승인내역 조회에 cardNo가 있으면 그대로, cardPassword가 있으면 RSA 암호화해 요청에 담는다")
+    void includesCardNoAndEncryptedCardPasswordInApprovalsRequestWhenPresent() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")));
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+
+        codefClient.getApprovals("cid-1", "0301", "900101", "20260801", "20260803",
+                "1234567890123456", "12");
+
+        verify(httpClient).post(eq(APPROVAL_URL), any(), bodyCaptor.capture());
         String body = bodyCaptor.getValue();
         assertTrue(body.contains("\"cardNo\":\"1234567890123456\""));
         assertTrue(body.contains("\"cardPassword\""));

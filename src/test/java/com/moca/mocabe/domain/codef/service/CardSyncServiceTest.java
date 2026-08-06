@@ -22,6 +22,7 @@ import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
+import com.moca.mocabe.domain.codef.model.ActiveCardCredential;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
 import com.moca.mocabe.domain.codef.model.CodefCardPerformance;
@@ -113,7 +114,7 @@ class CardSyncServiceTest {
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection()));
         when(encryptor.decrypt(any())).thenReturn("900101");
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of());
         when(approvalIngestStore.insertAll(any())).thenReturn(0);
 
@@ -121,7 +122,7 @@ class CardSyncServiceTest {
         SyncMyCardsResponse response = service.sync(USER_ID, null, null);
 
         verify(codefClient).getApprovals(eq("cid"), eq("0301"), eq("900101"),
-                startCaptor.capture(), anyString());
+                startCaptor.capture(), anyString(), any(), any());
         assertTrue(startCaptor.getValue().endsWith("01"));
         assertEquals(1, response.getSyncedCardCount());
     }
@@ -140,7 +141,7 @@ class CardSyncServiceTest {
             return "미매칭".equals(approval.memberStoreName()) ? null : "uc-1";
         });
         when(merchantCandidates.resolveMerchantId("스타벅스")).thenReturn("m-1");
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of(
                         approval("20260801", "120000", "카드A", "스타벅스", "5,000", "100", "1", "0"),
                         approval("20260801", "120000", "카드A", "스타벅스", "5,000", "100", "1", "0"),
@@ -190,7 +191,7 @@ class CardSyncServiceTest {
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection()));
         when(encryptor.decrypt(any())).thenReturn("900101");
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of());
         when(approvalIngestStore.insertAll(any())).thenReturn(0);
         when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), any(), any(), anyString()))
@@ -221,15 +222,15 @@ class CardSyncServiceTest {
     @DisplayName("실적조회 대상 월이 연동의 조회 가능 개월수를 벗어나면 실적조회 실패 예외를 던져 전체 동기화를 중단한다")
     void throwsWhenTargetMonthExceedsLookback() {
         CodefConnection allowedConnection = new CodefConnection(
-                "link-1", "cid-1", "0301", "issuer-1", "KB카드", 12, new byte[]{1, 2, 3}, null, null);
+                "link-1", "cid-1", "0301", "issuer-1", "KB카드", 12, new byte[]{1, 2, 3}, false, false);
         CodefConnection blockedConnection = new CodefConnection(
-                "link-2", "cid-2", "0302", "issuer-2", "신한카드", null, new byte[]{4, 5, 6}, null, null);
+                "link-2", "cid-2", "0302", "issuer-2", "신한카드", null, new byte[]{4, 5, 6}, false, false);
         when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(allowedConnection, blockedConnection));
         when(encryptor.decrypt(any())).thenReturn("900101");
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of());
         when(codefClient.getPerformance(eq("cid-1"), eq("0301"), eq("900101"), any(), any(), anyString()))
                 .thenReturn(List.of());
@@ -251,13 +252,13 @@ class CardSyncServiceTest {
     @DisplayName("실적조회 가능 개월수가 -1인 연동은 실적조회 실패 예외를 던져 전체 동기화를 중단한다")
     void throwsWhenLookbackIsMinusOne() {
         CodefConnection unsupportedConnection = new CodefConnection(
-                "link-1", "cid-1", "0304", "issuer-1", "하나카드", -1, new byte[]{1, 2, 3}, null, null);
+                "link-1", "cid-1", "0304", "issuer-1", "하나카드", -1, new byte[]{1, 2, 3}, false, false);
         when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(unsupportedConnection));
         when(encryptor.decrypt(any())).thenReturn("900101");
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of());
 
         PerformanceSyncFailedException exception = assertThrows(PerformanceSyncFailedException.class,
@@ -267,7 +268,8 @@ class CardSyncServiceTest {
         verify(codefClient, never()).getPerformance(
                 anyString(), anyString(), anyString(), any(), any(), anyString());
         // 실적조회 미지원으로 실패해도 승인내역 조회 자체는 그 연동에서 정상 수행된다.
-        verify(codefClient).getApprovals(eq("cid-1"), eq("0304"), eq("900101"), anyString(), anyString());
+        verify(codefClient).getApprovals(eq("cid-1"), eq("0304"), eq("900101"), anyString(), anyString(),
+                any(), any());
     }
 
     @Test
@@ -277,7 +279,7 @@ class CardSyncServiceTest {
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection()));
         when(encryptor.decrypt(any())).thenReturn("900101");
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenThrow(new CodefUnavailableException("CODEF 승인내역 조회에 실패했습니다."));
 
         ApprovalSyncFailedException exception = assertThrows(ApprovalSyncFailedException.class,
@@ -294,7 +296,7 @@ class CardSyncServiceTest {
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection()));
         when(encryptor.decrypt(any())).thenReturn("900101");
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of());
         when(codefClient.getPerformance(anyString(), anyString(), anyString(), any(), any(), anyString()))
                 .thenThrow(new CodefUnavailableException("CODEF 실적조회에 실패했습니다."));
@@ -310,12 +312,12 @@ class CardSyncServiceTest {
     @DisplayName("비씨카드는 CODEF가 startDate 기준 전월 실적을 주므로 조회 대상 월보다 한 달 뒤를 보낸다")
     void requestsNextMonthForBcCard() {
         CodefConnection bcConnection = new CodefConnection(
-                "link-1", "cid-1", "0305", "issuer-1", "비씨카드", 12, new byte[]{1, 2, 3}, null, null);
+                "link-1", "cid-1", "0305", "issuer-1", "비씨카드", 12, new byte[]{1, 2, 3}, false, false);
         when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(bcConnection));
         when(encryptor.decrypt(any())).thenReturn("900101");
         when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
-        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of());
         when(approvalIngestStore.insertAll(any())).thenReturn(0);
         when(codefClient.getPerformance(anyString(), anyString(), anyString(), any(), any(), anyString()))
@@ -328,6 +330,41 @@ class CardSyncServiceTest {
         verify(codefClient).getPerformance(eq("cid-1"), eq("0305"), eq("900101"), any(), any(), eq("202609"));
     }
 
+    @Test
+    @DisplayName("카드번호가 필요한 카드사는 활성 카드마다 승인내역·실적조회를 개별 호출하고, "
+            + "카드번호가 저장되지 않은 활성 카드는 건너뛴다")
+    void ingestsPerCardWhenConnectionRequiresCardNo() {
+        CodefConnection connection = new CodefConnection(
+                "link-1", "cid-1", "0301", "issuer-1", "KB카드", 12, new byte[] {1, 2, 3}, true, true);
+        when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection));
+        when(encryptor.decrypt(new byte[] {1, 2, 3})).thenReturn("900101");
+        when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
+        // 카드번호가 없는 활성 카드(활성화 검증이 정상 동작했다면 발생하지 않아야 하는 상태)는 로그만 남기고 건너뛴다.
+        ActiveCardCredential withoutCardNo = new ActiveCardCredential("uc-missing", null, null);
+        ActiveCardCredential withCardNo = new ActiveCardCredential("uc-1", new byte[] {9}, new byte[] {5});
+        when(cardApprovalMapper.findActiveCardCredentialsByCredentialId("link-1"))
+                .thenReturn(List.of(withoutCardNo, withCardNo));
+        when(encryptor.decrypt(new byte[] {9})).thenReturn("9999888877776666");
+        when(encryptor.decrypt(new byte[] {5})).thenReturn("5678");
+        when(codefClient.getApprovals(eq("cid-1"), eq("0301"), eq("900101"), anyString(), anyString(),
+                eq("9999888877776666"), eq("5678"))).thenReturn(List.of());
+        when(codefClient.getPerformance(eq("cid-1"), eq("0301"), eq("900101"),
+                eq("9999888877776666"), eq("5678"), anyString())).thenReturn(List.of());
+        when(approvalIngestStore.insertAll(any())).thenReturn(0);
+        when(performanceSnapshotStore.upsertAll(any())).thenReturn(0);
+
+        service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+        verify(codefClient).getApprovals(eq("cid-1"), eq("0301"), eq("900101"), anyString(), anyString(),
+                eq("9999888877776666"), eq("5678"));
+        verify(codefClient).getPerformance(eq("cid-1"), eq("0301"), eq("900101"),
+                eq("9999888877776666"), eq("5678"), anyString());
+        // 연동 전체를 한 번에 조회하는 기존 방식(카드번호 없이)은 호출되지 않는다.
+        verify(codefClient, never()).getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(),
+                eq((String) null), eq((String) null));
+    }
+
     private CodefApproval approval(String usedDate, String usedTime, String cardName, String store,
                                    String amount, String approvalNo, String homeForeign, String cancel) {
         return new CodefApproval(usedDate, usedTime, "1234****5678", cardName, store, amount,
@@ -336,7 +373,7 @@ class CardSyncServiceTest {
 
     private CodefConnection connection() {
         return new CodefConnection(
-                "link-1", "cid", "0301", "issuer-1", "KB카드", null, new byte[]{1, 2, 3}, null, null);
+                "link-1", "cid", "0301", "issuer-1", "KB카드", null, new byte[]{1, 2, 3}, false, false);
     }
 
     private UserCardMatchRow userCard() {

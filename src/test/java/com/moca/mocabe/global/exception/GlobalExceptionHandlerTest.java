@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
@@ -13,6 +15,7 @@ import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -214,6 +217,25 @@ class GlobalExceptionHandlerTest {
         assertEquals("카드번호는 필수입니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
         assertError(duplicateResponse, HttpStatus.CONFLICT, "CODEF_ACCOUNT_ALREADY_LINKED");
         assertError(duplicateCardResponse, HttpStatus.CONFLICT, "CARD_ALREADY_LINKED");
+    }
+
+    @Test
+    @DisplayName("카드 활성화·카드정보 추가 입력 관련 오류를 식별 가능한 오류로 변환한다")
+    void handlesCardCredentialErrors() {
+        Map<String, String> fields = new LinkedHashMap<String, String>();
+        fields.put("cardNo", "카드번호가 필요합니다.");
+
+        ResponseEntity<ApiErrorResponse> requiredResponse = handler.handleCardCredentialRequired(
+                new CardCredentialRequiredException(fields));
+        ResponseEntity<ApiErrorResponse> mismatchResponse = handler.handleCardNumberMismatch(
+                new CardNumberMismatchException());
+        ResponseEntity<ApiErrorResponse> notFoundResponse = handler.handleUserCardNotFound(
+                new UserCardNotFoundException());
+
+        assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
+        assertEquals("카드번호가 필요합니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
+        assertError(mismatchResponse, HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH");
+        assertError(notFoundResponse, HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND");
     }
 
     @Test
