@@ -9,6 +9,7 @@ import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
+import com.moca.mocabe.domain.codef.model.ActiveCardCredential;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
 import com.moca.mocabe.domain.codef.model.CodefCardPerformance;
@@ -138,23 +139,28 @@ public class CardSyncService {
         String performanceMonth = targetMonth.format(PERFORMANCE_MONTH);
         for (CodefConnection connection : connections) {
             String birthDate = encryptor.decrypt(connection.birthDateEnc());
-            List<CodefApproval> approvals = fetchApprovals(connection, birthDate, startStr, endStr);
-            for (CodefApproval approval : approvals) {
-                ApprovalInsert insert = toInsert(userId, userCards, approval, connection.issuerId(),
-                        merchantCandidates, seenKeys, stats);
-                if (insert != null) {
-                    inserts.add(insert);
+            if (connection.requiresCardNo()) {
+                // 카드번호가 필요한 카드사는 카드마다 카드번호가 달라 연동 전체를 한 번에 조회할 수 없으므로,
+                // 활성 카드별로 저장된 카드번호/비밀번호를 꺼내 승인내역·실적조회를 각각 호출한다.
+                for (ActiveCardCredential cardCredential
+                        : cardApprovalMapper.findActiveCardCredentialsByCredentialId(
+                                connection.codefAccountCredentialId())) {
+                    if (cardCredential.cardNumberEnc() == null) {
+                        // 활성화 검증(activateCards)이 정상 동작했다면 발생하지 않아야 하는 상태다.
+                        LOGGER.warning("활성 카드에 카드번호가 없어 동기화에서 건너뜁니다. userCardId="
+                                + cardCredential.userCardId());
+                        continue;
+                    }
+                    String cardNo = encryptor.decrypt(cardCredential.cardNumberEnc());
+                    String cardPassword = encryptor.decrypt(cardCredential.cardPasswordEnc());
+                    fetchAndCollect(userId, userCards, connection, birthDate, startStr, endStr, cardNo, cardPassword,
+                            targetMonth, monthsBack, performanceMonth, merchantCandidates, seenKeys, stats,
+                            inserts, performanceUpserts);
                 }
-            }
-
-            List<CodefCardPerformance> performances = fetchPerformances(
-                    connection, birthDate, targetMonth, monthsBack, performanceMonth);
-            for (CodefCardPerformance performance : performances) {
-                PerformanceSnapshotUpsert upsert = toPerformanceUpsert(
-                        userCards, performance, connection.issuerId(), performanceMonth);
-                if (upsert != null) {
-                    performanceUpserts.add(upsert);
-                }
+            } else {
+                fetchAndCollect(userId, userCards, connection, birthDate, startStr, endStr, null, null,
+                        targetMonth, monthsBack, performanceMonth, merchantCandidates, seenKeys, stats,
+                        inserts, performanceUpserts);
             }
         }
         int inserted = approvalIngestStore.insertAll(inserts);
@@ -167,12 +173,43 @@ public class CardSyncService {
         return new IngestResult(inserted, upsertedPerformances);
     }
 
+    /**
+     * 연동(또는 카드번호가 필요한 카드사면 카드 한 장) 단위로 승인내역·실적을 조회해 inserts/
+     * performanceUpserts에 누적한다. cardNo/cardPassword는 카드번호가 필요하지 않은 카드사면 null이다.
+     */
+    private void fetchAndCollect(String userId, List<UserCardMatchRow> userCards, CodefConnection connection,
+                                 String birthDate, String startStr, String endStr, String cardNo, String cardPassword,
+                                 YearMonth targetMonth, long monthsBack, String performanceMonth,
+                                 MerchantCandidateSnapshot merchantCandidates, Set<String> seenKeys,
+                                 IngestStats stats, List<ApprovalInsert> inserts,
+                                 List<PerformanceSnapshotUpsert> performanceUpserts) {
+        List<CodefApproval> approvals =
+                fetchApprovals(connection, birthDate, startStr, endStr, cardNo, cardPassword);
+        for (CodefApproval approval : approvals) {
+            ApprovalInsert insert = toInsert(userId, userCards, approval, connection.issuerId(),
+                    merchantCandidates, seenKeys, stats);
+            if (insert != null) {
+                inserts.add(insert);
+            }
+        }
+
+        List<CodefCardPerformance> performances = fetchPerformances(
+                connection, birthDate, targetMonth, monthsBack, performanceMonth, cardNo, cardPassword);
+        for (CodefCardPerformance performance : performances) {
+            PerformanceSnapshotUpsert upsert = toPerformanceUpsert(
+                    userCards, performance, connection.issuerId(), performanceMonth);
+            if (upsert != null) {
+                performanceUpserts.add(upsert);
+            }
+        }
+    }
+
     /** CODEF 승인내역 조회가 실패하면 원인을 구분할 수 있도록 ApprovalSyncFailedException으로 감싼다. */
-    private List<CodefApproval> fetchApprovals(CodefConnection connection, String birthDate,
-                                               String startStr, String endStr) {
+    private List<CodefApproval> fetchApprovals(CodefConnection connection, String birthDate, String startStr,
+                                               String endStr, String cardNo, String cardPassword) {
         try {
-            return codefClient.getApprovals(
-                    connection.connectedId(), connection.institutionCode(), birthDate, startStr, endStr);
+            return codefClient.getApprovals(connection.connectedId(), connection.institutionCode(), birthDate,
+                    startStr, endStr, cardNo, cardPassword);
         } catch (CodefUnavailableException exception) {
             throw new ApprovalSyncFailedException(
                     "승인내역 동기화에 실패했습니다(issuerId=" + connection.issuerId() + "). "
@@ -183,11 +220,13 @@ public class CardSyncService {
     /**
      * 이 연동으로 조회 대상 월(targetMonth)의 실적을 받을 수 있는지 먼저 확인하고(카드사 미지원 또는
      * 조회 가능 범위 초과면 PerformanceSyncFailedException), 가능하면 CODEF를 호출한다. CODEF 호출
-     * 자체가 실패해도 같은 예외로 감싸 승인내역 실패와 응답 code로 구분되게 한다.
+     * 자체가 실패해도 같은 예외로 감싸 승인내역 실패와 응답 code로 구분되게 한다. cardNo/cardPassword는
+     * KB 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값으로, 요구하지 않으면 null이다.
      */
     private List<CodefCardPerformance> fetchPerformances(CodefConnection connection, String birthDate,
                                                           YearMonth targetMonth, long monthsBack,
-                                                          String performanceMonth) {
+                                                          String performanceMonth, String cardNo,
+                                                          String cardPassword) {
         int allowedLookback = connection.performanceLookbackMonths() != null
                 ? connection.performanceLookbackMonths() : DEFAULT_PERFORMANCE_LOOKBACK_MONTHS;
         if (allowedLookback == PERFORMANCE_UNSUPPORTED_LOOKBACK_MONTHS) {
@@ -199,9 +238,6 @@ public class CardSyncService {
                     + " 실적을 조회할 수 없습니다(조회 가능 범위: 최근 " + allowedLookback + "개월).");
         }
         String performanceStartDate = resolvePerformanceStartDate(targetMonth, connection.institutionCode());
-        // KB 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값이라 저장돼 있지 않으면 null이다.
-        String cardNo = encryptor.decrypt(connection.cardNumberEnc());
-        String cardPassword = encryptor.decrypt(connection.cardPasswordEnc());
         try {
             return codefClient.getPerformance(connection.connectedId(), connection.institutionCode(), birthDate,
                     cardNo, cardPassword, performanceStartDate);
