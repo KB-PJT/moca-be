@@ -2,6 +2,8 @@ package com.moca.mocabe.global.exception;
 
 import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
@@ -13,6 +15,7 @@ import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
@@ -75,6 +78,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, "CARD_LINK_NOT_FOUND", exception.getMessage());
     }
 
+    @ExceptionHandler(UserCardNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleUserCardNotFound(UserCardNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND", exception.getMessage());
+    }
+
     @ExceptionHandler(CodefConnectionNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleCodefConnectionNotFound(
             CodefConnectionNotFoundException exception) {
@@ -106,6 +114,18 @@ public class GlobalExceptionHandler {
             CodefCredentialRequiredException exception) {
         return error(HttpStatus.BAD_REQUEST, "CODEF_CREDENTIAL_REQUIRED",
                 exception.getMessage(), exception.getFields());
+    }
+
+    @ExceptionHandler(CardCredentialRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleCardCredentialRequired(
+            CardCredentialRequiredException exception) {
+        return error(HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED",
+                exception.getMessage(), exception.getFields());
+    }
+
+    @ExceptionHandler(CardNumberMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleCardNumberMismatch(CardNumberMismatchException exception) {
+        return error(HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH", exception.getMessage());
     }
 
     @ExceptionHandler(CodefInvalidCredentialsException.class)
