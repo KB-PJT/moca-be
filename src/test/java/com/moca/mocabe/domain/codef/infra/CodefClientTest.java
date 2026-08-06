@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
@@ -82,6 +83,20 @@ class CodefClientTest {
                         + "]}}")));
 
         assertThrows(CodefInvalidCredentialsException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("errorList에 비밀번호 오류 횟수 초과 코드가 있으면 CODEF 장애가 아니라 계정 잠김 오류로 변환한다")
+    void throwsAccountLockedWhenErrorListHasPasswordAttemptsExceeded() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\",\"message\":\"사용자 계정정보 등록에 실패했습니다.\"},"
+                        + "\"data\":{\"errorList\":["
+                        + "{\"code\":\"CF-12802\",\"message\":\"비밀번호 오류 횟수 초과입니다.\"}"
+                        + "]}}")));
+
+        assertThrows(CodefAccountLockedException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
     }
 

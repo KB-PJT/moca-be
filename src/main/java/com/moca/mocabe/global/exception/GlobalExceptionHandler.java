@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
@@ -109,6 +110,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleCodefInvalidCredentials(
             CodefInvalidCredentialsException exception) {
         return error(HttpStatus.BAD_REQUEST, "CODEF_INVALID_CREDENTIALS", exception.getMessage());
+    }
+
+    @ExceptionHandler(CodefAccountLockedException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefAccountLocked(CodefAccountLockedException exception) {
+        // 비밀번호 오류 횟수 초과로 계정 자체가 잠긴 상태라 재시도해도 해결되지 않으므로 423으로 구분한다.
+        return error(HttpStatus.LOCKED, "CODEF_ACCOUNT_LOCKED", exception.getMessage());
     }
 
     @ExceptionHandler(CodefUnavailableException.class)

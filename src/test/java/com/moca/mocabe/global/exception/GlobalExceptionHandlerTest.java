@@ -6,6 +6,7 @@ import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
@@ -125,6 +126,17 @@ class GlobalExceptionHandlerTest {
 
         assertError(response, HttpStatus.BAD_REQUEST, "CODEF_INVALID_CREDENTIALS");
         assertEquals("아이디 또는 비밀번호가 올바르지 않습니다.",
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("비밀번호 오류 횟수 초과로 계정이 잠기면 재시도 안내가 아니라 423 잠김 오류로 변환한다")
+    void handlesCodefAccountLocked() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleCodefAccountLocked(
+                new CodefAccountLockedException());
+
+        assertError(response, HttpStatus.LOCKED, "CODEF_ACCOUNT_LOCKED");
+        assertEquals("비밀번호 오류 횟수를 초과해 카드사 계정이 잠겼습니다. 카드사를 통해 잠금을 해제한 뒤 다시 시도해주세요.",
                 response.getBody().getError().getMessage());
     }
 

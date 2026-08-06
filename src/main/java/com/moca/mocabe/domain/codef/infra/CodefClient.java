@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.codef.infra;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
@@ -35,6 +36,7 @@ public class CodefClient {
     private static final String LOGIN_TYPE_ID_PASSWORD = "1";
     private static final String RESULT_CODE_SUCCESS = "CF-00000";
     private static final String ERROR_CODE_INVALID_CREDENTIALS = "CF-12803";
+    private static final String ERROR_CODE_ACCOUNT_LOCKED = "CF-12802";
     private static final Logger LOGGER = Logger.getLogger(CodefClient.class.getName());
 
     private final CodefHttpClient httpClient;
@@ -70,9 +72,14 @@ public class CodefClient {
         // HTTP 200이어도 result.code로 실패를 반환할 수 있어 connectedId 유무보다 먼저 확인한다.
         if (!RESULT_CODE_SUCCESS.equals(root.path("result").path("code").asText())) {
             // result.code(예 CF-04000)는 "계정 등록 실패"라는 요약일 뿐 원인은 data.errorList[].code에
-            // 있다. 그중 아이디/비밀번호 오류(CF-12803)는 CODEF 상류 문제가 아니라 사용자 입력 오류이므로
-            // 재시도 안내(503)가 아니라 400으로 구분해 알려준다. 그 외는 CODEF 상류 문제로 본다.
-            if (hasErrorCode(root.path("data").path("errorList"), ERROR_CODE_INVALID_CREDENTIALS)) {
+            // 있다. 아이디/비밀번호 오류(CF-12803)와 계정 잠김(CF-12802, 비밀번호 오류 횟수 초과)은
+            // CODEF 상류 문제가 아니라 사용자 입력·계정 상태 문제이므로 재시도 안내(503)가 아니라
+            // 각각 구분되는 응답으로 알려준다. 그 외는 CODEF 상류 문제로 본다.
+            JsonNode errorList = root.path("data").path("errorList");
+            if (hasErrorCode(errorList, ERROR_CODE_ACCOUNT_LOCKED)) {
+                throw new CodefAccountLockedException();
+            }
+            if (hasErrorCode(errorList, ERROR_CODE_INVALID_CREDENTIALS)) {
                 throw new CodefInvalidCredentialsException();
             }
             // 사용자 입력 오류로 특정하지 못한 나머지는 원인 진단을 위해 CODEF result 코드를 로그로 남긴다.
@@ -179,10 +186,24 @@ public class CodefClient {
         return approvals;
     }
 
-    /** CODEF result 코드/메시지(값은 고정 안내문이라 민감정보 없음)를 남겨 어떤 CF-코드로 실패했는지 진단할 수 있게 한다. */
+    /**
+     * CODEF result 코드/메시지(값은 고정 안내문이라 민감정보 없음)를 남겨 어떤 CF-코드로 실패했는지
+     * 진단할 수 있게 한다. result.code(예 CF-04000)는 요약 코드일 뿐이고 실제 원인은 보통
+     * data.errorList[]에 더 구체적인 코드로 들어있으므로 함께 남긴다.
+     */
     private void logResultFailure(String operation, JsonNode root) {
         LOGGER.warning("CODEF " + operation + " 실패 code=" + root.path("result").path("code").asText()
-                + " message=" + root.path("result").path("message").asText());
+                + " message=" + root.path("result").path("message").asText()
+                + " errorList=" + summarizeErrors(root.path("data").path("errorList")));
+    }
+
+    /** errorList의 code/message만 뽑아 로그용 문자열로 요약한다(민감정보 없는 고정 안내문만 포함). */
+    private String summarizeErrors(JsonNode errorListNode) {
+        List<String> summaries = new ArrayList<>();
+        for (JsonNode error : asNodeList(errorListNode)) {
+            summaries.add(error.path("code").asText() + ":" + error.path("message").asText());
+        }
+        return summaries.toString();
     }
 
     /** errorList에 지정한 코드가 있는지 확인한다. 계정 1건만 요청해도 CODEF 관례상 배열/단일객체 둘 다 올 수 있다. */
