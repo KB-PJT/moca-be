@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
@@ -210,12 +212,18 @@ class CodefClientTest {
                         + "\"resCardType\":\"신용/본인\",\"resImageLink\":\"https://codef/a.png\"},"
                         + "{\"resCardName\":\"카드 B\",\"resImageLink\":\"\"}]}")));
 
-        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301");
+        List<CodefOwnedCard> cards = codefClient.getOwnedCards(
+                "cid-1", "0301", "1234567890123456", "1234", "900101");
 
         assertEquals(2, cards.size());
         assertEquals("카드 A", cards.get(0).cardName());
         assertEquals("https://codef/a.png", cards.get(0).imageUrl());
         assertEquals(null, cards.get(1).imageUrl());
+        verify(httpClient).post(eq(CARD_LIST_URL), any(), argThat(body ->
+                body.contains("\"cardNo\":\"1234567890123456\"")
+                        && body.contains("\"cardPassword\":\"")
+                        && !body.contains("\"cardPassword\":\"1234\"")
+                        && body.contains("\"birthDate\":\"900101\"")));
     }
 
     @Test
@@ -227,7 +235,8 @@ class CodefClientTest {
                         + "\"resCardName\":\"노리2 체크카드(KB Pay)_비교통\",\"resCardNo\":\"943646******1069\","
                         + "\"resCardType\":\"\",\"resImageLink\":\"\"}}")));
 
-        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301");
+        List<CodefOwnedCard> cards = codefClient.getOwnedCards(
+                "cid-1", "0301", "1234567890123456", "1234", "900101");
 
         assertEquals(1, cards.size());
         assertEquals("노리2 체크카드(KB Pay)_비교통", cards.get(0).cardName());
@@ -242,7 +251,8 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
 
         assertThrows(CodefUnavailableException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards(
+                        "cid-1", "0301", "1234567890123456", "1234", "900101"));
     }
 
     @Test
@@ -253,7 +263,8 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards(
+                        "cid-1", "0301", "1234567890123456", "1234", "900101"));
     }
 
     @Test
@@ -264,7 +275,8 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":[{\"resCardName\":\" \"}]}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards(
+                        "cid-1", "0301", "1234567890123456", "1234", "900101"));
     }
 
     @Test

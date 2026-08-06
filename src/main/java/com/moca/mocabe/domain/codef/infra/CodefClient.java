@@ -88,12 +88,17 @@ public class CodefClient {
     }
 
     /** Connected ID로 개인 보유카드를 조회한다. */
-    public List<CodefOwnedCard> getOwnedCards(String connectedId, String organization) {
+    public List<CodefOwnedCard> getOwnedCards(String connectedId, String organization,
+                                               String cardNo, String cardPassword, String birthDate) {
         String accessToken = requestAccessToken();
         ObjectNode request = objectMapper.createObjectNode();
         request.put("connectedId", connectedId);
         request.put("organization", organization);
-        request.put("birthDate", "");
+        // TODO(BE): 현대카드(0302) 보유카드 조회에서 확인된 요구값이다. 카드사별 필수값과
+        // cardPassword RSA 암호화 규칙을 CODEF 명세 기준으로 최종 확인해 유지·조정한다.
+        putIfPresent(request, "cardNo", cardNo);
+        putEncryptedIfPresent(request, "cardPassword", cardPassword, parsePublicKey());
+        request.put("birthDate", birthDate == null ? "" : birthDate);
         request.put("inquiryType", "0");
 
         Map<String, String> headers = new LinkedHashMap<>();

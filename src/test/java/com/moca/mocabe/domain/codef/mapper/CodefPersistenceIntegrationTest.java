@@ -100,7 +100,9 @@ class CodefPersistenceIntegrationTest {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
             return CONNECTED_ID;
         });
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301")).thenReturn(List.of());
+        when(codefClient.getOwnedCards(
+                CONNECTED_ID, "0301", "1234567890123456", "1234", "900101"))
+                .thenReturn(List.of());
     }
 
     @AfterEach
@@ -158,7 +160,9 @@ class CodefPersistenceIntegrationTest {
                         + "(option_choice_id, option_group_id, choice_key, choice_name, "
                         + "parse_status, parse_confidence) VALUES (?, ?, 'a', 'A팩', 'verified', 0.9900)",
                 OPTION_CHOICE_ID, OPTION_GROUP_ID);
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301")).thenReturn(List.of(
+        when(codefClient.getOwnedCards(
+                CONNECTED_ID, "0301", "1234567890123456", "1234", "900101"))
+                .thenReturn(List.of(
                 new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "1234****5678", "체크/본인", "")));
 
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
@@ -207,6 +211,8 @@ class CodefPersistenceIntegrationTest {
         assertEquals(CONNECTED_ID, connections.get(0).connectedId());
         assertEquals("0301", connections.get(0).institutionCode());
         assertEquals(ISSUER_ID, connections.get(0).issuerId());
+        assertEquals("1234567890123456", encryptor.decrypt(connections.get(0).cardNumberEnc()));
+        assertEquals("1234", encryptor.decrypt(connections.get(0).cardPasswordEnc()));
         assertEquals("900101", encryptor.decrypt(connections.get(0).birthDateEnc()));
     }
 
@@ -261,9 +267,12 @@ class CodefPersistenceIntegrationTest {
                                   String identityHash, byte[] birthDateEnc) {
         jdbcTemplate.update("INSERT INTO codef_account_credentials "
                         + "(codef_account_credential_id, user_id, issuer_id, connected_id, "
-                        + "birth_date_enc, credential_identity_hash, status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                credentialId, USER_ID, ISSUER_ID, connectedId, birthDateEnc, identityHash, status);
+                        + "card_number_enc, card_password_enc, birth_date_enc, "
+                        + "credential_identity_hash, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                credentialId, USER_ID, ISSUER_ID, connectedId,
+                encryptor.encrypt("1234567890123456"), encryptor.encrypt("1234"),
+                birthDateEnc, identityHash, status);
     }
 
     private CreateCardLinkRequest request() {

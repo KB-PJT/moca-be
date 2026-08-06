@@ -114,7 +114,11 @@ public class CardLinkService {
 
         List<CardLinkCardResponse> cards = List.of();
         try {
-            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(connectedId, policy.getInstitutionCode());
+            // TODO(BE): Connected ID 생성 직후 현대카드 보유카드 조회에도 카드번호·카드 비밀번호·
+            // 생년월일이 필요해 전달한다. 카드사별 정책 확정 후 불필요한 값은 전송하지 않도록 검토한다.
+            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                    connectedId, policy.getInstitutionCode(), request.getCardNo(),
+                    request.getCardPassword(), request.getBirthDate());
             cards = matchAndPersistOwnedCards(userId, linkId, policy, ownedCards);
         } catch (RuntimeException exception) {
             LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
@@ -151,8 +155,15 @@ public class CardLinkService {
         try {
             // findActiveConnectionsByUserId가 issuers와 INNER JOIN하므로 정책은 항상 존재한다.
             CodefIssuerPolicy policy = issuerMapper.findCodefPolicyByInstitutionCode(connection.institutionCode());
+            // TODO(BE): 기존 Connected ID로 현대카드를 재조회할 때 필요한 값을 저장 암호문에서
+            // 복호화한다. 복호화 범위·수명과 카드사별 전달 조건을 백엔드 보안 정책에 맞게 확인한다.
+            String cardNo = encryptor.decrypt(connection.cardNumberEnc());
+            String cardPassword = encryptor.decrypt(connection.cardPasswordEnc());
+            String birthDate = encryptor.decrypt(connection.birthDateEnc());
             List<CodefOwnedCard> ownedCards =
-                    codefClient.getOwnedCards(connection.connectedId(), connection.institutionCode());
+                    codefClient.getOwnedCards(
+                            connection.connectedId(), connection.institutionCode(),
+                            cardNo, cardPassword, birthDate);
             List<CardLinkCardResponse> cards = matchAndPersistOwnedCards(
                     userId, connection.codefAccountCredentialId(), policy, ownedCards);
             return new SyncOwnedCardsResult(

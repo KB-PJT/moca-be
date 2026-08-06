@@ -64,6 +64,9 @@ class CardLinkServiceTest {
     private static final String USER_ID = "01980d6a-5c0c-7aaf-9b85-010203040506";
     private static final String ISSUER_ID = "00000000-0000-4000-8000-000000000301";
     private static final String INSTITUTION_CODE = "0301";
+    private static final byte[] CARD_NUMBER_ENC = {1};
+    private static final byte[] CARD_PASSWORD_ENC = {2};
+    private static final byte[] BIRTH_DATE_ENC = {3};
 
     @Mock
     private CodefClient codefClient;
@@ -98,6 +101,9 @@ class CardLinkServiceTest {
         // 기본은 동시성 충돌 없이 요청한 그대로 적재되는 상황을 가정한다(경합 시나리오는 각 테스트에서 재정의).
         lenient().when(codefCredentialStore.saveCard(any(LinkedCardInsert.class)))
                 .thenAnswer(invocation -> invocation.<LinkedCardInsert>getArgument(0).userCardId());
+        lenient().when(encryptor.decrypt(CARD_NUMBER_ENC)).thenReturn("1234567890123456");
+        lenient().when(encryptor.decrypt(CARD_PASSWORD_ENC)).thenReturn("1234");
+        lenient().when(encryptor.decrypt(BIRTH_DATE_ENC)).thenReturn("900101");
     }
 
     @Test
@@ -106,7 +112,9 @@ class CardLinkServiceTest {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
         when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
-        when(codefClient.getOwnedCards("cid-1", "0301")).thenReturn(List.of());
+        when(codefClient.getOwnedCards(
+                "cid-1", "0301", "1234567890123456", "1234", "900101"))
+                .thenReturn(List.of());
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 
         CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
@@ -164,7 +172,7 @@ class CardLinkServiceTest {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(accountPolicy());
         when(credentialHasher.generate("ACCOUNT_ID", "tester")).thenReturn("account-hash");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-2");
-        when(codefClient.getOwnedCards("cid-2", "0301")).thenReturn(List.of());
+        when(codefClient.getOwnedCards("cid-2", "0301", null, null, null)).thenReturn(List.of());
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1});
 
         cardLinkService.createLink(USER_ID, request);
@@ -225,7 +233,7 @@ class CardLinkServiceTest {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(policy);
         when(credentialHasher.generate("ACCOUNT_ID", "tester")).thenReturn("cred-hash");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-3");
-        when(codefClient.getOwnedCards("cid-3", "0301")).thenReturn(List.of(
+        when(codefClient.getOwnedCards("cid-3", "0301", null, null, null)).thenReturn(List.of(
                 new CodefOwnedCard("매칭 카드", "1111****2222", "", "https://codef/ignored.png"),
                 new CodefOwnedCard("미매칭 체크", "3333****4444", "체크/본인", "https://codef/check.png"),
                 new CodefOwnedCard("이미지 없음", "5555****6666", "기타", " ")));
@@ -280,7 +288,8 @@ class CardLinkServiceTest {
         when(credentialHasher.generate("ACCOUNT_ID", "tester")).thenReturn("cred-hash");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-4");
         CodefOwnedCard duplicate = new CodefOwnedCard("동일 카드", "1111****2222", "신용", null);
-        when(codefClient.getOwnedCards("cid-4", "0301")).thenReturn(List.of(duplicate, duplicate));
+        when(codefClient.getOwnedCards("cid-4", "0301", null, null, null))
+                .thenReturn(List.of(duplicate, duplicate));
         when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("same-key");
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1});
 
@@ -295,7 +304,8 @@ class CardLinkServiceTest {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
         when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
-        when(codefClient.getOwnedCards("cid-1", "0301"))
+        when(codefClient.getOwnedCards(
+                "cid-1", "0301", "1234567890123456", "1234", "900101"))
                 .thenThrow(new CodefUnavailableException("upstream timeout"));
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 
@@ -312,9 +322,12 @@ class CardLinkServiceTest {
     @Test
     @DisplayName("institutionCode 없이 재조회하면 모든 활성 연동을 순회해 결과를 모은다")
     void syncsAllActiveConnectionsWhenInstitutionCodeOmitted() {
-        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID,
+                CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         CodefConnection shinhanConnection =
-                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", new byte[0]);
+                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan",
+                        CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(kbConnection, shinhanConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
@@ -323,8 +336,12 @@ class CardLinkServiceTest {
         shinhanPolicy.setInstitutionCode("0302");
         when(issuerMapper.findCodefPolicyByInstitutionCode("0302")).thenReturn(shinhanPolicy);
         // 매칭되는 카드가 하나도 없어도(카탈로그가 비어 있어도) 실패가 아니라 빈 배열로 성공 처리돼야 한다.
-        when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of());
-        when(codefClient.getOwnedCards("cid-shinhan", "0302")).thenReturn(List.of());
+        when(codefClient.getOwnedCards(
+                "cid-kb", "0301", "1234567890123456", "1234", "900101"))
+                .thenReturn(List.of());
+        when(codefClient.getOwnedCards(
+                "cid-shinhan", "0302", "1234567890123456", "1234", "900101"))
+                .thenReturn(List.of());
 
         SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
 
@@ -338,19 +355,25 @@ class CardLinkServiceTest {
     @Test
     @DisplayName("institutionCode를 주면 그 카드사 연동만 재조회한다")
     void syncsOnlyMatchingInstitutionCode() {
-        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID,
+                CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         CodefConnection shinhanConnection =
-                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", new byte[0]);
+                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan",
+                        CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(kbConnection, shinhanConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
-        when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of());
+        when(codefClient.getOwnedCards(
+                "cid-kb", "0301", "1234567890123456", "1234", "900101"))
+                .thenReturn(List.of());
 
         SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, "0301");
 
         assertEquals(1, response.results().size());
         assertEquals("link-kb", response.results().get(0).linkId());
-        verify(codefClient, never()).getOwnedCards("cid-shinhan", "0302");
+        verify(codefClient, never()).getOwnedCards(
+                "cid-shinhan", "0302", "1234567890123456", "1234", "900101");
     }
 
     @Test
@@ -366,9 +389,12 @@ class CardLinkServiceTest {
     @Test
     @DisplayName("한 연동의 재조회 실패는 다른 연동 결과에 영향을 주지 않는다")
     void isolatesFailureOfOneConnectionDuringSync() {
-        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID,
+                CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         CodefConnection shinhanConnection =
-                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", new byte[0]);
+                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan",
+                        CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(kbConnection, shinhanConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
@@ -376,9 +402,12 @@ class CardLinkServiceTest {
         shinhanPolicy.setIssuerId("issuer-shinhan");
         shinhanPolicy.setInstitutionCode("0302");
         when(issuerMapper.findCodefPolicyByInstitutionCode("0302")).thenReturn(shinhanPolicy);
-        when(codefClient.getOwnedCards("cid-kb", "0301"))
+        when(codefClient.getOwnedCards(
+                "cid-kb", "0301", "1234567890123456", "1234", "900101"))
                 .thenThrow(new CodefUnavailableException("timeout", new java.io.IOException("connection reset")));
-        when(codefClient.getOwnedCards("cid-shinhan", "0302")).thenReturn(List.of());
+        when(codefClient.getOwnedCards(
+                "cid-shinhan", "0302", "1234567890123456", "1234", "900101"))
+                .thenReturn(List.of());
 
         SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
 
@@ -395,11 +424,14 @@ class CardLinkServiceTest {
     @Test
     @DisplayName("이미 적재된 카드는 재조회해도 다시 적재하지 않고 기존 userCardId를 재사용한다")
     void reusesExistingUserCardIdOnResync() {
-        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID,
+                CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
         CodefIssuerPolicy policy = cardPolicy();
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(policy);
-        when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of(
+        when(codefClient.getOwnedCards(
+                "cid-kb", "0301", "1234567890123456", "1234", "900101")).thenReturn(List.of(
                 new CodefOwnedCard("매칭 카드", "1111****2222", "신용", null)));
         when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("existing-key");
         CardCatalogEntry matched = new CardCatalogEntry(
@@ -422,10 +454,13 @@ class CardLinkServiceTest {
     @Test
     @DisplayName("동시 재조회로 다른 요청이 먼저 적재했다면 새로 만든 ID 대신 그 요청의 userCardId를 응답에 반영한다")
     void usesWinningUserCardIdWhenConcurrentResyncRacesOnSameCard() {
-        CodefConnection kbConnection = new CodefConnection("link-kb", "cid-kb", "0301", ISSUER_ID, new byte[0]);
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID,
+                CARD_NUMBER_ENC, CARD_PASSWORD_ENC, BIRTH_DATE_ENC);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
-        when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of(
+        when(codefClient.getOwnedCards(
+                "cid-kb", "0301", "1234567890123456", "1234", "900101")).thenReturn(List.of(
                 new CodefOwnedCard("매칭 카드", "1111****2222", "신용", null)));
         when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("race-key");
         CardCatalogEntry matched = new CardCatalogEntry(
