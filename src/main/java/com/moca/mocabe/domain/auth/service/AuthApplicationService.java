@@ -14,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 /** Google authorization code 검증 후 MOCA opaque 세션을 발급하는 인증 유스케이스다. */
 public class AuthApplicationService {
 
-    private static final String DEFAULT_NICKNAME = "MOCA 회원";
-
     private final UserDomainService userDomainService;
     private final GoogleAuthorizationCodeExchanger googleAuthorizationCodeExchanger;
     private final OpaqueTokenService opaqueTokenService;
@@ -33,7 +31,7 @@ public class AuthApplicationService {
         GoogleUserIdentity identity = googleAuthorizationCodeExchanger.exchangeAndVerify(code, codeVerifier,
                 redirectUri);
         UserDomainService.GoogleUserResult userResult = userDomainService.findOrCreateGoogleUser(
-                identity.getSubject(), identity.getEmail(), DEFAULT_NICKNAME);
+                identity.getSubject(), identity.getEmail(), identity.getProfileName());
         UserProfile userProfile = userResult.getUserProfile();
 
         OpaqueTokenPair tokens = opaqueTokenService.issue(userProfile.getUserId(), userProfile.getUserType());

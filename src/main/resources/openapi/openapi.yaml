@@ -284,6 +284,8 @@ paths:
       description: |
         PWA는 callback에서 받은 authorization code, code verifier, redirect URI를 전달합니다.
         서버는 Google access token을 교환하고 tokeninfo의 audience, 만료, scope, user_id를 검증합니다.
+        PWA는 Google OAuth 요청에 openid, userinfo.email, userinfo.profile scope를 포함해야 하며,
+        서버는 UserInfo의 profile name을 신규 회원의 nickname으로 저장합니다.
         refresh token은 JSON이 아닌 HttpOnly cookie로만 반환합니다.
       operationId: loginWithGoogle
       security: []

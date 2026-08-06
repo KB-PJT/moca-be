@@ -33,7 +33,7 @@ class JdkGoogleOAuthHttpClientTest {
     }
 
     @Test
-    @DisplayName("token 교환 form과 tokeninfo GET 요청에 타임아웃을 적용한다")
+    @DisplayName("token 교환 form과 Google GET 요청에 타임아웃·Authorization 헤더를 적용한다")
     void sendsFormAndGetRequests() throws Exception {
         when(httpResponse.statusCode()).thenReturn(200);
         when(httpResponse.body()).thenReturn("response-body");
@@ -42,17 +42,23 @@ class JdkGoogleOAuthHttpClientTest {
         GoogleOAuthHttpResponse formResponse = googleOAuthHttpClient.postForm("https://google.example.com/token",
                 Map.of("code", "code value"));
         GoogleOAuthHttpResponse getResponse = googleOAuthHttpClient.get("https://google.example.com/tokeninfo");
+        GoogleOAuthHttpResponse authorizedGetResponse = googleOAuthHttpClient.get("https://google.example.com/userinfo",
+                Map.of("Authorization", "Bearer access-token"));
 
         assertEquals(200, formResponse.getStatusCode());
         assertEquals("response-body", getResponse.getBody());
+        assertEquals("response-body", authorizedGetResponse.getBody());
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-        verify(httpClient, org.mockito.Mockito.times(2)).send(requestCaptor.capture(), anyStringBodyHandler());
+        verify(httpClient, org.mockito.Mockito.times(3)).send(requestCaptor.capture(), anyStringBodyHandler());
         HttpRequest formRequest = requestCaptor.getAllValues().get(0);
         HttpRequest getRequest = requestCaptor.getAllValues().get(1);
+        HttpRequest authorizedGetRequest = requestCaptor.getAllValues().get(2);
         assertEquals(Duration.ofSeconds(7), formRequest.timeout().orElseThrow());
         assertEquals("application/x-www-form-urlencoded",
                 formRequest.headers().firstValue("Content-Type").orElseThrow());
         assertEquals("GET", getRequest.method());
+        assertEquals("Bearer access-token", authorizedGetRequest.headers()
+                .firstValue("Authorization").orElseThrow());
     }
 
     @Test
