@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
@@ -112,6 +114,28 @@ class GlobalExceptionHandlerTest {
 
         assertError(response, HttpStatus.NOT_FOUND, "ISSUER_NOT_FOUND");
         assertEquals("등록되지 않은 발급사입니다: " + issuerId,
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("카드사 로그인 아이디·비밀번호가 틀리면 재시도 안내가 아니라 식별 가능한 400 오류로 변환한다")
+    void handlesCodefInvalidCredentials() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleCodefInvalidCredentials(
+                new CodefInvalidCredentialsException());
+
+        assertError(response, HttpStatus.BAD_REQUEST, "CODEF_INVALID_CREDENTIALS");
+        assertEquals("아이디 또는 비밀번호가 올바르지 않습니다.",
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("보유카드 재조회 시 지정한 기관코드로 연동된 계정이 없으면 식별 가능한 404 오류로 변환한다")
+    void handlesCodefConnectionNotFound() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleCodefConnectionNotFound(
+                new CodefConnectionNotFoundException("0301"));
+
+        assertError(response, HttpStatus.NOT_FOUND, "CODEF_CONNECTION_NOT_FOUND");
+        assertEquals("연동된 카드사 계정을 찾을 수 없습니다: 0301",
                 response.getBody().getError().getMessage());
     }
 

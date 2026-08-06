@@ -2,7 +2,9 @@ package com.moca.mocabe.global.exception;
 
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
@@ -70,6 +72,12 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, "CARD_LINK_NOT_FOUND", exception.getMessage());
     }
 
+    @ExceptionHandler(CodefConnectionNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefConnectionNotFound(
+            CodefConnectionNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "CODEF_CONNECTION_NOT_FOUND", exception.getMessage());
+    }
+
     @ExceptionHandler(InvalidCardSelectionException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidCardSelection(InvalidCardSelectionException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_CARD_SELECTION", exception.getMessage());
@@ -95,6 +103,12 @@ public class GlobalExceptionHandler {
             CodefCredentialRequiredException exception) {
         return error(HttpStatus.BAD_REQUEST, "CODEF_CREDENTIAL_REQUIRED",
                 exception.getMessage(), exception.getFields());
+    }
+
+    @ExceptionHandler(CodefInvalidCredentialsException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefInvalidCredentials(
+            CodefInvalidCredentialsException exception) {
+        return error(HttpStatus.BAD_REQUEST, "CODEF_INVALID_CREDENTIALS", exception.getMessage());
     }
 
     @ExceptionHandler(CodefUnavailableException.class)

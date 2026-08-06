@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 
 export function runGradle(args, hookName) {
     const isWindows = process.platform === "win32";
-    const command = isWindows ? "gradlew.bat" : "./gradlew";
+    const command = isWindows ? ".\\gradlew.bat" : "./gradlew";
     const result = spawnSync(command, args, {
         cwd: process.cwd(),
         stdio: "inherit",

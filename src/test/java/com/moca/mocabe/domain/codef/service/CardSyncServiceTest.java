@@ -181,7 +181,7 @@ class CardSyncServiceTest {
     }
 
     private CodefConnection connection() {
-        return new CodefConnection("cid", "0301", "issuer-1", new byte[]{1, 2, 3});
+        return new CodefConnection("link-1", "cid", "0301", "issuer-1", new byte[]{1, 2, 3});
     }
 
     private UserCardMatchRow userCard() {
