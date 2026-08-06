@@ -9,8 +9,6 @@ public class CodefAccountCredential {
     private String connectedId;
     private byte[] accountIdEnc;
     private byte[] accountPasswordEnc;
-    private byte[] cardNumberEnc;
-    private byte[] cardPasswordEnc;
     private byte[] birthDateEnc;
     private String credentialIdentityHash;
     private String status;
@@ -61,22 +59,6 @@ public class CodefAccountCredential {
 
     public void setAccountPasswordEnc(byte[] accountPasswordEnc) {
         this.accountPasswordEnc = accountPasswordEnc;
-    }
-
-    public byte[] getCardNumberEnc() {
-        return cardNumberEnc;
-    }
-
-    public void setCardNumberEnc(byte[] cardNumberEnc) {
-        this.cardNumberEnc = cardNumberEnc;
-    }
-
-    public byte[] getCardPasswordEnc() {
-        return cardPasswordEnc;
-    }
-
-    public void setCardPasswordEnc(byte[] cardPasswordEnc) {
-        this.cardPasswordEnc = cardPasswordEnc;
     }
 
     public byte[] getBirthDateEnc() {

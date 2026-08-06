@@ -34,6 +34,22 @@
         ORDER BY display_order ASC, user_card_id ASC
     </select>
 
+    <resultMap id="activeCardCredentialMap" type="com.moca.mocabe.domain.codef.model.ActiveCardCredential">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="card_number_enc" javaType="_byte[]"/>
+            <arg column="card_password_enc" javaType="_byte[]"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findActiveCardCredentialsByCredentialId" resultMap="activeCardCredentialMap">
+        SELECT user_card_id, card_number_enc, card_password_enc
+        FROM user_cards
+        WHERE codef_account_credential_id = #{codefAccountCredentialId}
+          AND is_active = TRUE
+        ORDER BY display_order ASC, user_card_id ASC
+    </select>
+
     <select id="findExistingApprovalKeys" resultMap="existingApprovalKeyMap">
         SELECT user_card_id, approval_number, approved_at, amount, merchant_name
         FROM card_payment_approvals

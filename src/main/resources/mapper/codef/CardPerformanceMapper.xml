@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.codef.mapper.CardPerformanceMapper">
+
+    <insert id="upsertPerformanceSnapshot">
+        INSERT INTO user_card_performance_snapshots (
+            performance_snapshot_id, user_card_id, performance_month, current_spend_amount,
+            created_at, updated_at
+        ) VALUES (
+            #{performanceSnapshotId}, #{userCardId}, #{performanceMonth}, #{currentSpendAmount},
+            UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+        )
+        ON DUPLICATE KEY UPDATE
+            current_spend_amount = VALUES(current_spend_amount),
+            updated_at = UTC_TIMESTAMP(6)
+    </insert>
+</mapper>

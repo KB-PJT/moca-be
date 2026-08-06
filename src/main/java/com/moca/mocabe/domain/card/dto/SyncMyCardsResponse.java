@@ -5,11 +5,14 @@ public class SyncMyCardsResponse {
 
     private final int syncedCardCount;
     private final int syncedApprovalCount;
+    private final int syncedPerformanceCount;
     private final String syncedAt;
 
-    public SyncMyCardsResponse(int syncedCardCount, int syncedApprovalCount, String syncedAt) {
+    public SyncMyCardsResponse(int syncedCardCount, int syncedApprovalCount, int syncedPerformanceCount,
+                               String syncedAt) {
         this.syncedCardCount = syncedCardCount;
         this.syncedApprovalCount = syncedApprovalCount;
+        this.syncedPerformanceCount = syncedPerformanceCount;
         this.syncedAt = syncedAt;
     }
 
@@ -19,6 +22,10 @@ public class SyncMyCardsResponse {
 
     public int getSyncedApprovalCount() {
         return syncedApprovalCount;
+    }
+
+    public int getSyncedPerformanceCount() {
+        return syncedPerformanceCount;
     }
 
     public String getSyncedAt() {

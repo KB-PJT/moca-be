@@ -196,6 +196,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '423':
+          description: >-
+            카드사 비밀번호 오류 횟수 초과로 계정이 잠김(code=CODEF_ACCOUNT_LOCKED). 재시도 안내가 아니라
+            카드사를 통한 잠금 해제가 필요하다는 뜻입니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/CodefUnavailableError'
   /card-links/{linkId}/cards:
@@ -231,7 +239,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ActivateCardLinkCardsApiResponse'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED), 연동에 속하지 않은 카드·옵션 오류
+            (code=INVALID_CARD_SELECTION), 또는 카드사가 요구하는 카드번호/비밀번호가 이 카드에
+            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — PATCH /card-links/cards/{userCardId}/credentials로
+            먼저 채워야 합니다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '404':
@@ -277,6 +293,62 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /card-links/cards/{userCardId}/credentials:
+    patch:
+      tags: [CardLink]
+      summary: 카드별 카드번호/비밀번호 추가 입력
+      description: |
+        카드번호가 필요한 카드사에서, 계정 생성 시 입력한 카드와 일치하지 않아 카드번호/비밀번호가
+        비어 있는 보유카드에 값을 채웁니다. 입력한 카드번호/비밀번호로 그 카드사 connectedId와 함께
+        보유카드 조회를 호출해 정상 응답을 받으면 유효한 것으로 보고 암호화해 저장합니다.
+        이 요청만으로는 카드가 활성화되지 않습니다(is_active는 그대로 false). 응답은 옵션 그룹을
+        포함한 카드 정보이며, 옵션이 있으면 골라서 PATCH /card-links/{linkId}/cards로 별도
+        활성화해야 합니다(활성화 경로를 하나로 유지해 옵션 검증을 항상 거치게 하기 위함입니다).
+      operationId: submitCardCredentials
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: userCardId
+          in: path
+          required: true
+          description: 카드정보를 채울 보유카드(user_cards)의 식별자
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitCardCredentialsRequest'
+      responses:
+        '200':
+          description: 저장 성공(옵션 그룹을 포함한 카드 정보 반환, 활성화는 별도 요청 필요)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardLinkCardApiResponse'
+        '400':
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED), 카드번호/비밀번호 누락
+            (code=CARD_CREDENTIAL_REQUIRED), 이 카드사는 카드번호가 필요하지 않음
+            (code=INVALID_CARD_SELECTION), 또는 입력한 카드번호가 이 카드의 저장된 마스킹
+            카드번호(앞·뒤 노출 자리)와 일치하지 않음(code=CARD_NUMBER_MISMATCH — CODEF를
+            호출하지 않고 로컬에서 먼저 걸러낸 결과입니다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          description: 본인 소유의 카드를 찾을 수 없음(code=USER_CARD_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/CodefUnavailableError'
   /auth/google/login:
     post:
       tags: [Auth]
@@ -467,6 +539,11 @@ paths:
         연결된 카드사의 승인내역(거래내역)을 CODEF에서 조회해 새로 발견한 정상 국내 승인건만 중복 없이 적재합니다.
         취소·부분취소·거절 및 해외결제는 적재하지 않습니다.
         startDate/endDate를 생략하면 이번 달 1일부터 오늘까지(KST) 조회합니다.
+        또한 카드별 실적현황을 CODEF에서 조회해 인정 실적금액을 최신 값으로 upsert합니다. 실적 조회 대상 월은
+        startDate가 속한 달(기본값 이번 달)입니다. 연동 중 하나라도 승인내역 또는 실적조회 호출 자체가
+        실패하면 전체 동기화를 실패로 처리하고 재시도 가능한 503으로 응답합니다. 요청한 달을 카드사가
+        애초에 지원하지 않는 경우(카드사 실적조회 미지원 또는 조회 가능 범위 초과)는 재시도해도 항상
+        실패하는 영구 조건이므로 503이 아니라 400으로 응답합니다.
       operationId: syncMyCardApprovals
       security:
         - MocaBearerAuth: []
@@ -495,13 +572,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/SyncMyCardsApiResponse'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED), 또는 요청한 달을 카드사가 애초에 지원하지 않음
+            (code=PERFORMANCE_UNSUPPORTED — 카드사 실적조회 미지원 또는 조회 가능 범위 초과. 재시도해도
+            항상 실패하는 영구 조건이라 503이 아닙니다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
         '503':
-          $ref: '#/components/responses/CodefUnavailableError'
+          $ref: '#/components/responses/CardSyncFailedError'
   /me/card-sort-mode:
     patch:
       tags: [User]
@@ -656,6 +740,17 @@ components:
     CodefUnavailableError:
       description: >-
         CODEF 상류 타임아웃·연결 실패·비2xx 응답으로 처리하지 못함(재시도 가능, code=CODEF_UNAVAILABLE).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    CardSyncFailedError:
+      description: >-
+        승인내역 또는 실적조회 CODEF 호출 자체가 실패해 전체 동기화를 중단함(재시도 가능). code로
+        원인을 구분한다. APPROVAL_SYNC_FAILED(CODEF 승인내역 조회 실패),
+        PERFORMANCE_SYNC_FAILED(CODEF 실적조회 호출 실패). 카드사 실적조회 미지원·조회 가능 범위
+        초과처럼 재시도해도 항상 실패하는 영구 조건은 이 응답이 아니라 400(code=PERFORMANCE_UNSUPPORTED)
+        으로 응답한다.
       content:
         application/json:
           schema:
@@ -939,6 +1034,24 @@ components:
                     optionChoiceId:
                       type: string
                       format: uuid
+    SubmitCardCredentialsRequest:
+      type: object
+      required: [cardNo]
+      properties:
+        cardNo:
+          type: string
+          description: 이 카드의 전체 카드번호. 카드사가 카드번호를 요구할 때만 쓰입니다.
+        cardPassword:
+          type: string
+          description: 카드사 정책상 카드 비밀번호가 필요한 경우에만 필수입니다.
+    CardLinkCardApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/CardLinkCardResponse'
     SyncOwnedCardsApiResponse:
       type: object
       properties:
@@ -1104,7 +1217,7 @@ components:
           $ref: '#/components/schemas/SyncMyCardsResponse'
     SyncMyCardsResponse:
       type: object
-      required: [syncedCardCount, syncedApprovalCount, syncedAt]
+      required: [syncedCardCount, syncedApprovalCount, syncedPerformanceCount, syncedAt]
       properties:
         syncedCardCount:
           type: integer
@@ -1114,6 +1227,10 @@ components:
           type: integer
           description: 이번 동기화로 새로 적재된 승인내역 건수.
           example: 42
+        syncedPerformanceCount:
+          type: integer
+          description: 이번 동기화로 upsert된 카드 실적 스냅샷 건수.
+          example: 3
         syncedAt:
           type: string
           format: date-time

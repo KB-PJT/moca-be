@@ -1,15 +1,22 @@
 package com.moca.mocabe.global.exception;
 
+import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
+import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
@@ -72,6 +79,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, "CARD_LINK_NOT_FOUND", exception.getMessage());
     }
 
+    @ExceptionHandler(UserCardNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleUserCardNotFound(UserCardNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND", exception.getMessage());
+    }
+
     @ExceptionHandler(CodefConnectionNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleCodefConnectionNotFound(
             CodefConnectionNotFoundException exception) {
@@ -105,10 +117,28 @@ public class GlobalExceptionHandler {
                 exception.getMessage(), exception.getFields());
     }
 
+    @ExceptionHandler(CardCredentialRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleCardCredentialRequired(
+            CardCredentialRequiredException exception) {
+        return error(HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED",
+                exception.getMessage(), exception.getFields());
+    }
+
+    @ExceptionHandler(CardNumberMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleCardNumberMismatch(CardNumberMismatchException exception) {
+        return error(HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH", exception.getMessage());
+    }
+
     @ExceptionHandler(CodefInvalidCredentialsException.class)
     public ResponseEntity<ApiErrorResponse> handleCodefInvalidCredentials(
             CodefInvalidCredentialsException exception) {
         return error(HttpStatus.BAD_REQUEST, "CODEF_INVALID_CREDENTIALS", exception.getMessage());
+    }
+
+    @ExceptionHandler(CodefAccountLockedException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefAccountLocked(CodefAccountLockedException exception) {
+        // 비밀번호 오류 횟수 초과로 계정 자체가 잠긴 상태라 재시도해도 해결되지 않으므로 423으로 구분한다.
+        return error(HttpStatus.LOCKED, "CODEF_ACCOUNT_LOCKED", exception.getMessage());
     }
 
     @ExceptionHandler(CodefUnavailableException.class)
@@ -117,6 +147,26 @@ public class GlobalExceptionHandler {
         // 예외 원문(메시지·스택트레이스)은 로그에 남기지 않고, 클래스명만 남긴다(CWE-532).
         LOGGER.log(Level.WARNING, "CODEF 연동 상류 오류로 503을 반환합니다. " + describeException(exception));
         return error(HttpStatus.SERVICE_UNAVAILABLE, "CODEF_UNAVAILABLE", exception.getMessage());
+    }
+
+    @ExceptionHandler(ApprovalSyncFailedException.class)
+    public ResponseEntity<ApiErrorResponse> handleApprovalSyncFailed(ApprovalSyncFailedException exception) {
+        // CODEF 승인내역 조회 실패는 상류 일시 장애이므로 재시도 가능한 503으로 안내한다.
+        LOGGER.log(Level.WARNING, "승인내역 동기화 실패로 503을 반환합니다. " + describeException(exception));
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "APPROVAL_SYNC_FAILED", exception.getMessage());
+    }
+
+    @ExceptionHandler(PerformanceSyncFailedException.class)
+    public ResponseEntity<ApiErrorResponse> handlePerformanceSyncFailed(PerformanceSyncFailedException exception) {
+        // CODEF 실적조회 호출 자체가 실패한 일시적 상황이므로 재시도 가능한 503으로 안내한다.
+        LOGGER.log(Level.WARNING, "실적조회 동기화 실패로 503을 반환합니다. " + describeException(exception));
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "PERFORMANCE_SYNC_FAILED", exception.getMessage());
+    }
+
+    @ExceptionHandler(PerformanceUnsupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handlePerformanceUnsupported(PerformanceUnsupportedException exception) {
+        // 카드사 실적조회 미지원 또는 조회 가능 범위 초과는 재시도해도 항상 실패하는 영구 조건이므로 400으로 안내한다.
+        return error(HttpStatus.BAD_REQUEST, "PERFORMANCE_UNSUPPORTED", exception.getMessage());
     }
 
     @ExceptionHandler(CodefAccountAlreadyLinkedException.class)

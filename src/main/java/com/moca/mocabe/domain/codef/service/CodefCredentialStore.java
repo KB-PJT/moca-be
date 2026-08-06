@@ -37,7 +37,8 @@ public class CodefCredentialStore {
         try {
             linkedCardMapper.insertLinkedCard(card.userCardId(), card.linkId(), card.userId(),
                     card.issuerId(), card.cardId(), card.cardNameFromCodef(), card.cardNo(),
-                    card.codefCardKeyHash(), card.displayOrder());
+                    card.codefCardKeyHash(), card.displayOrder(),
+                    card.cardNumberEnc(), card.cardPasswordEnc(), card.isActive());
             return card.userCardId();
         } catch (DuplicateKeyException exception) {
             String existingUserCardId = linkedCardMapper.findUserCardIdByUserIdAndCardKeyHash(
