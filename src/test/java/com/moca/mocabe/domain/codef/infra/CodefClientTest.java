@@ -459,13 +459,23 @@ class CodefClientTest {
     }
 
     @Test
-    @DisplayName("실적조회 data가 해석 불가한 형식이면 예외를 던진다")
+    @DisplayName("실적조회 data가 해석 불가한 형식이면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
     void rejectsInvalidPerformanceData() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
         when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":\"unexpected\"}")));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
+    }
+
+    @Test
+    @DisplayName("실적조회 응답 JSON이 손상되면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsMalformedPerformanceResponse() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded("not-json")));
+
+        assertThrows(CodefUnavailableException.class,
                 () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
     }
 
