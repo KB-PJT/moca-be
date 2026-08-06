@@ -27,8 +27,10 @@ class MerchantCategoryQueryServiceTest {
         List<MerchantCategoryResponse> categories = service.getCategories();
 
         assertEquals(2, categories.size());
+        assertEquals("cat-mart", categories.get(0).categoryId());
         assertEquals("MART", categories.get(0).categoryCode());
         assertEquals("대형마트", categories.get(0).categoryName());
+        assertEquals("cat-cafe", categories.get(1).categoryId());
         assertEquals("CAFE", categories.get(1).categoryCode());
     }
 

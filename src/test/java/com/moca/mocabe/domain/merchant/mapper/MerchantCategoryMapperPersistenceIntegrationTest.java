@@ -59,9 +59,11 @@ class MerchantCategoryMapperPersistenceIntegrationTest {
         List<MerchantCategoryRow> rows = merchantCategoryMapper.findAllOrderedByDisplayOrder();
 
         assertEquals(2, rows.size());
+        assertEquals(MART_ID, rows.get(0).merchantCategoryId());
         assertEquals("MART", rows.get(0).categoryCode());
         assertEquals("대형마트", rows.get(0).categoryName());
         assertEquals(1, rows.get(0).displayOrder());
+        assertEquals(CAFE_ID, rows.get(1).merchantCategoryId());
         assertEquals("CAFE", rows.get(1).categoryCode());
     }
 
