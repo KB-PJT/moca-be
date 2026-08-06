@@ -207,6 +207,8 @@ class CodefPersistenceIntegrationTest {
         assertEquals(CONNECTED_ID, connections.get(0).connectedId());
         assertEquals("0301", connections.get(0).institutionCode());
         assertEquals(ISSUER_ID, connections.get(0).issuerId());
+        assertEquals("KB카드", connections.get(0).issuerName());
+        assertEquals(null, connections.get(0).performanceLookbackMonths());
         assertEquals("900101", encryptor.decrypt(connections.get(0).birthDateEnc()));
     }
 
