@@ -73,40 +73,12 @@ public class ApprovalCardMatcher {
     }
 
     private String matchByCardNo(List<UserCardMatchRow> cards, String approvalCardNo) {
-        String frontTarget = leadingDigits(approvalCardNo);
-        String backTarget = trailingDigits(approvalCardNo);
-        if (frontTarget.isEmpty() && backTarget.isEmpty()) {
-            return null;
-        }
         for (UserCardMatchRow card : cards) {
-            if (sameMaskedCardNo(frontTarget, backTarget, card.cardNo())) {
+            if (MaskedCardNoMatcher.matches(approvalCardNo, card.cardNo())) {
                 return card.userCardId();
             }
         }
         return null;
-    }
-
-    private boolean sameMaskedCardNo(String frontTarget, String backTarget, String cardNo) {
-        if (cardNo == null || cardNo.isBlank()) {
-            return false;
-        }
-        String front = leadingDigits(cardNo);
-        String back = trailingDigits(cardNo);
-        // 마스킹 위치가 달라도 앞자리·뒷자리 노출 숫자가 겹치는 만큼 모두 일치하면 같은 카드로 본다.
-        return equalsOnOverlap(frontTarget, front, true) && equalsOnOverlap(backTarget, back, false)
-                && (!frontTarget.isEmpty() || !backTarget.isEmpty());
-    }
-
-    private boolean equalsOnOverlap(String a, String b, boolean fromStart) {
-        int length = Math.min(a.length(), b.length());
-        if (length == 0) {
-            // 비교할 노출 숫자가 한쪽도 없으면 이 구간은 판단에서 제외한다(다른 구간으로 판정).
-            return true;
-        }
-        if (fromStart) {
-            return a.regionMatches(0, b, 0, length);
-        }
-        return a.regionMatches(a.length() - length, b, b.length() - length, length);
     }
 
     private int longestCommonSubstringLength(String a, String b) {
@@ -124,27 +96,5 @@ public class ApprovalCardMatcher {
             previous = current;
         }
         return best;
-    }
-
-    private String leadingDigits(String value) {
-        if (value == null) {
-            return "";
-        }
-        int index = 0;
-        while (index < value.length() && Character.isDigit(value.charAt(index))) {
-            index++;
-        }
-        return value.substring(0, index);
-    }
-
-    private String trailingDigits(String value) {
-        if (value == null) {
-            return "";
-        }
-        int index = value.length();
-        while (index > 0 && Character.isDigit(value.charAt(index - 1))) {
-            index--;
-        }
-        return value.substring(index);
     }
 }
