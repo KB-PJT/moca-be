@@ -84,7 +84,8 @@ public class AuthConfig {
                 requiredProperty(environment, "MOCA_GOOGLE_CLIENT_SECRET"),
                 Arrays.asList(requiredProperty(environment, "MOCA_GOOGLE_ALLOWED_REDIRECT_URIS").split(",")),
                 Arrays.asList(environment.getProperty("MOCA_GOOGLE_REQUIRED_SCOPES",
-                        "openid,https://www.googleapis.com/auth/userinfo.email").split(",")), new ObjectMapper());
+                        "openid,https://www.googleapis.com/auth/userinfo.email,"
+                                + "https://www.googleapis.com/auth/userinfo.profile").split(",")), new ObjectMapper());
     }
 
     @Bean

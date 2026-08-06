@@ -15,6 +15,7 @@ public class GoogleAuthorizationCodeClient implements GoogleAuthorizationCodeExc
 
     private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String TOKEN_INFO_URL = "https://www.googleapis.com/oauth2/v2/tokeninfo";
+    private static final String USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 
     private final GoogleOAuthHttpClient httpClient;
     private final String clientId;
@@ -55,7 +56,14 @@ public class GoogleAuthorizationCodeClient implements GoogleAuthorizationCodeExc
         if (!isSuccess(tokenInfoResponse)) {
             throw new GoogleAuthorizationCodeException();
         }
-        return verifiedIdentity(readTree(tokenInfoResponse));
+        JsonNode tokenInfo = readTree(tokenInfoResponse);
+        String subject = verifiedSubject(tokenInfo);
+        GoogleOAuthHttpResponse userInfoResponse = httpClient.get(USER_INFO_URL,
+                Map.of("Authorization", "Bearer " + accessToken));
+        if (!isSuccess(userInfoResponse)) {
+            throw new GoogleAuthorizationCodeException();
+        }
+        return verifiedIdentity(subject, tokenInfo, readTree(userInfoResponse));
     }
 
     private Map<String, String> tokenExchangeForm(String code, String codeVerifier, String redirectUri) {
@@ -69,12 +77,19 @@ public class GoogleAuthorizationCodeClient implements GoogleAuthorizationCodeExc
         return form;
     }
 
-    private GoogleUserIdentity verifiedIdentity(JsonNode tokenInfo) {
+    private String verifiedSubject(JsonNode tokenInfo) {
         if (!clientId.equals(tokenInfo.path("audience").asText()) || tokenInfo.path("expires_in").asLong(0) <= 0
                 || !grantedScopes(tokenInfo).containsAll(requiredScopes)) {
             throw new GoogleAuthorizationCodeException();
         }
-        return new GoogleUserIdentity(requiredText(tokenInfo, "user_id"), tokenInfo.path("email").asText(null));
+        return requiredText(tokenInfo, "user_id");
+    }
+
+    private GoogleUserIdentity verifiedIdentity(String subject, JsonNode tokenInfo, JsonNode userInfo) {
+        if (!subject.equals(requiredText(userInfo, "sub"))) {
+            throw new GoogleAuthorizationCodeException();
+        }
+        return new GoogleUserIdentity(subject, tokenInfo.path("email").asText(null), requiredText(userInfo, "name"));
     }
 
     private Set<String> grantedScopes(JsonNode tokenInfo) {

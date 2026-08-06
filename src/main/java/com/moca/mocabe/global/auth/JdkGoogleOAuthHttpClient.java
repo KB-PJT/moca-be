@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -37,10 +38,16 @@ public class JdkGoogleOAuthHttpClient implements GoogleOAuthHttpClient {
 
     @Override
     public GoogleOAuthHttpResponse get(String url) {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+        return get(url, Collections.emptyMap());
+    }
+
+    @Override
+    public GoogleOAuthHttpResponse get(String url, Map<String, String> headers) {
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(URI.create(url))
                 .timeout(requestTimeout)
-                .GET()
-                .build();
+                .GET();
+        headers.forEach(requestBuilder::header);
+        HttpRequest request = requestBuilder.build();
         return send(request);
     }
 
