@@ -183,8 +183,10 @@ public class CardLinkService {
      *
      * creatorCardNo/creatorCardPassword는 카드번호가 필요한 카드사에서 방금 계정 생성 시 입력한
      * 카드번호/비밀번호다(그 외에는 null). 이 값과 마스킹 카드번호가 일치하는 보유카드는 이미 유효성이
-     * 검증된 카드번호를 갖고 있으므로 is_active=true·크리덴셜 채움으로 즉시 활성화 적재하고, 나머지
-     * 보유카드는 크리덴셜 없이 비활성 적재해 사용자가 추가로 카드번호를 입력해야 활성화할 수 있게 한다.
+     * 검증된 카드번호이므로 크리덴셜을 미리 채워 적재해두면, 이후 PATCH /card-links/{linkId}/cards로
+     * 활성화를 요청할 때 카드정보 누락 검증을 그대로 통과한다(적재 자체는 여전히 비활성이며, 이 메서드가
+     * 직접 활성화하지는 않는다). 크리덴셜이 채워지지 않은 나머지 보유카드는 사용자가 추가로 카드번호를
+     * 입력해야 활성화할 수 있다.
      */
     private List<CardLinkCardResponse> matchAndPersistOwnedCards(String userId, String linkId,
                                                                   CodefIssuerPolicy policy,

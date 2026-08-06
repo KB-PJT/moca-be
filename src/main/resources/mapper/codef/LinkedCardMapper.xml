@@ -21,8 +21,9 @@
         WHERE user_id = #{userId}
     </select>
 
-    <!-- 매칭된 보유카드를 적재한다. 카드번호가 필요한 카드사에서 계정 생성 시 입력한 카드번호와
-         일치하는 카드는 isActive=true·크리덴셜 채움으로, 나머지는 isActive=false·크리덴셜 null로 넘어온다. -->
+    <!-- 매칭된 보유카드를 항상 isActive=false로 적재한다. 카드번호가 필요한 카드사에서 계정 생성 시
+         입력한 카드번호와 일치하는 카드는 크리덴셜이 채워져서, 나머지는 크리덴셜 null로 넘어온다.
+         활성화는 이 INSERT가 아니라 이후 activateCards 호출에서 이뤄진다. -->
     <insert id="insertLinkedCard">
         INSERT INTO user_cards (
             user_card_id, user_id, card_id, codef_account_credential_id,
