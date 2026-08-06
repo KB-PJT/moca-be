@@ -5,6 +5,7 @@ import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
@@ -40,7 +41,9 @@ import java.util.logging.Logger;
  * 실적현황을 조회해 user_card_performance_snapshots에 upsert한다. 실적 조회 대상 월은 sync의
  * startDate가 속한 달이며(기본값은 이번 달), 그 달이 카드사가 지원하는 조회 가능 범위
  * (issuers.performance_lookback_months, NULL이면 이번 달까지만)를 벗어나거나 카드사가 실적조회
- * 자체를 지원하지 않으면(-1) {@link PerformanceSyncFailedException}을 던져 동기화 전체를 실패시킨다.
+ * 자체를 지원하지 않으면(-1) 재시도해도 항상 실패하는 영구 조건이므로
+ * {@link PerformanceUnsupportedException}(400)을 던져 동기화 전체를 실패시킨다. CODEF 실적조회
+ * 호출 자체가 실패하는 일시적 상황은 {@link PerformanceSyncFailedException}(503)으로 구분한다.
  * 승인내역 조회 실패는 {@link ApprovalSyncFailedException}으로 구분해 응답 code를 다르게 내려보낸다
  * (사용자 결정: 부분 성공 대신 하나라도 실패하면 무엇이 문제인지 구분해서 전체를 실패로 처리).
  * 비씨카드(0305)는 CODEF가 startDate 기준 "전월" 실적을 주는 카드사라 조회 대상 월보다 한 달 뒤를
@@ -152,7 +155,9 @@ public class CardSyncService {
                         continue;
                     }
                     String cardNo = encryptor.decrypt(cardCredential.cardNumberEnc());
-                    String cardPassword = encryptor.decrypt(cardCredential.cardPasswordEnc());
+                    // 카드사가 카드번호만 요구하고 카드 비밀번호는 요구하지 않으면 정상적으로 null이다.
+                    String cardPassword = cardCredential.cardPasswordEnc() == null
+                            ? null : encryptor.decrypt(cardCredential.cardPasswordEnc());
                     fetchAndCollect(userId, userCards, connection, birthDate, startStr, endStr, cardNo, cardPassword,
                             targetMonth, monthsBack, performanceMonth, merchantCandidates, seenKeys, stats,
                             inserts, performanceUpserts);
@@ -219,9 +224,11 @@ public class CardSyncService {
 
     /**
      * 이 연동으로 조회 대상 월(targetMonth)의 실적을 받을 수 있는지 먼저 확인하고(카드사 미지원 또는
-     * 조회 가능 범위 초과면 PerformanceSyncFailedException), 가능하면 CODEF를 호출한다. CODEF 호출
-     * 자체가 실패해도 같은 예외로 감싸 승인내역 실패와 응답 code로 구분되게 한다. cardNo/cardPassword는
-     * KB 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값으로, 요구하지 않으면 null이다.
+     * 조회 가능 범위 초과면 재시도해도 항상 실패하는 영구 조건이므로 PerformanceUnsupportedException),
+     * 가능하면 CODEF를 호출한다. CODEF 호출 자체가 실패하면 일시적 상황이므로 별도로
+     * PerformanceSyncFailedException으로 감싸 승인내역 실패와 응답 code로 구분되게 한다.
+     * cardNo/cardPassword는 KB 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값으로,
+     * 요구하지 않으면 null이다.
      */
     private List<CodefCardPerformance> fetchPerformances(CodefConnection connection, String birthDate,
                                                           YearMonth targetMonth, long monthsBack,
@@ -230,11 +237,11 @@ public class CardSyncService {
         int allowedLookback = connection.performanceLookbackMonths() != null
                 ? connection.performanceLookbackMonths() : DEFAULT_PERFORMANCE_LOOKBACK_MONTHS;
         if (allowedLookback == PERFORMANCE_UNSUPPORTED_LOOKBACK_MONTHS) {
-            throw new PerformanceSyncFailedException(
+            throw new PerformanceUnsupportedException(
                     connection.issuerName() + "는 실적조회를 지원하지 않는 카드사입니다.");
         }
         if (monthsBack > allowedLookback) {
-            throw new PerformanceSyncFailedException(connection.issuerName() + "는 " + performanceMonth
+            throw new PerformanceUnsupportedException(connection.issuerName() + "는 " + performanceMonth
                     + " 실적을 조회할 수 없습니다(조회 가능 범위: 최근 " + allowedLookback + "개월).");
         }
         String performanceStartDate = resolvePerformanceStartDate(targetMonth, connection.institutionCode());
