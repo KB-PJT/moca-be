@@ -18,6 +18,7 @@ import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
@@ -219,7 +220,7 @@ class CardSyncServiceTest {
     }
 
     @Test
-    @DisplayName("실적조회 대상 월이 연동의 조회 가능 개월수를 벗어나면 실적조회 실패 예외를 던져 전체 동기화를 중단한다")
+    @DisplayName("실적조회 대상 월이 연동의 조회 가능 개월수를 벗어나면 실적조회 미지원 예외를 던져 전체 동기화를 중단한다")
     void throwsWhenTargetMonthExceedsLookback() {
         CodefConnection allowedConnection = new CodefConnection(
                 "link-1", "cid-1", "0301", "issuer-1", "KB카드", 12, new byte[]{1, 2, 3}, false, false);
@@ -237,7 +238,7 @@ class CardSyncServiceTest {
         // lookback=12는 허용, lookback 미확인(null→0)은 차단되도록 오늘 기준 7개월 전을 조회 대상으로 삼는다.
         LocalDate sevenMonthsAgo = LocalDate.now(ZoneId.of("Asia/Seoul")).minusMonths(7).withDayOfMonth(1);
 
-        PerformanceSyncFailedException exception = assertThrows(PerformanceSyncFailedException.class,
+        PerformanceUnsupportedException exception = assertThrows(PerformanceUnsupportedException.class,
                 () -> service.sync(USER_ID, sevenMonthsAgo, sevenMonthsAgo.plusDays(2)));
 
         assertTrue(exception.getMessage().contains("신한카드"));
@@ -249,7 +250,7 @@ class CardSyncServiceTest {
     }
 
     @Test
-    @DisplayName("실적조회 가능 개월수가 -1인 연동은 실적조회 실패 예외를 던져 전체 동기화를 중단한다")
+    @DisplayName("실적조회 가능 개월수가 -1인 연동은 실적조회 미지원 예외를 던져 전체 동기화를 중단한다")
     void throwsWhenLookbackIsMinusOne() {
         CodefConnection unsupportedConnection = new CodefConnection(
                 "link-1", "cid-1", "0304", "issuer-1", "하나카드", -1, new byte[]{1, 2, 3}, false, false);
@@ -261,7 +262,7 @@ class CardSyncServiceTest {
         when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of());
 
-        PerformanceSyncFailedException exception = assertThrows(PerformanceSyncFailedException.class,
+        PerformanceUnsupportedException exception = assertThrows(PerformanceUnsupportedException.class,
                 () -> service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3)));
 
         assertTrue(exception.getMessage().contains("하나카드"));

@@ -540,8 +540,10 @@ paths:
         취소·부분취소·거절 및 해외결제는 적재하지 않습니다.
         startDate/endDate를 생략하면 이번 달 1일부터 오늘까지(KST) 조회합니다.
         또한 카드별 실적현황을 CODEF에서 조회해 인정 실적금액을 최신 값으로 upsert합니다. 실적 조회 대상 월은
-        startDate가 속한 달(기본값 이번 달)입니다. 연동 중 하나라도 승인내역 또는 실적조회에 실패하면
-        (카드사 실적조회 미지원·조회 가능 범위 초과 포함) 전체 동기화를 실패로 처리하고 503으로 응답합니다.
+        startDate가 속한 달(기본값 이번 달)입니다. 연동 중 하나라도 승인내역 또는 실적조회 호출 자체가
+        실패하면 전체 동기화를 실패로 처리하고 재시도 가능한 503으로 응답합니다. 요청한 달을 카드사가
+        애초에 지원하지 않는 경우(카드사 실적조회 미지원 또는 조회 가능 범위 초과)는 재시도해도 항상
+        실패하는 영구 조건이므로 503이 아니라 400으로 응답합니다.
       operationId: syncMyCardApprovals
       security:
         - MocaBearerAuth: []
@@ -570,7 +572,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/SyncMyCardsApiResponse'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED), 또는 요청한 달을 카드사가 애초에 지원하지 않음
+            (code=PERFORMANCE_UNSUPPORTED — 카드사 실적조회 미지원 또는 조회 가능 범위 초과. 재시도해도
+            항상 실패하는 영구 조건이라 503이 아닙니다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '403':
@@ -737,9 +746,11 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     CardSyncFailedError:
       description: >-
-        승인내역 또는 실적조회 동기화가 실패해 전체 동기화를 중단함. code로 원인을 구분한다.
-        APPROVAL_SYNC_FAILED(CODEF 승인내역 조회 실패, 재시도 가능),
-        PERFORMANCE_SYNC_FAILED(카드사 실적조회 미지원·조회 가능 범위 초과·CODEF 실적조회 실패 중 하나).
+        승인내역 또는 실적조회 CODEF 호출 자체가 실패해 전체 동기화를 중단함(재시도 가능). code로
+        원인을 구분한다. APPROVAL_SYNC_FAILED(CODEF 승인내역 조회 실패),
+        PERFORMANCE_SYNC_FAILED(CODEF 실적조회 호출 실패). 카드사 실적조회 미지원·조회 가능 범위
+        초과처럼 재시도해도 항상 실패하는 영구 조건은 이 응답이 아니라 400(code=PERFORMANCE_UNSUPPORTED)
+        으로 응답한다.
       content:
         application/json:
           schema:

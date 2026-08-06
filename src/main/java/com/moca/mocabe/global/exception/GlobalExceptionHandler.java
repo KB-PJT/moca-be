@@ -15,6 +15,7 @@ import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -157,9 +158,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PerformanceSyncFailedException.class)
     public ResponseEntity<ApiErrorResponse> handlePerformanceSyncFailed(PerformanceSyncFailedException exception) {
-        // 카드사 미지원·조회범위 초과·CODEF 실적조회 실패를 모두 포함하며, 원인은 message로 구분한다.
+        // CODEF 실적조회 호출 자체가 실패한 일시적 상황이므로 재시도 가능한 503으로 안내한다.
         LOGGER.log(Level.WARNING, "실적조회 동기화 실패로 503을 반환합니다. " + describeException(exception));
         return error(HttpStatus.SERVICE_UNAVAILABLE, "PERFORMANCE_SYNC_FAILED", exception.getMessage());
+    }
+
+    @ExceptionHandler(PerformanceUnsupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handlePerformanceUnsupported(PerformanceUnsupportedException exception) {
+        // 카드사 실적조회 미지원 또는 조회 가능 범위 초과는 재시도해도 항상 실패하는 영구 조건이므로 400으로 안내한다.
+        return error(HttpStatus.BAD_REQUEST, "PERFORMANCE_UNSUPPORTED", exception.getMessage());
     }
 
     @ExceptionHandler(CodefAccountAlreadyLinkedException.class)

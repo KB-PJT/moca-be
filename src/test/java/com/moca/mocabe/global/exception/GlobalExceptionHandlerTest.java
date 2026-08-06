@@ -15,6 +15,7 @@ import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
@@ -180,12 +181,23 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("실적조회 동기화 실패는 실적조회 전용 코드로 503 오류로 변환한다")
+    @DisplayName("CODEF 실적조회 호출 자체의 실패는 재시도 가능한 503 오류로 변환한다")
     void handlesPerformanceSyncFailed() {
         ResponseEntity<ApiErrorResponse> response = handler.handlePerformanceSyncFailed(
-                new PerformanceSyncFailedException("하나카드는 실적조회를 지원하지 않는 카드사입니다."));
+                new PerformanceSyncFailedException("실적조회 동기화에 실패했습니다(issuerId=issuer-1). 잠시 후 다시 시도해주세요."));
 
         assertError(response, HttpStatus.SERVICE_UNAVAILABLE, "PERFORMANCE_SYNC_FAILED");
+        assertEquals("실적조회 동기화에 실패했습니다(issuerId=issuer-1). 잠시 후 다시 시도해주세요.",
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("카드사 실적조회 미지원·조회범위 초과는 재시도해도 항상 실패하므로 400 오류로 변환한다")
+    void handlesPerformanceUnsupported() {
+        ResponseEntity<ApiErrorResponse> response = handler.handlePerformanceUnsupported(
+                new PerformanceUnsupportedException("하나카드는 실적조회를 지원하지 않는 카드사입니다."));
+
+        assertError(response, HttpStatus.BAD_REQUEST, "PERFORMANCE_UNSUPPORTED");
         assertEquals("하나카드는 실적조회를 지원하지 않는 카드사입니다.", response.getBody().getError().getMessage());
     }
 

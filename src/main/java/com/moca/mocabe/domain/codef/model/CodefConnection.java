@@ -7,7 +7,8 @@ package com.moca.mocabe.domain.codef.model;
  * 보유카드 재조회 시 적재 대상 user_cards.codef_account_credential_id로 쓰인다.
  * performanceLookbackMonths는 issuers.performance_lookback_months(카드사별 실적조회 가능 개월수)
  * 값을 그대로 담으며, null이면 정책이 확인되지 않은 카드사, -1이면 실적조회 자체를 지원하지 않는
- * 카드사다. issuerName은 -1인 경우 응답의 unsupportedPerformanceIssuers에 담을 표시용 이름이다.
+ * 카드사다. -1이면 CardSyncService가 CODEF를 호출하지 않고 PerformanceUnsupportedException(400)을
+ * 던져 전체 동기화를 실패시키며, issuerName은 그 예외 메시지에 담을 표시용 이름이다.
  * requiresCardNo/requiresCardPassword는 issuers 정책으로, true면 승인내역·실적조회를 연동 전체가
  * 아니라 카드마다(각 카드의 user_cards.card_number_enc/card_password_enc로) 개별 호출해야 함을 뜻한다.
  */
