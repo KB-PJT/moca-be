@@ -8,4 +8,6 @@ public interface GoogleOAuthHttpClient {
     GoogleOAuthHttpResponse postForm(String url, Map<String, String> form);
 
     GoogleOAuthHttpResponse get(String url);
+
+    GoogleOAuthHttpResponse get(String url, Map<String, String> headers);
 }

@@ -45,8 +45,8 @@ class AuthApplicationServiceTest {
     void logsInExistingGoogleMember() {
         UserProfile user = user();
         when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
-                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
-        when(userDomainService.findOrCreateGoogleUser(GOOGLE_SUBJECT, "moca@example.com", "MOCA 회원"))
+                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com", "모카 프로필"));
+        when(userDomainService.findOrCreateGoogleUser(GOOGLE_SUBJECT, "moca@example.com", "모카 프로필"))
                 .thenReturn(new UserDomainService.GoogleUserResult(user, false));
         when(opaqueTokenService.issue(USER_ID, "user"))
                 .thenReturn(new OpaqueTokenPair("access", "refresh", 1800));
@@ -64,7 +64,7 @@ class AuthApplicationServiceTest {
     void createsNewGoogleMember() {
         UserProfile user = user();
         when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
-                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
+                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com", "모카 프로필"));
         when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), anyString()))
                 .thenReturn(new UserDomainService.GoogleUserResult(user, true));
         when(opaqueTokenService.issue(USER_ID, "user"))
@@ -74,16 +74,16 @@ class AuthApplicationServiceTest {
 
         assertTrue(response.isNewMember());
         verify(userDomainService).findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"),
-                eq("MOCA 회원"));
+                eq("모카 프로필"));
         verify(opaqueTokenService).issue(USER_ID, "user");
     }
 
     @Test
-    @DisplayName("access token 정보에는 이름이 없으므로 최초 회원은 기본 닉네임으로 생성한다")
-    void createsNewMemberWithDefaultNickname() {
+    @DisplayName("최초 Google 회원은 검증된 프로필 이름으로 생성한다")
+    void createsNewMemberWithGoogleProfileName() {
         UserProfile user = user();
         when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
-                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
+                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com", "모카 프로필"));
         when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"), anyString()))
                 .thenReturn(new UserDomainService.GoogleUserResult(user, true));
         when(opaqueTokenService.issue(USER_ID, "user"))
@@ -92,14 +92,14 @@ class AuthApplicationServiceTest {
         authApplicationService.login("google-code", "code-verifier", "redirect-uri");
 
         verify(userDomainService).findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), eq("moca@example.com"),
-                eq("MOCA 회원"));
+                eq("모카 프로필"));
     }
 
     @Test
     @DisplayName("사용자 도메인 서비스의 사용자 조회 오류를 로그인 흐름에 전달한다")
     void propagatesMissingGoogleMember() {
         when(googleAuthorizationCodeExchanger.exchangeAndVerify("google-code", "code-verifier", "redirect-uri"))
-                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com"));
+                .thenReturn(new GoogleUserIdentity(GOOGLE_SUBJECT, "moca@example.com", "모카 프로필"));
         when(userDomainService.findOrCreateGoogleUser(eq(GOOGLE_SUBJECT), anyString(), anyString()))
                 .thenThrow(new com.moca.mocabe.global.exception.user.UserNotFoundException());
         org.junit.jupiter.api.Assertions.assertThrows(
