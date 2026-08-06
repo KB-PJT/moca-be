@@ -232,18 +232,23 @@ public class CodefClient {
      * Connected ID로 카드별 실적현황을 조회한다. startDate(YYYYMM)는 조회 대상 월이며, 카드사가 실제로
      * 그만큼 과거를 지원하는지는 호출자(CardSyncService)가 issuers.performance_lookback_months로
      * 먼저 확인해야 한다(비씨카드 등 일부 카드사의 "당월 조회 시 익월로 설정" 같은 예외 규칙은 다루지 않는다).
+     * cardNo/cardPassword는 KB 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값으로,
+     * 요구하지 않는 카드사에는 보내도 무시되므로 저장된 값을 그대로 전달한다. cardPassword는 CODEF가
+     * RSA 암호화를 요구하므로 평문을 받아 이 메서드 안에서 암호화해 보낸다.
      * 카드 한 장에 혜택별로 여러 실적 리스트가 나올 수 있어, 그중 가장 큰 resCurrentUseAmt(현재이용금액)를
      * 이 카드의 대표 실적으로 담는다.
      */
     public List<CodefCardPerformance> getPerformance(String connectedId, String organization, String birthDate,
-                                                      String startDate) {
+                                                      String cardNo, String cardPassword, String startDate) {
         String accessToken = requestAccessToken();
         ObjectNode request = objectMapper.createObjectNode();
         request.put("organization", organization);
         request.put("connectedId", connectedId);
         request.put("birthDate", birthDate == null ? "" : birthDate);
-        request.put("cardNo", "");
-        request.put("cardPassword", "");
+        putIfPresent(request, "cardNo", cardNo);
+        if (cardPassword != null && !cardPassword.isBlank()) {
+            putEncryptedIfPresent(request, "cardPassword", cardPassword, parsePublicKey());
+        }
         request.put("startDate", startDate == null ? "" : startDate);
 
         Map<String, String> headers = new LinkedHashMap<>();

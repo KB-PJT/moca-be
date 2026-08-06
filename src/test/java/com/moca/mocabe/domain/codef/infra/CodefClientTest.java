@@ -1,10 +1,13 @@
 package com.moca.mocabe.domain.codef.infra;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
@@ -24,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -372,7 +376,7 @@ class CodefClientTest {
                         + "{\"resCurrentUseAmt\":\"99999999999999\"}]}]}]}")));
 
         List<CodefCardPerformance> performances =
-                codefClient.getPerformance("cid-1", "0301", "900101", "202608");
+                codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608");
 
         assertEquals(1, performances.size());
         assertEquals("** 체크카드", performances.get(0).cardName());
@@ -391,7 +395,7 @@ class CodefClientTest {
                         + "{\"resCurrentUseAmt\":\"212000\"}}}}")));
 
         List<CodefCardPerformance> performances =
-                codefClient.getPerformance("cid-1", "0301", "900101", "202608");
+                codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608");
 
         assertEquals(1, performances.size());
         assertEquals("노리2 체크카드(KB Pay)_비교통", performances.get(0).cardName());
@@ -406,7 +410,8 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":{"
                         + "\"resCardName\":\"카드 A\",\"resCardNo\":\"1234****5678\"}}")));
 
-        List<CodefCardPerformance> performances = codefClient.getPerformance("cid-1", "0301", null, null);
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", null, null, null, null);
 
         assertEquals(1, performances.size());
         assertEquals(null, performances.get(0).currentSpendAmount());
@@ -419,9 +424,27 @@ class CodefClientTest {
         when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
 
-        List<CodefCardPerformance> performances = codefClient.getPerformance("cid-1", "0301", "", "");
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", "", "", "", "");
 
         assertEquals(0, performances.size());
+    }
+
+    @Test
+    @DisplayName("cardNo가 있으면 그대로, cardPassword가 있으면 RSA 암호화해 요청에 담는다")
+    void includesCardNoAndEncryptedCardPasswordWhenPresent() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+
+        codefClient.getPerformance("cid-1", "0301", "900101", "1234567890123456", "12", "202608");
+
+        verify(httpClient).post(eq(PERFORMANCE_URL), any(), bodyCaptor.capture());
+        String body = bodyCaptor.getValue();
+        assertTrue(body.contains("\"cardNo\":\"1234567890123456\""));
+        assertTrue(body.contains("\"cardPassword\""));
+        assertFalse(body.contains("\"cardPassword\":\"12\""));
     }
 
     @Test
@@ -432,7 +455,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
 
         assertThrows(CodefUnavailableException.class,
-                () -> codefClient.getPerformance("cid-1", "0301", "900101", "202608"));
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
     }
 
     @Test
@@ -443,7 +466,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":\"unexpected\"}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getPerformance("cid-1", "0301", "900101", "202608"));
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
     }
 
     private CodefConnectionCommand command(String password, String cardNo, String cardPassword,

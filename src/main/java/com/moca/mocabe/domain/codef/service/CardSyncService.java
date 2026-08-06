@@ -199,9 +199,12 @@ public class CardSyncService {
                     + " 실적을 조회할 수 없습니다(조회 가능 범위: 최근 " + allowedLookback + "개월).");
         }
         String performanceStartDate = resolvePerformanceStartDate(targetMonth, connection.institutionCode());
+        // KB 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값이라 저장돼 있지 않으면 null이다.
+        String cardNo = encryptor.decrypt(connection.cardNumberEnc());
+        String cardPassword = encryptor.decrypt(connection.cardPasswordEnc());
         try {
-            return codefClient.getPerformance(
-                    connection.connectedId(), connection.institutionCode(), birthDate, performanceStartDate);
+            return codefClient.getPerformance(connection.connectedId(), connection.institutionCode(), birthDate,
+                    cardNo, cardPassword, performanceStartDate);
         } catch (CodefUnavailableException exception) {
             throw new PerformanceSyncFailedException(
                     "실적조회 동기화에 실패했습니다(issuerId=" + connection.issuerId() + "). "

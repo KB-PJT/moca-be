@@ -313,9 +313,11 @@ class CardLinkServiceTest {
     @DisplayName("institutionCode 없이 재조회하면 모든 활성 연동을 순회해 결과를 모은다")
     void syncsAllActiveConnectionsWhenInstitutionCodeOmitted() {
         CodefConnection kbConnection = new CodefConnection(
-                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0]);
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], null, null);
         CodefConnection shinhanConnection =
-                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", "신한카드", null, new byte[0]);
+                new CodefConnection(
+                        "link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", "신한카드", null, new byte[0],
+                        null, null);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(kbConnection, shinhanConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
@@ -340,9 +342,11 @@ class CardLinkServiceTest {
     @DisplayName("institutionCode를 주면 그 카드사 연동만 재조회한다")
     void syncsOnlyMatchingInstitutionCode() {
         CodefConnection kbConnection = new CodefConnection(
-                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0]);
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], null, null);
         CodefConnection shinhanConnection =
-                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", "신한카드", null, new byte[0]);
+                new CodefConnection(
+                        "link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", "신한카드", null, new byte[0],
+                        null, null);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(kbConnection, shinhanConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
@@ -369,9 +373,11 @@ class CardLinkServiceTest {
     @DisplayName("한 연동의 재조회 실패는 다른 연동 결과에 영향을 주지 않는다")
     void isolatesFailureOfOneConnectionDuringSync() {
         CodefConnection kbConnection = new CodefConnection(
-                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0]);
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], null, null);
         CodefConnection shinhanConnection =
-                new CodefConnection("link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", "신한카드", null, new byte[0]);
+                new CodefConnection(
+                        "link-shinhan", "cid-shinhan", "0302", "issuer-shinhan", "신한카드", null, new byte[0],
+                        null, null);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
                 .thenReturn(List.of(kbConnection, shinhanConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
@@ -399,7 +405,7 @@ class CardLinkServiceTest {
     @DisplayName("이미 적재된 카드는 재조회해도 다시 적재하지 않고 기존 userCardId를 재사용한다")
     void reusesExistingUserCardIdOnResync() {
         CodefConnection kbConnection = new CodefConnection(
-                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0]);
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], null, null);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
         CodefIssuerPolicy policy = cardPolicy();
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(policy);
@@ -427,7 +433,7 @@ class CardLinkServiceTest {
     @DisplayName("동시 재조회로 다른 요청이 먼저 적재했다면 새로 만든 ID 대신 그 요청의 userCardId를 응답에 반영한다")
     void usesWinningUserCardIdWhenConcurrentResyncRacesOnSameCard() {
         CodefConnection kbConnection = new CodefConnection(
-                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0]);
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], null, null);
         when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
         when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
         when(codefClient.getOwnedCards("cid-kb", "0301")).thenReturn(List.of(
