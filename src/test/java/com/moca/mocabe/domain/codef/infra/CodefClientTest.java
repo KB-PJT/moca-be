@@ -514,6 +514,17 @@ class CodefClientTest {
                 () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
     }
 
+    @Test
+    @DisplayName("실적조회 응답에 잘못된 %이스케이프가 있어 URL 디코딩에 실패해도 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsPerformanceResponseWithInvalidPercentEscape() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        // "%zz"는 유효한 %escape가 아니라서 URLDecoder.decode가 IllegalArgumentException을 던진다.
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok("%zz"));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
+    }
+
     private CodefConnectionCommand command(String password, String cardNo, String cardPassword,
                                            String birthDate) {
         return new CodefConnectionCommand("0301", "tester", password, cardNo, cardPassword, birthDate);

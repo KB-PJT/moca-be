@@ -274,13 +274,13 @@ public class CodefClient {
         headers.put("Content-Type", "application/json");
         String responseBody = postSuccessful(
                 baseUrl + "/v1/kr/card/p/account/result-check-list", headers, request.toString());
-        // 응답 파싱 실패(손상된 JSON 등)도 CODEF 상류 문제로 보아 재시도 가능한 503으로 안내한다.
-        // 이래야 CardSyncService.fetchPerformances가 CodefUnavailableException만 잡아 만드는
-        // PerformanceSyncFailedException 경로를 우회하지 않는다.
+        // 응답 파싱 실패(손상된 JSON, 잘못된 %이스케이프로 URL 디코딩 실패 등)도 CODEF 상류 문제로 보아
+        // 재시도 가능한 503으로 안내한다. 이래야 CardSyncService.fetchPerformances가
+        // CodefUnavailableException만 잡아 만드는 PerformanceSyncFailedException 경로를 우회하지 않는다.
         JsonNode root;
         try {
             root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
-        } catch (IllegalStateException exception) {
+        } catch (IllegalStateException | IllegalArgumentException exception) {
             throw new CodefUnavailableException(
                     "CODEF 실적조회 응답 파싱에 실패했습니다. 잠시 후 다시 시도해주세요.", exception);
         }
