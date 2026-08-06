@@ -196,6 +196,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '423':
+          description: >-
+            카드사 비밀번호 오류 횟수 초과로 계정이 잠김(code=CODEF_ACCOUNT_LOCKED). 재시도 안내가 아니라
+            카드사를 통한 잠금 해제가 필요하다는 뜻입니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/CodefUnavailableError'
   /card-links/{linkId}/cards:
@@ -467,6 +475,9 @@ paths:
         연결된 카드사의 승인내역(거래내역)을 CODEF에서 조회해 새로 발견한 정상 국내 승인건만 중복 없이 적재합니다.
         취소·부분취소·거절 및 해외결제는 적재하지 않습니다.
         startDate/endDate를 생략하면 이번 달 1일부터 오늘까지(KST) 조회합니다.
+        또한 카드별 실적현황을 CODEF에서 조회해 인정 실적금액을 최신 값으로 upsert합니다. 실적 조회 대상 월은
+        startDate가 속한 달(기본값 이번 달)입니다. 연동 중 하나라도 승인내역 또는 실적조회에 실패하면
+        (카드사 실적조회 미지원·조회 가능 범위 초과 포함) 전체 동기화를 실패로 처리하고 503으로 응답합니다.
       operationId: syncMyCardApprovals
       security:
         - MocaBearerAuth: []
@@ -501,7 +512,7 @@ paths:
         '403':
           $ref: '#/components/responses/AuthorizationError'
         '503':
-          $ref: '#/components/responses/CodefUnavailableError'
+          $ref: '#/components/responses/CardSyncFailedError'
   /me/card-sort-mode:
     patch:
       tags: [User]
@@ -656,6 +667,15 @@ components:
     CodefUnavailableError:
       description: >-
         CODEF 상류 타임아웃·연결 실패·비2xx 응답으로 처리하지 못함(재시도 가능, code=CODEF_UNAVAILABLE).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    CardSyncFailedError:
+      description: >-
+        승인내역 또는 실적조회 동기화가 실패해 전체 동기화를 중단함. code로 원인을 구분한다.
+        APPROVAL_SYNC_FAILED(CODEF 승인내역 조회 실패, 재시도 가능),
+        PERFORMANCE_SYNC_FAILED(카드사 실적조회 미지원·조회 가능 범위 초과·CODEF 실적조회 실패 중 하나).
       content:
         application/json:
           schema:
@@ -1104,7 +1124,7 @@ components:
           $ref: '#/components/schemas/SyncMyCardsResponse'
     SyncMyCardsResponse:
       type: object
-      required: [syncedCardCount, syncedApprovalCount, syncedAt]
+      required: [syncedCardCount, syncedApprovalCount, syncedPerformanceCount, syncedAt]
       properties:
         syncedCardCount:
           type: integer
@@ -1114,6 +1134,10 @@ components:
           type: integer
           description: 이번 동기화로 새로 적재된 승인내역 건수.
           example: 42
+        syncedPerformanceCount:
+          type: integer
+          description: 이번 동기화로 upsert된 카드 실적 스냅샷 건수.
+          example: 3
         syncedAt:
           type: string
           format: date-time

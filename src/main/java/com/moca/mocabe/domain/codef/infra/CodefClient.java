@@ -3,9 +3,11 @@ package com.moca.mocabe.domain.codef.infra;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
+import com.moca.mocabe.domain.codef.model.CodefCardPerformance;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.io.IOException;
@@ -35,6 +37,7 @@ public class CodefClient {
     private static final String LOGIN_TYPE_ID_PASSWORD = "1";
     private static final String RESULT_CODE_SUCCESS = "CF-00000";
     private static final String ERROR_CODE_INVALID_CREDENTIALS = "CF-12803";
+    private static final String ERROR_CODE_ACCOUNT_LOCKED = "CF-12802";
     private static final Logger LOGGER = Logger.getLogger(CodefClient.class.getName());
 
     private final CodefHttpClient httpClient;
@@ -70,9 +73,14 @@ public class CodefClient {
         // HTTP 200이어도 result.code로 실패를 반환할 수 있어 connectedId 유무보다 먼저 확인한다.
         if (!RESULT_CODE_SUCCESS.equals(root.path("result").path("code").asText())) {
             // result.code(예 CF-04000)는 "계정 등록 실패"라는 요약일 뿐 원인은 data.errorList[].code에
-            // 있다. 그중 아이디/비밀번호 오류(CF-12803)는 CODEF 상류 문제가 아니라 사용자 입력 오류이므로
-            // 재시도 안내(503)가 아니라 400으로 구분해 알려준다. 그 외는 CODEF 상류 문제로 본다.
-            if (hasErrorCode(root.path("data").path("errorList"), ERROR_CODE_INVALID_CREDENTIALS)) {
+            // 있다. 아이디/비밀번호 오류(CF-12803)와 계정 잠김(CF-12802, 비밀번호 오류 횟수 초과)은
+            // CODEF 상류 문제가 아니라 사용자 입력·계정 상태 문제이므로 재시도 안내(503)가 아니라
+            // 각각 구분되는 응답으로 알려준다. 그 외는 CODEF 상류 문제로 본다.
+            JsonNode errorList = root.path("data").path("errorList");
+            if (hasErrorCode(errorList, ERROR_CODE_ACCOUNT_LOCKED)) {
+                throw new CodefAccountLockedException();
+            }
+            if (hasErrorCode(errorList, ERROR_CODE_INVALID_CREDENTIALS)) {
                 throw new CodefInvalidCredentialsException();
             }
             // 사용자 입력 오류로 특정하지 못한 나머지는 원인 진단을 위해 CODEF result 코드를 로그로 남긴다.
@@ -179,10 +187,24 @@ public class CodefClient {
         return approvals;
     }
 
-    /** CODEF result 코드/메시지(값은 고정 안내문이라 민감정보 없음)를 남겨 어떤 CF-코드로 실패했는지 진단할 수 있게 한다. */
+    /**
+     * CODEF result 코드/메시지(값은 고정 안내문이라 민감정보 없음)를 남겨 어떤 CF-코드로 실패했는지
+     * 진단할 수 있게 한다. result.code(예 CF-04000)는 요약 코드일 뿐이고 실제 원인은 보통
+     * data.errorList[]에 더 구체적인 코드로 들어있으므로 함께 남긴다.
+     */
     private void logResultFailure(String operation, JsonNode root) {
         LOGGER.warning("CODEF " + operation + " 실패 code=" + root.path("result").path("code").asText()
-                + " message=" + root.path("result").path("message").asText());
+                + " message=" + root.path("result").path("message").asText()
+                + " errorList=" + summarizeErrors(root.path("data").path("errorList")));
+    }
+
+    /** errorList의 code/message만 뽑아 로그용 문자열로 요약한다(민감정보 없는 고정 안내문만 포함). */
+    private String summarizeErrors(JsonNode errorListNode) {
+        List<String> summaries = new ArrayList<>();
+        for (JsonNode error : asNodeList(errorListNode)) {
+            summaries.add(error.path("code").asText() + ":" + error.path("message").asText());
+        }
+        return summaries.toString();
     }
 
     /** errorList에 지정한 코드가 있는지 확인한다. 계정 1건만 요청해도 CODEF 관례상 배열/단일객체 둘 다 올 수 있다. */
@@ -204,6 +226,100 @@ public class CodefClient {
             nodes.add(node);
         }
         return nodes;
+    }
+
+    /**
+     * Connected ID로 카드별 실적현황을 조회한다. startDate(YYYYMM)는 조회 대상 월이며, 카드사가 실제로
+     * 그만큼 과거를 지원하는지는 호출자(CardSyncService)가 issuers.performance_lookback_months로
+     * 먼저 확인해야 한다(비씨카드 등 일부 카드사의 "당월 조회 시 익월로 설정" 같은 예외 규칙은 다루지 않는다).
+     * cardNo/cardPassword는 KB 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값으로,
+     * 요구하지 않는 카드사에는 보내도 무시되므로 저장된 값을 그대로 전달한다. cardPassword는 CODEF가
+     * RSA 암호화를 요구하므로 평문을 받아 이 메서드 안에서 암호화해 보낸다.
+     * 카드 한 장에 혜택별로 여러 실적 리스트가 나올 수 있어, 그중 가장 큰 resCurrentUseAmt(현재이용금액)를
+     * 이 카드의 대표 실적으로 담는다.
+     */
+    public List<CodefCardPerformance> getPerformance(String connectedId, String organization, String birthDate,
+                                                      String cardNo, String cardPassword, String startDate) {
+        String accessToken = requestAccessToken();
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put("organization", organization);
+        request.put("connectedId", connectedId);
+        request.put("birthDate", birthDate == null ? "" : birthDate);
+        putIfPresent(request, "cardNo", cardNo);
+        if (cardPassword != null && !cardPassword.isBlank()) {
+            putEncryptedIfPresent(request, "cardPassword", cardPassword, parsePublicKey());
+        }
+        request.put("startDate", startDate == null ? "" : startDate);
+
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Authorization", "Bearer " + accessToken);
+        headers.put("Content-Type", "application/json");
+        String responseBody = postSuccessful(
+                baseUrl + "/v1/kr/card/p/account/result-check-list", headers, request.toString());
+        // 응답 파싱 실패(손상된 JSON 등)도 CODEF 상류 문제로 보아 재시도 가능한 503으로 안내한다.
+        // 이래야 CardSyncService.fetchPerformances가 CodefUnavailableException만 잡아 만드는
+        // PerformanceSyncFailedException 경로를 우회하지 않는다.
+        JsonNode root;
+        try {
+            root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
+        } catch (IllegalStateException exception) {
+            throw new CodefUnavailableException(
+                    "CODEF 실적조회 응답 파싱에 실패했습니다. 잠시 후 다시 시도해주세요.", exception);
+        }
+        if (!RESULT_CODE_SUCCESS.equals(root.path("result").path("code").asText())) {
+            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내하고, 원인 진단을 위해 로그를 남긴다.
+            logResultFailure("실적조회", root);
+            throw new CodefUnavailableException("CODEF 실적조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        List<CodefCardPerformance> performances = new ArrayList<>();
+        JsonNode data = root.path("data");
+        if (data.isArray()) {
+            for (JsonNode item : data) {
+                performances.add(toCardPerformance(item));
+            }
+        } else if (data.isObject() && data.hasNonNull("resCardName")) {
+            // 카드가 1장이면 CODEF는 배열이 아닌 단일 객체로 응답한다.
+            performances.add(toCardPerformance(data));
+        } else if (data.isObject() && data.size() == 0) {
+            // 실적 조회 대상 카드가 없으면 빈 객체({})로 응답할 수 있다.
+            return performances;
+        } else {
+            LOGGER.warning("CODEF 실적조회 data 형식을 해석할 수 없습니다. result=" + root.path("result")
+                    + ", dataType=" + data.getNodeType() + ", fields=" + fieldNames(data));
+            // 형식 검증 실패도 CodefUnavailableException으로 통일해 위와 같은 이유로 정의된
+            // 실적 동기화 실패 경로(PerformanceSyncFailedException)를 우회하지 않게 한다.
+            throw new CodefUnavailableException("CODEF 실적조회 응답 형식이 올바르지 않습니다. 잠시 후 다시 시도해주세요.");
+        }
+        return performances;
+    }
+
+    private CodefCardPerformance toCardPerformance(JsonNode item) {
+        Integer maxCurrentUseAmt = null;
+        for (JsonNode benefit : asNodeList(item.path("resCardBenefitList"))) {
+            for (JsonNode performance : asNodeList(benefit.path("resCardPerformanceList"))) {
+                Integer currentUseAmt = parsePerformanceAmount(performance.path("resCurrentUseAmt").asText(""));
+                if (currentUseAmt != null && (maxCurrentUseAmt == null || currentUseAmt > maxCurrentUseAmt)) {
+                    maxCurrentUseAmt = currentUseAmt;
+                }
+            }
+        }
+        return new CodefCardPerformance(
+                item.path("resCardName").asText("").trim(),
+                item.path("resCardNo").asText(""),
+                maxCurrentUseAmt);
+    }
+
+    private Integer parsePerformanceAmount(String value) {
+        String digits = value.replaceAll("[^0-9-]", "");
+        if (digits.isEmpty() || "-".equals(digits)) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(digits);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     /** 진단 로그용으로 객체 노드의 필드명 목록을 만든다(값은 남기지 않아 민감정보 노출을 피한다). */

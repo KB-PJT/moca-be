@@ -2,14 +2,17 @@ package com.moca.mocabe.global.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
+import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -129,6 +132,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("비밀번호 오류 횟수 초과로 계정이 잠기면 재시도 안내가 아니라 423 잠김 오류로 변환한다")
+    void handlesCodefAccountLocked() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleCodefAccountLocked(
+                new CodefAccountLockedException());
+
+        assertError(response, HttpStatus.LOCKED, "CODEF_ACCOUNT_LOCKED");
+        assertEquals("비밀번호 오류 횟수를 초과해 카드사 계정이 잠겼습니다. 카드사를 통해 잠금을 해제한 뒤 다시 시도해주세요.",
+                response.getBody().getError().getMessage());
+    }
+
+    @Test
     @DisplayName("보유카드 재조회 시 지정한 기관코드로 연동된 계정이 없으면 식별 가능한 404 오류로 변환한다")
     void handlesCodefConnectionNotFound() {
         ResponseEntity<ApiErrorResponse> response = handler.handleCodefConnectionNotFound(
@@ -149,6 +163,27 @@ class GlobalExceptionHandlerTest {
         assertError(response, HttpStatus.SERVICE_UNAVAILABLE, "CODEF_UNAVAILABLE");
         assertEquals("CODEF 응답이 지연되어 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
                 response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("승인내역 동기화 실패는 승인내역 전용 코드로 503 오류로 변환한다")
+    void handlesApprovalSyncFailed() {
+        ResponseEntity<ApiErrorResponse> response = handler.handleApprovalSyncFailed(
+                new ApprovalSyncFailedException("승인내역 동기화에 실패했습니다.",
+                        new CodefUnavailableException("CODEF 승인내역 조회에 실패했습니다.")));
+
+        assertError(response, HttpStatus.SERVICE_UNAVAILABLE, "APPROVAL_SYNC_FAILED");
+        assertEquals("승인내역 동기화에 실패했습니다.", response.getBody().getError().getMessage());
+    }
+
+    @Test
+    @DisplayName("실적조회 동기화 실패는 실적조회 전용 코드로 503 오류로 변환한다")
+    void handlesPerformanceSyncFailed() {
+        ResponseEntity<ApiErrorResponse> response = handler.handlePerformanceSyncFailed(
+                new PerformanceSyncFailedException("하나카드는 실적조회를 지원하지 않는 카드사입니다."));
+
+        assertError(response, HttpStatus.SERVICE_UNAVAILABLE, "PERFORMANCE_SYNC_FAILED");
+        assertEquals("하나카드는 실적조회를 지원하지 않는 카드사입니다.", response.getBody().getError().getMessage());
     }
 
     @Test

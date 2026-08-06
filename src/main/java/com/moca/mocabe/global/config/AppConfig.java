@@ -3,9 +3,11 @@ package com.moca.mocabe.global.config;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
+import com.moca.mocabe.domain.codef.mapper.CardPerformanceMapper;
 import com.moca.mocabe.domain.codef.service.ApprovalCardMatcher;
 import com.moca.mocabe.domain.codef.service.ApprovalIngestStore;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
+import com.moca.mocabe.domain.codef.service.PerformanceSnapshotStore;
 import com.moca.mocabe.domain.merchant.mapper.MerchantMapper;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
 import com.moca.mocabe.domain.merchant.service.MerchantNameNormalizer;
@@ -175,15 +177,21 @@ public class AppConfig {
     }
 
     @Bean
+    public PerformanceSnapshotStore performanceSnapshotStore(CardPerformanceMapper cardPerformanceMapper) {
+        return new PerformanceSnapshotStore(cardPerformanceMapper);
+    }
+
+    @Bean
     public CardSyncService cardSyncService(CodefClient codefClient,
                                            CodefCredentialMapper codefCredentialMapper,
                                            CardApprovalMapper cardApprovalMapper,
                                            ApprovalCardMatcher approvalCardMatcher,
                                            MerchantLookup merchantLookup,
                                            ApprovalIngestStore approvalIngestStore,
+                                           PerformanceSnapshotStore performanceSnapshotStore,
                                            Encryptor codefEncryptor) {
         return new CardSyncService(codefClient, codefCredentialMapper, cardApprovalMapper,
-                approvalCardMatcher, merchantLookup, approvalIngestStore, codefEncryptor);
+                approvalCardMatcher, merchantLookup, approvalIngestStore, performanceSnapshotStore, codefEncryptor);
     }
 
     @Bean

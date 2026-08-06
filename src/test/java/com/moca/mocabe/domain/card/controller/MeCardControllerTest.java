@@ -128,7 +128,7 @@ class MeCardControllerTest {
     void syncsWithDefaultPeriodWhenDatesOmitted() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(cardSyncService.sync(eq(USER_ID), isNull(), isNull()))
-                .thenReturn(new SyncMyCardsResponse(3, 42, "2026-08-03T10:30:00+09:00"));
+                .thenReturn(new SyncMyCardsResponse(3, 42, 2, "2026-08-03T10:30:00+09:00"));
 
         String response = mockMvc.perform(post("/me/cards/sync"))
                 .andExpect(status().isOk())
@@ -139,6 +139,7 @@ class MeCardControllerTest {
 
         assertEquals(3, data.path("syncedCardCount").asInt());
         assertEquals(42, data.path("syncedApprovalCount").asInt());
+        assertEquals(2, data.path("syncedPerformanceCount").asInt());
         assertEquals("2026-08-03T10:30:00+09:00", data.path("syncedAt").asText());
         verify(cardSyncService).sync(USER_ID, null, null);
     }
@@ -148,7 +149,7 @@ class MeCardControllerTest {
     void syncsWithProvidedPeriod() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(cardSyncService.sync(USER_ID, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31)))
-                .thenReturn(new SyncMyCardsResponse(1, 5, "2026-08-03T10:30:00+09:00"));
+                .thenReturn(new SyncMyCardsResponse(1, 5, 1, "2026-08-03T10:30:00+09:00"));
 
         mockMvc.perform(post("/me/cards/sync")
                         .param("startDate", "2026-07-01")

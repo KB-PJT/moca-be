@@ -207,7 +207,30 @@ class CodefPersistenceIntegrationTest {
         assertEquals(CONNECTED_ID, connections.get(0).connectedId());
         assertEquals("0301", connections.get(0).institutionCode());
         assertEquals(ISSUER_ID, connections.get(0).issuerId());
+        assertEquals("KB카드", connections.get(0).issuerName());
+        assertEquals(null, connections.get(0).performanceLookbackMonths());
         assertEquals("900101", encryptor.decrypt(connections.get(0).birthDateEnc()));
+        assertEquals(null, connections.get(0).cardNumberEnc());
+        assertEquals(null, connections.get(0).cardPasswordEnc());
+    }
+
+    @Test
+    @DisplayName("실적조회 인증에 필요한 카드번호·카드비밀번호가 저장돼 있으면 함께 조회한다")
+    void findsActiveConnectionsWithCardCredentials() {
+        jdbcTemplate.update("INSERT INTO codef_account_credentials "
+                        + "(codef_account_credential_id, user_id, issuer_id, connected_id, "
+                        + "birth_date_enc, card_number_enc, card_password_enc, credential_identity_hash, status, "
+                        + "created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                "01980d6a-5c0c-7aaf-9b85-0102030405c1", USER_ID, ISSUER_ID, "cid-with-card",
+                encryptor.encrypt("900101"), encryptor.encrypt("1234567890123456"), encryptor.encrypt("12"),
+                "4000000000000000000000000000000000000000000000000000000000000001");
+
+        List<CodefConnection> connections = codefCredentialMapper.findActiveConnectionsByUserId(USER_ID);
+
+        assertEquals(1, connections.size());
+        assertEquals("1234567890123456", encryptor.decrypt(connections.get(0).cardNumberEnc()));
+        assertEquals("12", encryptor.decrypt(connections.get(0).cardPasswordEnc()));
     }
 
     @Test

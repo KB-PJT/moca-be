@@ -1,15 +1,18 @@
 package com.moca.mocabe.global.exception;
 
+import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
+import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
@@ -111,12 +114,32 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "CODEF_INVALID_CREDENTIALS", exception.getMessage());
     }
 
+    @ExceptionHandler(CodefAccountLockedException.class)
+    public ResponseEntity<ApiErrorResponse> handleCodefAccountLocked(CodefAccountLockedException exception) {
+        // 비밀번호 오류 횟수 초과로 계정 자체가 잠긴 상태라 재시도해도 해결되지 않으므로 423으로 구분한다.
+        return error(HttpStatus.LOCKED, "CODEF_ACCOUNT_LOCKED", exception.getMessage());
+    }
+
     @ExceptionHandler(CodefUnavailableException.class)
     public ResponseEntity<ApiErrorResponse> handleCodefUnavailable(CodefUnavailableException exception) {
         // 상류(CODEF) 일시 장애·지연이므로 500이 아니라 재시도 가능한 503으로 안내한다.
         // 예외 원문(메시지·스택트레이스)은 로그에 남기지 않고, 클래스명만 남긴다(CWE-532).
         LOGGER.log(Level.WARNING, "CODEF 연동 상류 오류로 503을 반환합니다. " + describeException(exception));
         return error(HttpStatus.SERVICE_UNAVAILABLE, "CODEF_UNAVAILABLE", exception.getMessage());
+    }
+
+    @ExceptionHandler(ApprovalSyncFailedException.class)
+    public ResponseEntity<ApiErrorResponse> handleApprovalSyncFailed(ApprovalSyncFailedException exception) {
+        // CODEF 승인내역 조회 실패는 상류 일시 장애이므로 재시도 가능한 503으로 안내한다.
+        LOGGER.log(Level.WARNING, "승인내역 동기화 실패로 503을 반환합니다. " + describeException(exception));
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "APPROVAL_SYNC_FAILED", exception.getMessage());
+    }
+
+    @ExceptionHandler(PerformanceSyncFailedException.class)
+    public ResponseEntity<ApiErrorResponse> handlePerformanceSyncFailed(PerformanceSyncFailedException exception) {
+        // 카드사 미지원·조회범위 초과·CODEF 실적조회 실패를 모두 포함하며, 원인은 message로 구분한다.
+        LOGGER.log(Level.WARNING, "실적조회 동기화 실패로 503을 반환합니다. " + describeException(exception));
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "PERFORMANCE_SYNC_FAILED", exception.getMessage());
     }
 
     @ExceptionHandler(CodefAccountAlreadyLinkedException.class)
