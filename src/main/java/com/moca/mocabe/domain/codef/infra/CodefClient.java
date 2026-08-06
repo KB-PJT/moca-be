@@ -7,6 +7,7 @@ import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
+import com.moca.mocabe.domain.codef.model.CodefCardPerformance;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.io.IOException;
@@ -225,6 +226,84 @@ public class CodefClient {
             nodes.add(node);
         }
         return nodes;
+    }
+
+    /**
+     * Connected ID로 카드별 실적현황을 조회한다. startDate(YYYYMM)는 조회 대상 월이며, 카드사가 실제로
+     * 그만큼 과거를 지원하는지는 호출자(CardSyncService)가 issuers.performance_lookback_months로
+     * 먼저 확인해야 한다(비씨카드 등 일부 카드사의 "당월 조회 시 익월로 설정" 같은 예외 규칙은 다루지 않는다).
+     * 카드 한 장에 혜택별로 여러 실적 리스트가 나올 수 있어, 그중 가장 큰 resCurrentUseAmt(현재이용금액)를
+     * 이 카드의 대표 실적으로 담는다.
+     */
+    public List<CodefCardPerformance> getPerformance(String connectedId, String organization, String birthDate,
+                                                      String startDate) {
+        String accessToken = requestAccessToken();
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put("organization", organization);
+        request.put("connectedId", connectedId);
+        request.put("birthDate", birthDate == null ? "" : birthDate);
+        request.put("cardNo", "");
+        request.put("cardPassword", "");
+        request.put("startDate", startDate == null ? "" : startDate);
+
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Authorization", "Bearer " + accessToken);
+        headers.put("Content-Type", "application/json");
+        String responseBody = postSuccessful(
+                baseUrl + "/v1/kr/card/p/account/result-check-list", headers, request.toString());
+        JsonNode root = readTree(URLDecoder.decode(responseBody, StandardCharsets.UTF_8));
+        if (!RESULT_CODE_SUCCESS.equals(root.path("result").path("code").asText())) {
+            // CODEF 상류 문제이므로 500이 아니라 재시도 가능한 503으로 안내하고, 원인 진단을 위해 로그를 남긴다.
+            logResultFailure("실적조회", root);
+            throw new CodefUnavailableException("CODEF 실적조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        List<CodefCardPerformance> performances = new ArrayList<>();
+        JsonNode data = root.path("data");
+        if (data.isArray()) {
+            for (JsonNode item : data) {
+                performances.add(toCardPerformance(item));
+            }
+        } else if (data.isObject() && data.hasNonNull("resCardName")) {
+            // 카드가 1장이면 CODEF는 배열이 아닌 단일 객체로 응답한다.
+            performances.add(toCardPerformance(data));
+        } else if (data.isObject() && data.size() == 0) {
+            // 실적 조회 대상 카드가 없으면 빈 객체({})로 응답할 수 있다.
+            return performances;
+        } else {
+            LOGGER.warning("CODEF 실적조회 data 형식을 해석할 수 없습니다. result=" + root.path("result")
+                    + ", dataType=" + data.getNodeType() + ", fields=" + fieldNames(data));
+            throw new IllegalStateException("CODEF 실적조회 응답 형식이 올바르지 않습니다.");
+        }
+        return performances;
+    }
+
+    private CodefCardPerformance toCardPerformance(JsonNode item) {
+        Integer maxCurrentUseAmt = null;
+        for (JsonNode benefit : asNodeList(item.path("resCardBenefitList"))) {
+            for (JsonNode performance : asNodeList(benefit.path("resCardPerformanceList"))) {
+                Integer currentUseAmt = parsePerformanceAmount(performance.path("resCurrentUseAmt").asText(""));
+                if (currentUseAmt != null && (maxCurrentUseAmt == null || currentUseAmt > maxCurrentUseAmt)) {
+                    maxCurrentUseAmt = currentUseAmt;
+                }
+            }
+        }
+        return new CodefCardPerformance(
+                item.path("resCardName").asText("").trim(),
+                item.path("resCardNo").asText(""),
+                maxCurrentUseAmt);
+    }
+
+    private Integer parsePerformanceAmount(String value) {
+        String digits = value.replaceAll("[^0-9-]", "");
+        if (digits.isEmpty() || "-".equals(digits)) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(digits);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     /** 진단 로그용으로 객체 노드의 필드명 목록을 만든다(값은 남기지 않아 민감정보 노출을 피한다). */

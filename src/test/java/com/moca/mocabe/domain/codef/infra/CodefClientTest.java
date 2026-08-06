@@ -11,6 +11,7 @@ import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
 import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
+import com.moca.mocabe.domain.codef.model.CodefCardPerformance;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.net.URLEncoder;
@@ -34,6 +35,7 @@ class CodefClientTest {
     private static final String CREATE_URL = BASE_URL + "/v1/account/create";
     private static final String CARD_LIST_URL = BASE_URL + "/v1/kr/card/p/account/card-list";
     private static final String APPROVAL_URL = BASE_URL + "/v1/kr/card/p/account/approval-list";
+    private static final String PERFORMANCE_URL = BASE_URL + "/v1/kr/card/p/account/result-check-list";
     private static final String TOKEN_RESPONSE = "{\"access_token\":\"tok-1\"}";
     private static final String PUBLIC_KEY_BASE64 = generatePublicKey();
 
@@ -354,6 +356,94 @@ class CodefClientTest {
 
         assertThrows(IllegalStateException.class,
                 () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803"));
+    }
+
+    @Test
+    @DisplayName("실적조회 응답에서 혜택별 실적 중 가장 큰 현재이용금액을 카드의 대표 실적으로 고른다")
+    void returnsPerformanceWithMaxCurrentUseAmt() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":["
+                        + "{\"resCardName\":\"** 체크카드\",\"resCardNo\":\"601234567891011\","
+                        + "\"resCardBenefitList\":["
+                        + "{\"resCardPerformanceList\":[{\"resCurrentUseAmt\":\"100000\"}]},"
+                        + "{\"resCardPerformanceList\":[{\"resCurrentUseAmt\":\"300000\"},"
+                        + "{\"resCurrentUseAmt\":\"250000\"},{\"resCurrentUseAmt\":\"\"},"
+                        + "{\"resCurrentUseAmt\":\"99999999999999\"}]}]}]}")));
+
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", "900101", "202608");
+
+        assertEquals(1, performances.size());
+        assertEquals("** 체크카드", performances.get(0).cardName());
+        assertEquals("601234567891011", performances.get(0).cardNo());
+        assertEquals(300000, performances.get(0).currentSpendAmount());
+    }
+
+    @Test
+    @DisplayName("카드가 1장이면 data가 단일 객체여도, 혜택·실적 목록이 단일 객체여도 한 장으로 파싱한다")
+    void returnsSinglePerformanceFromNestedSingleObjects() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{"
+                        + "\"resCardName\":\"노리2 체크카드(KB Pay)_비교통\",\"resCardNo\":\"943646******1069\","
+                        + "\"resCardBenefitList\":{\"resCardPerformanceList\":"
+                        + "{\"resCurrentUseAmt\":\"212000\"}}}}")));
+
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", "900101", "202608");
+
+        assertEquals(1, performances.size());
+        assertEquals("노리2 체크카드(KB Pay)_비교통", performances.get(0).cardName());
+        assertEquals(212000, performances.get(0).currentSpendAmount());
+    }
+
+    @Test
+    @DisplayName("혜택 목록이 없으면 currentSpendAmount는 null이다")
+    void returnsNullCurrentSpendAmountWhenNoBenefits() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{"
+                        + "\"resCardName\":\"카드 A\",\"resCardNo\":\"1234****5678\"}}")));
+
+        List<CodefCardPerformance> performances = codefClient.getPerformance("cid-1", "0301", null, null);
+
+        assertEquals(1, performances.size());
+        assertEquals(null, performances.get(0).currentSpendAmount());
+    }
+
+    @Test
+    @DisplayName("조회 대상 카드가 없어 빈 객체면 빈 목록을 반환한다")
+    void returnsEmptyPerformanceForEmptyObject() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
+
+        List<CodefCardPerformance> performances = codefClient.getPerformance("cid-1", "0301", "", "");
+
+        assertEquals(0, performances.size());
+    }
+
+    @Test
+    @DisplayName("실적조회 결과 코드가 실패면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsFailedPerformanceResult() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", "202608"));
+    }
+
+    @Test
+    @DisplayName("실적조회 data가 해석 불가한 형식이면 예외를 던진다")
+    void rejectsInvalidPerformanceData() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":\"unexpected\"}")));
+
+        assertThrows(IllegalStateException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", "202608"));
     }
 
     private CodefConnectionCommand command(String password, String cardNo, String cardPassword,

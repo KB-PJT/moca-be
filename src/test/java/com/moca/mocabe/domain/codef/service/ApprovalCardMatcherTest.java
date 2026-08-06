@@ -168,6 +168,15 @@ class ApprovalCardMatcherTest {
         assertEquals("uc-2", matcher.match(cards, approvalWithName("노리2 체크카드(KB Pay)"), ISSUER_1));
     }
 
+    @Test
+    @DisplayName("승인내역이 아닌 카드명·카드번호를 직접 넘겨도 같은 규칙으로 매칭한다(실적조회 등 재사용)")
+    void matchesWithRawCardNameAndCardNo() {
+        List<UserCardMatchRow> cards = List.of(
+                new UserCardMatchRow("uc-1", ISSUER_1, "노리2 체크카드(KB Pay)_비교통", "943646******1069"));
+
+        assertEquals("uc-1", matcher.match(cards, "노리2 체크카드(KB Pay)_비교통", "943646******1069", ISSUER_1));
+    }
+
     private CodefApproval approvalWithName(String cardName) {
         return new CodefApproval(
                 "20260801", "120000", "1234****5678", cardName, "가맹점", "10000", "1", "1", "1", "{}");

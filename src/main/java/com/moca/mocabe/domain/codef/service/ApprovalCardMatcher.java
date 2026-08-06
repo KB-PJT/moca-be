@@ -5,10 +5,10 @@ import com.moca.mocabe.domain.codef.model.UserCardMatchRow;
 import java.util.List;
 
 /**
- * CODEF 승인내역 한 건을 사용자의 보유카드 중 하나에 매칭한다.
+ * CODEF 응답(승인내역·실적조회 등) 한 건을 사용자의 보유카드 중 하나에 매칭한다.
  *
- * 먼저 승인이 발생한 연동과 같은 카드사(issuerId)의 카드로 후보를 좁힌다. 카드사가 다르면 카드명이나
- * 마스킹 카드번호가 우연히 같아도 다른 카드이므로, 이 경계 없이는 승인건이 엉뚱한 카드로 저장될 수 있다.
+ * 먼저 응답이 발생한 연동과 같은 카드사(issuerId)의 카드로 후보를 좁힌다. 카드사가 다르면 카드명이나
+ * 마스킹 카드번호가 우연히 같아도 다른 카드이므로, 이 경계 없이는 엉뚱한 카드로 저장될 수 있다.
  * 그 다음 카드명(resCardName)이 있으면 ①정규화 원문 일치 → ②가장 많은 글자가 일치하는 카드 순으로 연결한다.
  * 신한카드처럼 카드명을 빈 값으로 주는 경우 마스킹된 카드번호(resCardNo)로 보유카드 번호와 대조한다.
  */
@@ -22,6 +22,15 @@ public class ApprovalCardMatcher {
 
     /** issuerId는 이 승인내역을 조회한 CODEF 연동의 카드사다. 매칭되는 보유카드의 user_card_id를 반환하고, 매칭 실패 시 null. */
     public String match(List<UserCardMatchRow> cards, CodefApproval approval, String issuerId) {
+        return match(cards, approval.cardName(), approval.cardNo(), issuerId);
+    }
+
+    /**
+     * cardName/cardNo는 CODEF 응답(승인내역·실적조회 등)이 준 카드명·마스킹 카드번호다.
+     * issuerId는 이 응답을 조회한 CODEF 연동의 카드사다. 매칭되는 보유카드의 user_card_id를 반환하고,
+     * 매칭 실패 시 null.
+     */
+    public String match(List<UserCardMatchRow> cards, String cardName, String cardNo, String issuerId) {
         if (cards == null || cards.isEmpty()) {
             return null;
         }
@@ -31,9 +40,8 @@ public class ApprovalCardMatcher {
         if (sameIssuerCards.isEmpty()) {
             return null;
         }
-        String cardName = approval.cardName();
         if (cardName == null || cardName.isBlank()) {
-            return matchByCardNo(sameIssuerCards, approval.cardNo());
+            return matchByCardNo(sameIssuerCards, cardNo);
         }
         return matchByCardName(sameIssuerCards, cardName);
     }
