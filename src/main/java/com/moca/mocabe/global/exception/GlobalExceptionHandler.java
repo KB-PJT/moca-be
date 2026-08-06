@@ -23,7 +23,6 @@ import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
 import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
-import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
@@ -109,11 +108,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HomeDataNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleHomeDataNotFound(HomeDataNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, "HOME_DATA_NOT_FOUND", exception.getMessage());
-    }
-
-    @ExceptionHandler(InvalidMerchantQueryException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidMerchantQuery(InvalidMerchantQueryException exception) {
-        return error(HttpStatus.BAD_REQUEST, "INVALID_MERCHANT_QUERY", exception.getMessage());
     }
 
     @ExceptionHandler(CodefCredentialRequiredException.class)

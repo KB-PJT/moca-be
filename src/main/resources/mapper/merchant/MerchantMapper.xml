@@ -25,18 +25,4 @@
         INNER JOIN merchants m ON m.merchant_id = a.merchant_id AND m.status = 'active'
         ORDER BY a.merchant_alias_id ASC
     </select>
-
-    <resultMap id="merchantListRowMap" type="com.moca.mocabe.domain.merchant.model.MerchantListRow">
-        <constructor>
-            <arg column="merchant_id" javaType="java.lang.String"/>
-            <arg column="name" javaType="java.lang.String"/>
-        </constructor>
-    </resultMap>
-
-    <select id="findActiveMerchantsByCategoryId" resultMap="merchantListRowMap">
-        SELECT merchant_id, name
-        FROM merchants
-        WHERE merchant_category_id = #{merchantCategoryId} AND status = 'active'
-        ORDER BY name ASC
-    </select>
 </mapper>
