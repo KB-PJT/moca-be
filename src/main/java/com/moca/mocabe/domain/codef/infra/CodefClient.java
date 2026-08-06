@@ -95,14 +95,24 @@ public class CodefClient {
         return connectedId;
     }
 
-    /** Connected ID로 개인 보유카드를 조회한다. */
-    public List<CodefOwnedCard> getOwnedCards(String connectedId, String organization) {
+    /**
+     * Connected ID로 개인 보유카드를 조회한다. cardNo/cardPassword는 카드번호가 필요한 카드사(KB
+     * 카드소지확인·현대카드 아이디로그인 등)에서 특정 카드의 카드번호/비밀번호가 유효한지 검증할 때
+     * 함께 보낸다(요구하지 않는 카드사에는 보내도 무시된다). cardPassword는 CODEF가 RSA 암호화를
+     * 요구하므로 평문을 받아 이 메서드 안에서 암호화해 보낸다.
+     */
+    public List<CodefOwnedCard> getOwnedCards(String connectedId, String organization, String birthDate,
+                                              String cardNo, String cardPassword) {
         String accessToken = requestAccessToken();
         ObjectNode request = objectMapper.createObjectNode();
         request.put("connectedId", connectedId);
         request.put("organization", organization);
-        request.put("birthDate", "");
+        request.put("birthDate", birthDate == null ? "" : birthDate);
         request.put("inquiryType", "0");
+        putIfPresent(request, "cardNo", cardNo);
+        if (cardPassword != null && !cardPassword.isBlank()) {
+            putEncryptedIfPresent(request, "cardPassword", cardPassword, parsePublicKey());
+        }
 
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", "Bearer " + accessToken);
@@ -138,9 +148,13 @@ public class CodefClient {
      *
      * inquiryType="1"(전체조회)로 카드사 전체 카드의 승인내역을 한 번에 받아 카드 매칭은 호출자가 수행한다.
      * 가맹점 상세는 요청하지 않으며(memberStoreInfoType="0"), 날짜는 CODEF 규격인 YYYYMMDD로 전달한다.
+     * cardNo/cardPassword는 카드번호가 필요한 카드사에서 카드마다 개별 조회할 때 그 카드의 카드번호·
+     * 비밀번호를 넘긴다(요구하지 않는 카드사는 null). cardPassword는 CODEF가 RSA 암호화를 요구하므로
+     * 평문을 받아 이 메서드 안에서 암호화해 보낸다.
      */
-    public List<CodefApproval> getApprovals(String connectedId, String organization,
-                                            String birthDate, String startDate, String endDate) {
+    public List<CodefApproval> getApprovals(String connectedId, String organization, String birthDate,
+                                            String startDate, String endDate,
+                                            String cardNo, String cardPassword) {
         String accessToken = requestAccessToken();
         ObjectNode request = objectMapper.createObjectNode();
         request.put("connectedId", connectedId);
@@ -151,6 +165,10 @@ public class CodefClient {
         request.put("orderBy", "0");
         request.put("inquiryType", "1");
         request.put("memberStoreInfoType", "0");
+        putIfPresent(request, "cardNo", cardNo);
+        if (cardPassword != null && !cardPassword.isBlank()) {
+            putEncryptedIfPresent(request, "cardPassword", cardPassword, parsePublicKey());
+        }
 
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", "Bearer " + accessToken);
