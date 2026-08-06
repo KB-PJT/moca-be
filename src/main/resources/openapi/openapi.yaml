@@ -239,7 +239,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ActivateCardLinkCardsApiResponse'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED), 연동에 속하지 않은 카드·옵션 오류
+            (code=INVALID_CARD_SELECTION), 또는 카드사가 요구하는 카드번호/비밀번호가 이 카드에
+            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — PATCH /card-links/cards/{userCardId}/credentials로
+            먼저 채워야 합니다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '404':
@@ -285,6 +293,62 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /card-links/cards/{userCardId}/credentials:
+    patch:
+      tags: [CardLink]
+      summary: 카드별 카드번호/비밀번호 추가 입력
+      description: |
+        카드번호가 필요한 카드사에서, 계정 생성 시 입력한 카드와 일치하지 않아 카드번호/비밀번호가
+        비어 있는 보유카드에 값을 채웁니다. 입력한 카드번호/비밀번호로 그 카드사 connectedId와 함께
+        보유카드 조회를 호출해 정상 응답을 받으면 유효한 것으로 보고 암호화해 저장합니다.
+        이 요청만으로는 카드가 활성화되지 않습니다(is_active는 그대로 false). 응답은 옵션 그룹을
+        포함한 카드 정보이며, 옵션이 있으면 골라서 PATCH /card-links/{linkId}/cards로 별도
+        활성화해야 합니다(활성화 경로를 하나로 유지해 옵션 검증을 항상 거치게 하기 위함입니다).
+      operationId: submitCardCredentials
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: userCardId
+          in: path
+          required: true
+          description: 카드정보를 채울 보유카드(user_cards)의 식별자
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitCardCredentialsRequest'
+      responses:
+        '200':
+          description: 저장 성공(옵션 그룹을 포함한 카드 정보 반환, 활성화는 별도 요청 필요)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardLinkCardApiResponse'
+        '400':
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED), 카드번호/비밀번호 누락
+            (code=CARD_CREDENTIAL_REQUIRED), 이 카드사는 카드번호가 필요하지 않음
+            (code=INVALID_CARD_SELECTION), 또는 입력한 카드번호가 이 카드의 저장된 마스킹
+            카드번호(앞·뒤 노출 자리)와 일치하지 않음(code=CARD_NUMBER_MISMATCH — CODEF를
+            호출하지 않고 로컬에서 먼저 걸러낸 결과입니다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          description: 본인 소유의 카드를 찾을 수 없음(code=USER_CARD_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/CodefUnavailableError'
   /auth/google/login:
     post:
       tags: [Auth]
@@ -959,6 +1023,24 @@ components:
                     optionChoiceId:
                       type: string
                       format: uuid
+    SubmitCardCredentialsRequest:
+      type: object
+      required: [cardNo]
+      properties:
+        cardNo:
+          type: string
+          description: 이 카드의 전체 카드번호. 카드사가 카드번호를 요구할 때만 쓰입니다.
+        cardPassword:
+          type: string
+          description: 카드사 정책상 카드 비밀번호가 필요한 경우에만 필수입니다.
+    CardLinkCardApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/CardLinkCardResponse'
     SyncOwnedCardsApiResponse:
       type: object
       properties:
