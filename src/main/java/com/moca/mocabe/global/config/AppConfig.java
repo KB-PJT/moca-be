@@ -8,7 +8,9 @@ import com.moca.mocabe.domain.codef.service.ApprovalCardMatcher;
 import com.moca.mocabe.domain.codef.service.ApprovalIngestStore;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.domain.codef.service.PerformanceSnapshotStore;
+import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantMapper;
+import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
 import com.moca.mocabe.domain.merchant.service.MerchantNameNormalizer;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
@@ -169,6 +171,11 @@ public class AppConfig {
     public MerchantLookup merchantLookup(MerchantMapper merchantMapper,
                                          MerchantNameNormalizer merchantNameNormalizer) {
         return new MerchantLookup(merchantMapper, merchantNameNormalizer);
+    }
+
+    @Bean
+    public MerchantCategoryQueryService merchantCategoryQueryService(MerchantCategoryMapper merchantCategoryMapper) {
+        return new MerchantCategoryQueryService(merchantCategoryMapper);
     }
 
     @Bean
