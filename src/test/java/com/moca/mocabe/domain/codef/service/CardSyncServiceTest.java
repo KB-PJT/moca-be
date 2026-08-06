@@ -7,26 +7,33 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
+import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
+import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
 import com.moca.mocabe.domain.codef.model.CodefApproval;
+import com.moca.mocabe.domain.codef.model.CodefCardPerformance;
 import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.ExistingApprovalKey;
+import com.moca.mocabe.domain.codef.model.PerformanceSnapshotUpsert;
 import com.moca.mocabe.domain.codef.model.UserCardMatchRow;
 import com.moca.mocabe.domain.merchant.service.MerchantCandidateSnapshot;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +51,7 @@ class CardSyncServiceTest {
     private MerchantLookup merchantLookup;
     private MerchantCandidateSnapshot merchantCandidates;
     private ApprovalIngestStore approvalIngestStore;
+    private PerformanceSnapshotStore performanceSnapshotStore;
     private Encryptor encryptor;
     private CardSyncService service;
 
@@ -56,10 +64,11 @@ class CardSyncServiceTest {
         merchantLookup = mock(MerchantLookup.class);
         merchantCandidates = mock(MerchantCandidateSnapshot.class);
         approvalIngestStore = mock(ApprovalIngestStore.class);
+        performanceSnapshotStore = mock(PerformanceSnapshotStore.class);
         encryptor = mock(Encryptor.class);
         when(merchantLookup.loadCandidates()).thenReturn(merchantCandidates);
         service = new CardSyncService(codefClient, codefCredentialMapper, cardApprovalMapper,
-                approvalCardMatcher, merchantLookup, approvalIngestStore, encryptor);
+                approvalCardMatcher, merchantLookup, approvalIngestStore, performanceSnapshotStore, encryptor);
     }
 
     @Test
@@ -174,6 +183,148 @@ class CardSyncServiceTest {
         verify(merchantLookup, times(1)).loadCandidates();
     }
 
+    @Test
+    @DisplayName("실적을 조회해 매칭된 카드만 대표값(최대 현재이용금액)을 upsert하고 건수를 반환한다")
+    void ingestsMatchedPerformanceSnapshots() {
+        when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection()));
+        when(encryptor.decrypt(any())).thenReturn("900101");
+        when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
+        when(approvalIngestStore.insertAll(any())).thenReturn(0);
+        when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), anyString())).thenReturn(List.of(
+                new CodefCardPerformance("카드A", "1234****5678", 300000),
+                new CodefCardPerformance("미매칭카드", "0000****0000", 100000),
+                new CodefCardPerformance("혜택없음", "9999****9999", null)));
+        when(approvalCardMatcher.match(any(), eq("카드A"), eq("1234****5678"), eq("issuer-1")))
+                .thenReturn("uc-1");
+        when(approvalCardMatcher.match(any(), eq("미매칭카드"), eq("0000****0000"), eq("issuer-1")))
+                .thenReturn(null);
+        when(performanceSnapshotStore.upsertAll(any()))
+                .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+        SyncMyCardsResponse response = service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+        ArgumentCaptor<List<PerformanceSnapshotUpsert>> captor = ArgumentCaptor.forClass(List.class);
+        verify(performanceSnapshotStore).upsertAll(captor.capture());
+        List<PerformanceSnapshotUpsert> upserts = captor.getValue();
+        assertEquals(1, upserts.size());
+        assertEquals("uc-1", upserts.get(0).userCardId());
+        assertEquals(300000, upserts.get(0).currentSpendAmount());
+        assertTrue(upserts.get(0).performanceMonth().matches("\\d{4}-\\d{2}"));
+        assertEquals(1, response.getSyncedPerformanceCount());
+    }
+
+    @Test
+    @DisplayName("실적조회 대상 월이 연동의 조회 가능 개월수를 벗어나면 실적조회 실패 예외를 던져 전체 동기화를 중단한다")
+    void throwsWhenTargetMonthExceedsLookback() {
+        CodefConnection allowedConnection = new CodefConnection(
+                "link-1", "cid-1", "0301", "issuer-1", "KB카드", 12, new byte[]{1, 2, 3});
+        CodefConnection blockedConnection = new CodefConnection(
+                "link-2", "cid-2", "0302", "issuer-2", "신한카드", null, new byte[]{4, 5, 6});
+        when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+                .thenReturn(List.of(allowedConnection, blockedConnection));
+        when(encryptor.decrypt(any())).thenReturn("900101");
+        when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
+        when(codefClient.getPerformance(eq("cid-1"), eq("0301"), eq("900101"), anyString()))
+                .thenReturn(List.of());
+        // lookback=12는 허용, lookback 미확인(null→0)은 차단되도록 오늘 기준 7개월 전을 조회 대상으로 삼는다.
+        LocalDate sevenMonthsAgo = LocalDate.now(ZoneId.of("Asia/Seoul")).minusMonths(7).withDayOfMonth(1);
+
+        PerformanceSyncFailedException exception = assertThrows(PerformanceSyncFailedException.class,
+                () -> service.sync(USER_ID, sevenMonthsAgo, sevenMonthsAgo.plusDays(2)));
+
+        assertTrue(exception.getMessage().contains("신한카드"));
+        verify(codefClient).getPerformance(eq("cid-1"), eq("0301"), eq("900101"), anyString());
+        verify(codefClient, never()).getPerformance(eq("cid-2"), anyString(), anyString(), anyString());
+        // 도중에 실패하면 이미 조회된 승인내역·실적도 커밋하지 않는다.
+        verifyNoInteractions(approvalIngestStore, performanceSnapshotStore);
+    }
+
+    @Test
+    @DisplayName("실적조회 가능 개월수가 -1인 연동은 실적조회 실패 예외를 던져 전체 동기화를 중단한다")
+    void throwsWhenLookbackIsMinusOne() {
+        CodefConnection unsupportedConnection = new CodefConnection(
+                "link-1", "cid-1", "0304", "issuer-1", "하나카드", -1, new byte[]{1, 2, 3});
+        when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+                .thenReturn(List.of(unsupportedConnection));
+        when(encryptor.decrypt(any())).thenReturn("900101");
+        when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
+
+        PerformanceSyncFailedException exception = assertThrows(PerformanceSyncFailedException.class,
+                () -> service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3)));
+
+        assertTrue(exception.getMessage().contains("하나카드"));
+        verify(codefClient, never()).getPerformance(anyString(), anyString(), anyString(), anyString());
+        // 실적조회 미지원으로 실패해도 승인내역 조회 자체는 그 연동에서 정상 수행된다.
+        verify(codefClient).getApprovals(eq("cid-1"), eq("0304"), eq("900101"), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("CODEF 승인내역 조회가 실패하면 ApprovalSyncFailedException으로 변환한다")
+    void wrapsApprovalCodefFailure() {
+        when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection()));
+        when(encryptor.decrypt(any())).thenReturn("900101");
+        when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new CodefUnavailableException("CODEF 승인내역 조회에 실패했습니다."));
+
+        ApprovalSyncFailedException exception = assertThrows(ApprovalSyncFailedException.class,
+                () -> service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3)));
+
+        assertEquals(CodefUnavailableException.class, exception.getCause().getClass());
+        verifyNoInteractions(approvalIngestStore, performanceSnapshotStore);
+    }
+
+    @Test
+    @DisplayName("CODEF 실적조회 호출 자체가 실패하면 PerformanceSyncFailedException으로 변환한다")
+    void wrapsPerformanceCodefFailure() {
+        when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(connection()));
+        when(encryptor.decrypt(any())).thenReturn("900101");
+        when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
+        when(codefClient.getPerformance(anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new CodefUnavailableException("CODEF 실적조회에 실패했습니다."));
+
+        PerformanceSyncFailedException exception = assertThrows(PerformanceSyncFailedException.class,
+                () -> service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3)));
+
+        assertEquals(CodefUnavailableException.class, exception.getCause().getClass());
+        verifyNoInteractions(approvalIngestStore, performanceSnapshotStore);
+    }
+
+    @Test
+    @DisplayName("비씨카드는 CODEF가 startDate 기준 전월 실적을 주므로 조회 대상 월보다 한 달 뒤를 보낸다")
+    void requestsNextMonthForBcCard() {
+        CodefConnection bcConnection = new CodefConnection(
+                "link-1", "cid-1", "0305", "issuer-1", "비씨카드", 12, new byte[]{1, 2, 3});
+        when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(bcConnection));
+        when(encryptor.decrypt(any())).thenReturn("900101");
+        when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any())).thenReturn(List.of());
+        when(codefClient.getApprovals(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
+        when(approvalIngestStore.insertAll(any())).thenReturn(0);
+        when(codefClient.getPerformance(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
+        when(performanceSnapshotStore.upsertAll(any())).thenReturn(0);
+
+        service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+        // 조회 대상 월은 2026-08이지만, 비씨카드는 익월(2026-09)을 startDate로 보내야 8월 실적을 받는다.
+        verify(codefClient).getPerformance(eq("cid-1"), eq("0305"), eq("900101"), eq("202609"));
+    }
+
     private CodefApproval approval(String usedDate, String usedTime, String cardName, String store,
                                    String amount, String approvalNo, String homeForeign, String cancel) {
         return new CodefApproval(usedDate, usedTime, "1234****5678", cardName, store, amount,
@@ -181,7 +332,7 @@ class CardSyncServiceTest {
     }
 
     private CodefConnection connection() {
-        return new CodefConnection("link-1", "cid", "0301", "issuer-1", new byte[]{1, 2, 3});
+        return new CodefConnection("link-1", "cid", "0301", "issuer-1", "KB카드", null, new byte[]{1, 2, 3});
     }
 
     private UserCardMatchRow userCard() {
