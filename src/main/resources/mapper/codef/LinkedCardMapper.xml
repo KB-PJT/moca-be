@@ -8,6 +8,10 @@
         <constructor>
             <arg column="user_card_id" javaType="java.lang.String"/>
             <arg column="card_id" javaType="java.lang.String"/>
+            <arg column="requires_card_no" javaType="_boolean"/>
+            <arg column="requires_card_password" javaType="_boolean"/>
+            <arg column="has_card_number" javaType="_boolean"/>
+            <arg column="has_card_password" javaType="_boolean"/>
         </constructor>
     </resultMap>
 
@@ -17,25 +21,32 @@
         WHERE user_id = #{userId}
     </select>
 
-    <!-- 매칭된 보유카드를 처음에는 비활성(is_active=false)으로 적재한다. -->
+    <!-- 매칭된 보유카드를 적재한다. 카드번호가 필요한 카드사에서 계정 생성 시 입력한 카드번호와
+         일치하는 카드는 isActive=true·크리덴셜 채움으로, 나머지는 isActive=false·크리덴셜 null로 넘어온다. -->
     <insert id="insertLinkedCard">
         INSERT INTO user_cards (
             user_card_id, user_id, card_id, codef_account_credential_id,
-            card_name_from_codef, card_no, issuer_id, display_order, is_active,
+            card_name_from_codef, card_no, card_number_enc, card_password_enc,
+            issuer_id, display_order, is_active,
             codef_card_key_hash, created_at, updated_at
         ) VALUES (
             #{userCardId}, #{userId}, #{cardId}, #{linkId},
-            #{cardNameFromCodef}, #{cardNo}, #{issuerId}, #{displayOrder}, FALSE,
+            #{cardNameFromCodef}, #{cardNo}, #{cardNumberEnc}, #{cardPasswordEnc},
+            #{issuerId}, #{displayOrder}, #{isActive},
             #{codefCardKeyHash}, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
         )
     </insert>
 
     <select id="findByLinkIdAndUserId" resultMap="linkedCardRowMap">
-        SELECT user_card_id, card_id
-        FROM user_cards
-        WHERE codef_account_credential_id = #{linkId}
-          AND user_id = #{userId}
-        ORDER BY display_order ASC, user_card_id ASC
+        SELECT uc.user_card_id, uc.card_id,
+               i.requires_card_no, i.requires_card_password,
+               (uc.card_number_enc IS NOT NULL) AS has_card_number,
+               (uc.card_password_enc IS NOT NULL) AS has_card_password
+        FROM user_cards uc
+        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        WHERE uc.codef_account_credential_id = #{linkId}
+          AND uc.user_id = #{userId}
+        ORDER BY uc.display_order ASC, uc.user_card_id ASC
     </select>
 
     <resultMap id="linkedCardKeyRowMap" type="com.moca.mocabe.domain.codef.model.LinkedCardKeyRow">
@@ -83,4 +94,39 @@
             option_choice_id = VALUES(option_choice_id),
             selected_at = UTC_TIMESTAMP(6)
     </insert>
+
+    <resultMap id="cardCredentialSubmissionTargetMap"
+               type="com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="codef_account_credential_id" javaType="java.lang.String"/>
+            <arg column="connected_id" javaType="java.lang.String"/>
+            <arg column="institution_code" javaType="java.lang.String"/>
+            <arg column="birth_date_enc" javaType="_byte[]"/>
+            <arg column="requires_card_no" javaType="_boolean"/>
+            <arg column="requires_card_password" javaType="_boolean"/>
+            <arg column="card_id" javaType="java.lang.String"/>
+            <arg column="card_no" javaType="java.lang.String"/>
+            <arg column="issuer_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findCardForCredentialSubmission" resultMap="cardCredentialSubmissionTargetMap">
+        SELECT uc.user_card_id, uc.codef_account_credential_id, c.connected_id, i.institution_code,
+               c.birth_date_enc, i.requires_card_no, i.requires_card_password,
+               uc.card_id, uc.card_no, i.issuer_name
+        FROM user_cards uc
+        INNER JOIN codef_account_credentials c ON c.codef_account_credential_id = uc.codef_account_credential_id
+        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        WHERE uc.user_card_id = #{userCardId}
+          AND uc.user_id = #{userId}
+    </select>
+
+    <update id="updateCardCredentials">
+        UPDATE user_cards
+        SET card_number_enc = #{cardNumberEnc}, card_password_enc = #{cardPasswordEnc},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_card_id = #{userCardId}
+          AND user_id = #{userId}
+    </update>
 </mapper>

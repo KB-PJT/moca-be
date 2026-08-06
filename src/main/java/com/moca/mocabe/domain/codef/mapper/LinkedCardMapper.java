@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.codef.mapper;
 
+import com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget;
 import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
 import java.util.List;
@@ -31,7 +32,10 @@ public interface LinkedCardMapper {
                           @Param("cardNameFromCodef") String cardNameFromCodef,
                           @Param("cardNo") String cardNo,
                           @Param("codefCardKeyHash") String codefCardKeyHash,
-                          @Param("displayOrder") int displayOrder);
+                          @Param("displayOrder") int displayOrder,
+                          @Param("cardNumberEnc") byte[] cardNumberEnc,
+                          @Param("cardPasswordEnc") byte[] cardPasswordEnc,
+                          @Param("isActive") boolean isActive);
 
     List<LinkedCardRow> findByLinkIdAndUserId(@Param("linkId") String linkId,
                                               @Param("userId") String userId);
@@ -44,4 +48,13 @@ public interface LinkedCardMapper {
                                @Param("optionGroupId") String optionGroupId,
                                @Param("cardId") String cardId,
                                @Param("optionChoiceId") String optionChoiceId);
+
+    /** 카드정보 추가 입력(PATCH /card-links/cards/{userCardId}/credentials) 전, 대상 카드·연동·정책을 조회한다. */
+    CardCredentialSubmissionTarget findCardForCredentialSubmission(@Param("userCardId") String userCardId,
+                                                                    @Param("userId") String userId);
+
+    int updateCardCredentials(@Param("userCardId") String userCardId,
+                              @Param("userId") String userId,
+                              @Param("cardNumberEnc") byte[] cardNumberEnc,
+                              @Param("cardPasswordEnc") byte[] cardPasswordEnc);
 }
