@@ -1,6 +1,6 @@
 package com.moca.mocabe.domain.user.service;
 
-import com.moca.mocabe.domain.card.mapper.UserCardMapper;
+import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.model.NotificationSettings;
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
@@ -20,13 +20,13 @@ public class UserApplicationService {
 
     private final UserDomainService userDomainService;
     private final OpaqueTokenService opaqueTokenService;
-    private final UserCardMapper userCardMapper;
+    private final CardQueryService cardQueryService;
 
     public UserApplicationService(UserDomainService userDomainService, OpaqueTokenService opaqueTokenService,
-                                  UserCardMapper userCardMapper) {
+                                  CardQueryService cardQueryService) {
         this.userDomainService = userDomainService;
         this.opaqueTokenService = opaqueTokenService;
-        this.userCardMapper = userCardMapper;
+        this.cardQueryService = cardQueryService;
     }
 
     @Transactional(readOnly = true)
@@ -80,7 +80,7 @@ public class UserApplicationService {
 
     @Transactional(readOnly = true)
     public NewUserCheckResponse isNewUser(String userId) {
-        boolean hasAnyCard = userCardMapper.existsByUserId(userId);
+        boolean hasAnyCard = cardQueryService.hasAnyCard(userId);
         return new NewUserCheckResponse(!hasAnyCard);
     }
 

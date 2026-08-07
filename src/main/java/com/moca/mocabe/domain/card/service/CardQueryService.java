@@ -17,6 +17,11 @@ public class CardQueryService {
     }
 
     @Transactional(readOnly = true)
+    public boolean hasAnyCard(String userId) {
+        return userCardMapper.existsByUserId(userId);
+    }
+
+    @Transactional(readOnly = true)
     public MeCardsResponse getMyCards(String userId, boolean activeOnly) {
         List<MeCardItemResponse> activeCards = mapCards(userCardMapper.findActiveByUserId(userId));
         List<MeCardItemResponse> inactiveCards = activeOnly

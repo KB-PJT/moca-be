@@ -92,8 +92,8 @@ public class AppConfig {
     @Bean
     public UserApplicationService userApplicationService(UserDomainService userDomainService,
                                                          OpaqueTokenService opaqueTokenService,
-                                                         UserCardMapper userCardMapper) {
-        return new UserApplicationService(userDomainService, opaqueTokenService, userCardMapper);
+                                                         CardQueryService cardQueryService) {
+        return new UserApplicationService(userDomainService, opaqueTokenService, cardQueryService);
     }
 
     @Bean

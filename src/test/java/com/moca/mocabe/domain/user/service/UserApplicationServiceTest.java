@@ -7,7 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.moca.mocabe.domain.card.mapper.UserCardMapper;
+import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsRequest;
@@ -38,7 +38,7 @@ class UserApplicationServiceTest {
     private OpaqueTokenService opaqueTokenService;
 
     @Mock
-    private UserCardMapper userCardMapper;
+    private CardQueryService cardQueryService;
 
     @InjectMocks
     private UserApplicationService userApplicationService;
@@ -140,7 +140,7 @@ class UserApplicationServiceTest {
     @Test
     @DisplayName("보유 카드가 없으면 신규 사용자로 판단한다")
     void treatsUserWithoutAnyCardAsNewUser() {
-        when(userCardMapper.existsByUserId(USER_ID)).thenReturn(false);
+        when(cardQueryService.hasAnyCard(USER_ID)).thenReturn(false);
 
         assertTrue(userApplicationService.isNewUser(USER_ID).isNewUser());
     }
@@ -148,7 +148,7 @@ class UserApplicationServiceTest {
     @Test
     @DisplayName("활성·비활성 상관없이 보유 카드가 있으면 기존 사용자로 판단한다")
     void treatsUserWithAnyCardAsExistingUser() {
-        when(userCardMapper.existsByUserId(USER_ID)).thenReturn(true);
+        when(cardQueryService.hasAnyCard(USER_ID)).thenReturn(true);
 
         assertFalse(userApplicationService.isNewUser(USER_ID).isNewUser());
     }
