@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.report.service;
 
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.domain.report.dto.BenefitBreakdownResponse;
 import com.moca.mocabe.domain.report.dto.BenefitCategoriesReportResponse;
 import com.moca.mocabe.domain.report.dto.BenefitCategoryResponse;
@@ -14,9 +15,7 @@ import com.moca.mocabe.domain.report.dto.ReportUserCardResponse;
 import com.moca.mocabe.domain.report.mapper.ReportMapper;
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
-import com.moca.mocabe.domain.report.model.MissedBenefitRow;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
-import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.global.exception.report.InvalidReportQueryException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
@@ -35,156 +34,203 @@ import org.springframework.transaction.annotation.Transactional;
 /** 혜택 이력에서 집계한 혜택·실적 리포트 조회 유스케이스다. */
 public class ReportQueryService {
 
-    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
-    private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter
-            .ofPattern("uuuu-MM", Locale.ROOT).withResolverStyle(ResolverStyle.STRICT);
+  private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+  private static final DateTimeFormatter YEAR_MONTH_FORMATTER =
+      DateTimeFormatter.ofPattern("uuuu-MM", Locale.ROOT).withResolverStyle(ResolverStyle.STRICT);
 
-    private final UserMapper userMapper;
-    private final ReportMapper reportMapper;
+  private final UserMapper userMapper;
+  private final ReportMapper reportMapper;
 
-    public ReportQueryService(UserMapper userMapper, ReportMapper reportMapper) {
-        this.userMapper = userMapper;
-        this.reportMapper = reportMapper;
+  public ReportQueryService(UserMapper userMapper, ReportMapper reportMapper) {
+    this.userMapper = userMapper;
+    this.reportMapper = reportMapper;
+  }
+
+  @Transactional(readOnly = true)
+  public BenefitSummaryReportResponse getBenefitSummary(String userId, String requestedYearMonth) {
+    requireUser(userId);
+    YearMonth yearMonth = parseYearMonth(requestedYearMonth);
+    List<BenefitTypeAmountRow> current = findBenefitAmounts(userId, yearMonth);
+    long total = total(current);
+    long previous = total(findBenefitAmounts(userId, yearMonth.minusMonths(1)));
+    List<BenefitBreakdownResponse> breakdown =
+        current.stream()
+            .map(
+                row ->
+                    new BenefitBreakdownResponse(
+                        row.benefitType(), labelOf(row.benefitType()), row.amount()))
+            .sorted(
+                Comparator.comparingLong(BenefitBreakdownResponse::amount)
+                    .reversed()
+                    .thenComparing(BenefitBreakdownResponse::type))
+            .toList();
+    return new BenefitSummaryReportResponse(
+        format(yearMonth), total, previous, total - previous, breakdown);
+  }
+
+  @Transactional(readOnly = true)
+  public BenefitCategoriesReportResponse getBenefitCategories(
+      String userId, String requestedYearMonth, int limit) {
+    requireUser(userId);
+    if (limit < 1 || limit > 3) {
+      throw new InvalidReportQueryException("limit은 1에서 3 사이여야 합니다.");
     }
+    YearMonth yearMonth = parseYearMonth(requestedYearMonth);
+    List<CategoryBenefitRow> rows =
+        reportMapper.findBenefitAmountsByCategory(
+            userId, startOfMonthUtc(yearMonth), startOfMonthUtc(yearMonth.plusMonths(1)), limit);
+    List<BenefitCategoryResponse> categories =
+        java.util.stream.IntStream.range(0, rows.size())
+            .mapToObj(
+                index -> {
+                  CategoryBenefitRow row = rows.get(index);
+                  return new BenefitCategoryResponse(
+                      index + 1, row.categoryCode(), row.categoryName(), row.benefitAmount());
+                })
+            .toList();
+    return new BenefitCategoriesReportResponse(format(yearMonth), categories);
+  }
 
-    @Transactional(readOnly = true)
-    public BenefitSummaryReportResponse getBenefitSummary(String userId, String requestedYearMonth) {
-        requireUser(userId);
-        YearMonth yearMonth = parseYearMonth(requestedYearMonth);
-        List<BenefitTypeAmountRow> current = findBenefitAmounts(userId, yearMonth);
-        long total = total(current);
-        long previous = total(findBenefitAmounts(userId, yearMonth.minusMonths(1)));
-        List<BenefitBreakdownResponse> breakdown = current.stream()
-                .map(row -> new BenefitBreakdownResponse(row.benefitType(), labelOf(row.benefitType()), row.amount()))
-                .sorted(Comparator.comparingLong(BenefitBreakdownResponse::amount).reversed()
-                        .thenComparing(BenefitBreakdownResponse::type))
-                .toList();
-        return new BenefitSummaryReportResponse(format(yearMonth), total, previous, total - previous, breakdown);
+  /** 계산 결과 원장에 남은 실제 예상액과 적용액의 차이만 '놓친 혜택'으로 반환한다. */
+  @Transactional(readOnly = true)
+  public MissedBenefitsReportResponse getMissedBenefits(
+      String userId, String requestedYearMonth, String userCardId) {
+    requireUser(userId);
+    if (userCardId == null || userCardId.isBlank()) {
+      throw new InvalidReportQueryException("userCardId는 필수입니다.");
     }
+    YearMonth yearMonth = parseYearMonth(requestedYearMonth);
+    PerformanceCardRow card =
+        reportMapper.findPerformanceCard(userId, userCardId, format(yearMonth));
+    if (card == null) {
+      // Mapper가 user_id를 조건으로 사용하므로 타인의 카드 ID도 같은 404로 처리한다.
+      throw new UserCardNotFoundException();
+    }
+    List<MissedBenefitItemResponse> benefits =
+        reportMapper.findMonthlyRemainingBenefits(userId, userCardId, format(yearMonth)).stream()
+            .map(
+                row ->
+                    new MissedBenefitItemResponse(
+                        row.benefitRuleId(),
+                        row.title(),
+                        row.benefitType(),
+                        row.usedAmount(),
+                        row.limitAmount(),
+                        Math.max(0, row.limitAmount() - row.usedAmount()),
+                        "KRW"))
+            .filter(row -> row.remainingAmount() > 0)
+            .toList();
+    long remaining = benefits.stream().mapToLong(MissedBenefitItemResponse::remainingAmount).sum();
+    return new MissedBenefitsReportResponse(
+        format(yearMonth),
+        new ReportUserCardResponse(card.userCardId(), card.cardName(), null),
+        remaining,
+        benefits);
+  }
 
-    @Transactional(readOnly = true)
-    public BenefitCategoriesReportResponse getBenefitCategories(String userId, String requestedYearMonth, int limit) {
-        requireUser(userId);
-        if (limit < 1 || limit > 3) {
-            throw new InvalidReportQueryException("limit은 1에서 3 사이여야 합니다.");
-        }
-        YearMonth yearMonth = parseYearMonth(requestedYearMonth);
-        List<CategoryBenefitRow> rows = reportMapper.findBenefitAmountsByCategory(userId,
-                startOfMonthUtc(yearMonth), startOfMonthUtc(yearMonth.plusMonths(1)), limit);
-        List<BenefitCategoryResponse> categories = java.util.stream.IntStream.range(0, rows.size())
-                .mapToObj(index -> {
-                    CategoryBenefitRow row = rows.get(index);
-                    return new BenefitCategoryResponse(index + 1, row.categoryCode(), row.categoryName(), row.benefitAmount());
-                }).toList();
-        return new BenefitCategoriesReportResponse(format(yearMonth), categories);
-    }
+  @Transactional(readOnly = true)
+  public PerformanceSummaryReportResponse getPerformanceSummary(
+      String userId, String requestedYearMonth) {
+    requireUser(userId);
+    YearMonth yearMonth = parseYearMonth(requestedYearMonth);
+    List<PerformanceCardRow> rows = reportMapper.findPerformanceCards(userId, format(yearMonth));
+    int achieved = (int) rows.stream().filter(this::isAchieved).count();
+    List<PerformanceSummaryCardResponse> cards =
+        rows.stream()
+            .limit(3)
+            .map(
+                row ->
+                    new PerformanceSummaryCardResponse(
+                        row.userCardId(), row.cardName(), achievementRate(row), isAchieved(row)))
+            .toList();
+    return new PerformanceSummaryReportResponse(format(yearMonth), rows.size(), achieved, cards);
+  }
 
-    /** 계산 결과 원장에 남은 실제 예상액과 적용액의 차이만 '놓친 혜택'으로 반환한다. */
-    @Transactional(readOnly = true)
-    public MissedBenefitsReportResponse getMissedBenefits(String userId, String requestedYearMonth,
-                                                          String userCardId) {
-        requireUser(userId);
-        if (userCardId == null || userCardId.isBlank()) {
-            throw new InvalidReportQueryException("userCardId는 필수입니다.");
-        }
-        YearMonth yearMonth = parseYearMonth(requestedYearMonth);
-        PerformanceCardRow card = reportMapper.findPerformanceCard(userId, userCardId, format(yearMonth));
-        if (card == null) {
-            // Mapper가 user_id를 조건으로 사용하므로 타인의 카드 ID도 같은 404로 처리한다.
-            throw new UserCardNotFoundException();
-        }
-        List<MissedBenefitItemResponse> benefits = reportMapper
-                .findMonthlyRemainingBenefits(userId, userCardId, format(yearMonth)).stream()
-                .map(row -> new MissedBenefitItemResponse(row.benefitRuleId(), row.title(), row.benefitType(),
-                        row.usedAmount(), row.limitAmount(), Math.max(0, row.limitAmount() - row.usedAmount()), "KRW"))
-                .filter(row -> row.remainingAmount() > 0)
-                .toList();
-        long remaining = benefits.stream().mapToLong(MissedBenefitItemResponse::remainingAmount).sum();
-        return new MissedBenefitsReportResponse(format(yearMonth),
-                new ReportUserCardResponse(card.userCardId(), card.cardName(), null), remaining, benefits);
-    }
+  @Transactional(readOnly = true)
+  public PerformanceCardsReportResponse getPerformanceCards(
+      String userId, String requestedYearMonth) {
+    requireUser(userId);
+    YearMonth yearMonth = parseYearMonth(requestedYearMonth);
+    List<PerformanceCardResponse> cards =
+        reportMapper.findPerformanceCards(userId, format(yearMonth)).stream()
+            .map(
+                row ->
+                    new PerformanceCardResponse(
+                        row.userCardId(),
+                        row.cardName(),
+                        row.cardImageUrl(),
+                        row.currentPerformanceAmount(),
+                        row.currentTierTargetAmount(),
+                        achievementRate(row),
+                        row.currentTier(),
+                        row.nextTier(),
+                        isAchieved(row),
+                        remainingToTarget(row)))
+            .toList();
+    return new PerformanceCardsReportResponse(format(yearMonth), cards);
+  }
 
-    @Transactional(readOnly = true)
-    public PerformanceSummaryReportResponse getPerformanceSummary(String userId, String requestedYearMonth) {
-        requireUser(userId);
-        YearMonth yearMonth = parseYearMonth(requestedYearMonth);
-        List<PerformanceCardRow> rows = reportMapper.findPerformanceCards(userId, format(yearMonth));
-        int achieved = (int) rows.stream().filter(this::isAchieved).count();
-        List<PerformanceSummaryCardResponse> cards = rows.stream().limit(3)
-                .map(row -> new PerformanceSummaryCardResponse(row.userCardId(), row.cardName(),
-                        achievementRate(row), isAchieved(row)))
-                .toList();
-        return new PerformanceSummaryReportResponse(format(yearMonth), rows.size(), achieved, cards);
-    }
+  private List<BenefitTypeAmountRow> findBenefitAmounts(String userId, YearMonth yearMonth) {
+    return reportMapper.findBenefitAmountsByType(
+        userId, startOfMonthUtc(yearMonth), startOfMonthUtc(yearMonth.plusMonths(1)));
+  }
 
-    @Transactional(readOnly = true)
-    public PerformanceCardsReportResponse getPerformanceCards(String userId, String requestedYearMonth) {
-        requireUser(userId);
-        YearMonth yearMonth = parseYearMonth(requestedYearMonth);
-        List<PerformanceCardResponse> cards = reportMapper.findPerformanceCards(userId, format(yearMonth)).stream()
-                .map(row -> new PerformanceCardResponse(row.userCardId(), row.cardName(), row.cardImageUrl(),
-                        row.currentPerformanceAmount(), row.currentTierTargetAmount(), achievementRate(row),
-                        row.currentTier(), row.nextTier(), isAchieved(row), remainingToTarget(row)))
-                .toList();
-        return new PerformanceCardsReportResponse(format(yearMonth), cards);
-    }
+  private long total(List<BenefitTypeAmountRow> rows) {
+    return rows.stream().mapToLong(BenefitTypeAmountRow::amount).sum();
+  }
 
-    private List<BenefitTypeAmountRow> findBenefitAmounts(String userId, YearMonth yearMonth) {
-        return reportMapper.findBenefitAmountsByType(userId, startOfMonthUtc(yearMonth),
-                startOfMonthUtc(yearMonth.plusMonths(1)));
+  private void requireUser(String userId) {
+    if (userMapper.findProfileById(userId) == null) {
+      throw new UserNotFoundException();
     }
+  }
 
-    private long total(List<BenefitTypeAmountRow> rows) {
-        return rows.stream().mapToLong(BenefitTypeAmountRow::amount).sum();
+  private YearMonth parseYearMonth(String value) {
+    if (value == null || value.isBlank()) {
+      return YearMonth.now(SEOUL);
     }
+    try {
+      return YearMonth.parse(value, YEAR_MONTH_FORMATTER);
+    } catch (DateTimeParseException exception) {
+      throw new InvalidReportQueryException("yearMonth는 YYYY-MM 형식이어야 합니다.");
+    }
+  }
 
-    private void requireUser(String userId) {
-        if (userMapper.findProfileById(userId) == null) {
-            throw new UserNotFoundException();
-        }
-    }
+  private LocalDateTime startOfMonthUtc(YearMonth yearMonth) {
+    return yearMonth
+        .atDay(1)
+        .atStartOfDay(SEOUL)
+        .withZoneSameInstant(ZoneOffset.UTC)
+        .toLocalDateTime();
+  }
 
-    private YearMonth parseYearMonth(String value) {
-        if (value == null || value.isBlank()) {
-            return YearMonth.now(SEOUL);
-        }
-        try {
-            return YearMonth.parse(value, YEAR_MONTH_FORMATTER);
-        } catch (DateTimeParseException exception) {
-            throw new InvalidReportQueryException("yearMonth는 YYYY-MM 형식이어야 합니다.");
-        }
-    }
+  private String format(YearMonth yearMonth) {
+    return yearMonth.format(YEAR_MONTH_FORMATTER);
+  }
 
-    private LocalDateTime startOfMonthUtc(YearMonth yearMonth) {
-        return yearMonth.atDay(1).atStartOfDay(SEOUL).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
-    }
+  private String labelOf(String type) {
+    return switch (type) {
+      case "DISCOUNT" -> "할인";
+      case "CASHBACK" -> "캐시백";
+      case "POINT" -> "포인트";
+      default -> type;
+    };
+  }
 
-    private String format(YearMonth yearMonth) {
-        return yearMonth.format(YEAR_MONTH_FORMATTER);
-    }
+  private boolean isAchieved(PerformanceCardRow row) {
+    return row.currentTierTargetAmount() > 0
+        && row.currentPerformanceAmount() >= row.currentTierTargetAmount();
+  }
 
-    private String labelOf(String type) {
-        return switch (type) {
-            case "DISCOUNT" -> "할인";
-            case "CASHBACK" -> "캐시백";
-            case "POINT" -> "포인트";
-            default -> type;
-        };
+  private int achievementRate(PerformanceCardRow row) {
+    if (row.currentTierTargetAmount() <= 0) {
+      return 0;
     }
+    return (int)
+        Math.min(100, row.currentPerformanceAmount() * 100 / row.currentTierTargetAmount());
+  }
 
-    private boolean isAchieved(PerformanceCardRow row) {
-        return row.currentTierTargetAmount() > 0
-                && row.currentPerformanceAmount() >= row.currentTierTargetAmount();
-    }
-
-    private int achievementRate(PerformanceCardRow row) {
-        if (row.currentTierTargetAmount() <= 0) {
-            return 0;
-        }
-        return (int) Math.min(100, row.currentPerformanceAmount() * 100 / row.currentTierTargetAmount());
-    }
-
-    private long remainingToTarget(PerformanceCardRow row) {
-        return Math.max(0, row.currentTierTargetAmount() - row.currentPerformanceAmount());
-    }
+  private long remainingToTarget(PerformanceCardRow row) {
+    return Math.max(0, row.currentTierTargetAmount() - row.currentPerformanceAmount());
+  }
 }

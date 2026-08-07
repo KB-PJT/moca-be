@@ -13,23 +13,27 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface ReportMapper {
 
-    List<BenefitTypeAmountRow> findBenefitAmountsByType(@Param("userId") String userId,
-                                                        @Param("fromUtc") LocalDateTime fromUtc,
-                                                        @Param("toUtc") LocalDateTime toUtc);
+  List<BenefitTypeAmountRow> findBenefitAmountsByType(
+      @Param("userId") String userId,
+      @Param("fromUtc") LocalDateTime fromUtc,
+      @Param("toUtc") LocalDateTime toUtc);
 
-    List<CategoryBenefitRow> findBenefitAmountsByCategory(@Param("userId") String userId,
-                                                          @Param("fromUtc") LocalDateTime fromUtc,
-                                                          @Param("toUtc") LocalDateTime toUtc,
-                                                          @Param("limit") int limit);
+  List<CategoryBenefitRow> findBenefitAmountsByCategory(
+      @Param("userId") String userId,
+      @Param("fromUtc") LocalDateTime fromUtc,
+      @Param("toUtc") LocalDateTime toUtc,
+      @Param("limit") int limit);
 
-    List<MissedBenefitRow> findMonthlyRemainingBenefits(@Param("userId") String userId,
-                                                        @Param("userCardId") String userCardId,
-                                                        @Param("yearMonth") String yearMonth);
+  List<MissedBenefitRow> findMonthlyRemainingBenefits(
+      @Param("userId") String userId,
+      @Param("userCardId") String userCardId,
+      @Param("yearMonth") String yearMonth);
 
-    PerformanceCardRow findPerformanceCard(@Param("userId") String userId,
-                                           @Param("userCardId") String userCardId,
-                                           @Param("yearMonth") String yearMonth);
+  PerformanceCardRow findPerformanceCard(
+      @Param("userId") String userId,
+      @Param("userCardId") String userCardId,
+      @Param("yearMonth") String yearMonth);
 
-    List<PerformanceCardRow> findPerformanceCards(@Param("userId") String userId,
-                                                   @Param("yearMonth") String yearMonth);
+  List<PerformanceCardRow> findPerformanceCards(
+      @Param("userId") String userId, @Param("yearMonth") String yearMonth);
 }

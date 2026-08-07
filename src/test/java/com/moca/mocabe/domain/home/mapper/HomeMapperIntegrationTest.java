@@ -12,27 +12,32 @@ import org.springframework.context.annotation.Import;
 
 /** 홈 집계 SQL이 실제 MySQL 8 스키마에서 실행되는지 검증한다. */
 @Tag("integration")
-@org.springframework.test.context.junit.jupiter.SpringJUnitConfig(HomeMapperIntegrationTest.HomeMapperTestConfig.class)
+@org.springframework.test.context.junit.jupiter.SpringJUnitConfig(
+    HomeMapperIntegrationTest.HomeMapperTestConfig.class)
 class HomeMapperIntegrationTest {
 
-    private static final String UNKNOWN_USER_ID = "00000000-0000-4000-8000-000000000001";
+  private static final String UNKNOWN_USER_ID = "00000000-0000-4000-8000-000000000001";
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private HomeMapper homeMapper;
+  @org.springframework.beans.factory.annotation.Autowired private HomeMapper homeMapper;
 
-    @Test
-    @DisplayName("홈 카드와 최근 혜택 집계 SQL은 데이터가 없는 사용자에게 빈 목록을 반환한다")
-    void executesHomeQueriesAgainstMySql() {
-        assertTrue(homeMapper.findHomeCards(UNKNOWN_USER_ID, "2026-07").isEmpty());
-        assertTrue(homeMapper.findRecentBenefits(UNKNOWN_USER_ID,
+  @Test
+  @DisplayName("홈 카드와 최근 혜택 집계 SQL은 데이터가 없는 사용자에게 빈 목록을 반환한다")
+  void executesHomeQueriesAgainstMySql() {
+    assertTrue(homeMapper.findHomeCards(UNKNOWN_USER_ID, "2026-07").isEmpty());
+    assertTrue(
+        homeMapper
+            .findRecentBenefits(
+                UNKNOWN_USER_ID,
                 LocalDateTime.of(2026, 6, 30, 15, 0),
-                LocalDateTime.of(2026, 7, 31, 15, 0), 5).isEmpty());
-    }
+                LocalDateTime.of(2026, 7, 31, 15, 0),
+                5)
+            .isEmpty());
+  }
 
-    @Configuration
-    @Import(TestcontainersMySqlConfig.class)
-    @org.mybatis.spring.annotation.MapperScan(
-            basePackageClasses = HomeMapper.class, sqlSessionFactoryRef = "testSqlSessionFactory")
-    static class HomeMapperTestConfig {
-    }
+  @Configuration
+  @Import(TestcontainersMySqlConfig.class)
+  @org.mybatis.spring.annotation.MapperScan(
+      basePackageClasses = HomeMapper.class,
+      sqlSessionFactoryRef = "testSqlSessionFactory")
+  static class HomeMapperTestConfig { }
 }

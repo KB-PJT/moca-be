@@ -21,43 +21,53 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ReportController {
 
-    private final ReportQueryService reportQueryService;
-    private final CurrentUserProvider currentUserProvider;
+  private final ReportQueryService reportQueryService;
+  private final CurrentUserProvider currentUserProvider;
 
-    @GetMapping("/benefits/summary")
-    public ResponseEntity<ApiResponse<BenefitSummaryReportResponse>> getBenefitSummary(
-            @RequestParam(name = "yearMonth", required = false) String yearMonth) {
-        return ResponseEntity.ok(ApiResponse.success(reportQueryService.getBenefitSummary(
+  @GetMapping("/benefits/summary")
+  public ResponseEntity<ApiResponse<BenefitSummaryReportResponse>> getBenefitSummary(
+      @RequestParam(name = "yearMonth", required = false) String yearMonth) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            reportQueryService.getBenefitSummary(
                 currentUserProvider.getCurrentUserId(), yearMonth)));
-    }
+  }
 
-    @GetMapping("/benefits/categories")
-    public ResponseEntity<ApiResponse<BenefitCategoriesReportResponse>> getBenefitCategories(
-            @RequestParam(name = "yearMonth", required = false) String yearMonth,
-            @RequestParam(name = "limit", defaultValue = "3") int limit) {
-        return ResponseEntity.ok(ApiResponse.success(reportQueryService.getBenefitCategories(
+  @GetMapping("/benefits/categories")
+  public ResponseEntity<ApiResponse<BenefitCategoriesReportResponse>> getBenefitCategories(
+      @RequestParam(name = "yearMonth", required = false) String yearMonth,
+      @RequestParam(name = "limit", defaultValue = "3") int limit) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            reportQueryService.getBenefitCategories(
                 currentUserProvider.getCurrentUserId(), yearMonth, limit)));
-    }
+  }
 
-    @GetMapping("/benefits/missed")
-    public ResponseEntity<ApiResponse<MissedBenefitsReportResponse>> getMissedBenefits(
-            @RequestParam(name = "yearMonth", required = false) String yearMonth,
-            @RequestParam(name = "userCardId") String userCardId) {
-        return ResponseEntity.ok(ApiResponse.success(reportQueryService.getMissedBenefits(
+  @GetMapping("/benefits/missed")
+  public ResponseEntity<ApiResponse<MissedBenefitsReportResponse>> getMissedBenefits(
+      @RequestParam(name = "yearMonth", required = false) String yearMonth,
+      @RequestParam(name = "userCardId") String userCardId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            reportQueryService.getMissedBenefits(
                 currentUserProvider.getCurrentUserId(), yearMonth, userCardId)));
-    }
+  }
 
-    @GetMapping("/performances/summary")
-    public ResponseEntity<ApiResponse<PerformanceSummaryReportResponse>> getPerformanceSummary(
-            @RequestParam(name = "yearMonth", required = false) String yearMonth) {
-        return ResponseEntity.ok(ApiResponse.success(reportQueryService.getPerformanceSummary(
+  @GetMapping("/performances/summary")
+  public ResponseEntity<ApiResponse<PerformanceSummaryReportResponse>> getPerformanceSummary(
+      @RequestParam(name = "yearMonth", required = false) String yearMonth) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            reportQueryService.getPerformanceSummary(
                 currentUserProvider.getCurrentUserId(), yearMonth)));
-    }
+  }
 
-    @GetMapping("/performances/cards")
-    public ResponseEntity<ApiResponse<PerformanceCardsReportResponse>> getPerformanceCards(
-            @RequestParam(name = "yearMonth", required = false) String yearMonth) {
-        return ResponseEntity.ok(ApiResponse.success(reportQueryService.getPerformanceCards(
+  @GetMapping("/performances/cards")
+  public ResponseEntity<ApiResponse<PerformanceCardsReportResponse>> getPerformanceCards(
+      @RequestParam(name = "yearMonth", required = false) String yearMonth) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            reportQueryService.getPerformanceCards(
                 currentUserProvider.getCurrentUserId(), yearMonth)));
-    }
+  }
 }

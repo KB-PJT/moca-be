@@ -10,9 +10,9 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CardCatalogMapper {
 
-    List<CardCatalogEntry> findCardsByIssuerId(@Param("issuerId") String issuerId);
+  List<CardCatalogEntry> findCardsByIssuerId(@Param("issuerId") String issuerId);
 
-    CardCatalogEntry findCardById(@Param("cardId") String cardId);
+  CardCatalogEntry findCardById(@Param("cardId") String cardId);
 
-    List<CardOptionRow> findOptionsByCardId(@Param("cardId") String cardId);
+  List<CardOptionRow> findOptionsByCardId(@Param("cardId") String cardId);
 }

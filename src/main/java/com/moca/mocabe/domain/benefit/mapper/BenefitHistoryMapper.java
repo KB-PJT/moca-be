@@ -11,21 +11,23 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface BenefitHistoryMapper {
 
-    List<BenefitHistoryRow> findHistory(@Param("userId") String userId,
-                                        @Param("fromUtc") LocalDateTime fromUtc,
-                                        @Param("toUtc") LocalDateTime toUtc,
-                                        @Param("userCardId") String userCardId,
-                                        @Param("benefitType") String benefitType,
-                                        @Param("sort") String sort,
-                                        @Param("offset") int offset,
-                                        @Param("size") int size);
+  List<BenefitHistoryRow> findHistory(
+      @Param("userId") String userId,
+      @Param("fromUtc") LocalDateTime fromUtc,
+      @Param("toUtc") LocalDateTime toUtc,
+      @Param("userCardId") String userCardId,
+      @Param("benefitType") String benefitType,
+      @Param("sort") String sort,
+      @Param("offset") int offset,
+      @Param("size") int size);
 
-    long countHistory(@Param("userId") String userId,
-                      @Param("fromUtc") LocalDateTime fromUtc,
-                      @Param("toUtc") LocalDateTime toUtc,
-                      @Param("userCardId") String userCardId,
-                      @Param("benefitType") String benefitType);
+  long countHistory(
+      @Param("userId") String userId,
+      @Param("fromUtc") LocalDateTime fromUtc,
+      @Param("toUtc") LocalDateTime toUtc,
+      @Param("userCardId") String userCardId,
+      @Param("benefitType") String benefitType);
 
-    BenefitHistoryDetailRow findDetail(@Param("userId") String userId,
-                                       @Param("usageId") String usageId);
+  BenefitHistoryDetailRow findDetail(
+      @Param("userId") String userId, @Param("usageId") String usageId);
 }
