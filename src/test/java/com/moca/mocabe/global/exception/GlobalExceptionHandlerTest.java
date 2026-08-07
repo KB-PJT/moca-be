@@ -247,13 +247,30 @@ class GlobalExceptionHandlerTest {
                 new UserCardNotFoundException());
 
         assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
-        // 여러 카드를 한 번에 활성화하는 요청이면 카드별로 배열에 담겨 내려온다(하나면 한 건만).
-        assertEquals(1, requiredResponse.getBody().getError().getCards().size());
-        assertEquals("uc-1", requiredResponse.getBody().getError().getCards().get(0).getUserCardId());
-        assertEquals("카드번호가 필요합니다.",
-                requiredResponse.getBody().getError().getCards().get(0).getFields().get("cardNo"));
+        assertEquals("카드번호가 필요합니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
+        assertEquals("uc-1", requiredResponse.getBody().getError().getFields().get("userCardId"));
         assertError(mismatchResponse, HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH");
         assertError(notFoundResponse, HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("카드정보 부족한 카드가 여러 개면 userCardId를 콤마로 묶어 내려준다")
+    void handlesCardCredentialRequiredWithMultipleCards() {
+        Map<String, String> firstFields = new LinkedHashMap<String, String>();
+        firstFields.put("cardNo", "카드번호가 필요합니다.");
+        Map<String, String> secondFields = new LinkedHashMap<String, String>();
+        secondFields.put("cardNo", "카드번호가 필요합니다.");
+        secondFields.put("cardPassword", "카드 비밀번호가 필요합니다.");
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleCardCredentialRequired(
+                new CardCredentialRequiredException(List.of(
+                        new CardCredentialIssue("uc-1", firstFields),
+                        new CardCredentialIssue("uc-2", secondFields))));
+
+        assertError(response, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
+        assertEquals("uc-1,uc-2", response.getBody().getError().getFields().get("userCardId"));
+        assertEquals("카드번호가 필요합니다.", response.getBody().getError().getFields().get("cardNo"));
+        assertEquals("카드 비밀번호가 필요합니다.", response.getBody().getError().getFields().get("cardPassword"));
     }
 
     @Test

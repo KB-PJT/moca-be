@@ -287,10 +287,10 @@ paths:
           description: >-
             요청값 검증 실패(code=VALIDATION_FAILED), 연동에 속하지 않은 카드·옵션 오류
             (code=INVALID_CARD_SELECTION), 또는 카드사가 요구하는 카드번호/비밀번호가 이 카드에
-            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — error.cards 배열에 문제 있는 카드를
-            모두 담아 내려줍니다. 카드 한 장을 활성화하는 요청이면 배열에 한 건만 담깁니다. 각 항목의
-            userCardId로 어느 카드인지 식별하고, PATCH /card-links/cards/{userCardId}/credentials로
-            채운 뒤 다시 시도해야 합니다)
+            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — error.fields.userCardId에 문제 있는
+            카드의 user_card_id를 콤마로 구분해 담습니다(카드 한 장이면 한 개만). cardNo/cardPassword는
+            카드별로 구분하지 않고, 그 필드가 부족한 카드가 하나라도 있으면 공통 메시지를 한 번만
+            담습니다. PATCH /card-links/cards/{userCardId}/credentials로 채운 뒤 다시 시도해야 합니다)
           content:
             application/json:
               schema:
@@ -1469,22 +1469,8 @@ components:
               type: object
               additionalProperties:
                 type: string
-            cards:
-              type: array
               description: >-
-                CARD_CREDENTIAL_REQUIRED처럼 여러 카드를 한 번에 다루는 요청에서, 문제 있는 카드마다
-                userCardId와 필드별 검증 메시지를 담는다. 해당하지 않는 오류는 빈 배열이다.
-              items:
-                type: object
-                required: [userCardId, fields]
-                properties:
-                  userCardId:
-                    type: string
-                    format: uuid
-                  fields:
-                    type: object
-                    additionalProperties:
-                      type: string
+                필드명(또는 CARD_CREDENTIAL_REQUIRED의 경우 userCardId)과 검증 메시지의 매핑이다.
     HealthResponse:
       type: object
       required: [status]
