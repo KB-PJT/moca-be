@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.codef.mapper.CardApprovalMapper">
+
+    <resultMap id="userCardMatchRowMap" type="com.moca.mocabe.domain.codef.model.UserCardMatchRow">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="issuer_id" javaType="java.lang.String"/>
+            <arg column="card_name_from_codef" javaType="java.lang.String"/>
+            <arg column="card_no" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="existingApprovalKeyMap" type="com.moca.mocabe.domain.codef.model.ExistingApprovalKey">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="approval_number" javaType="java.lang.String"/>
+            <arg column="approved_at" javaType="java.time.LocalDateTime"/>
+            <!-- ExistingApprovalKey.amount는 primitive int이다. MyBatis에서 "int"는 Integer로 aliasing되어
+                 record 생성자(int)와 타입이 안 맞으므로 primitive alias "_int"를 써야 한다. -->
+            <arg column="amount" javaType="_int"/>
+            <arg column="merchant_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 활성(is_active=TRUE) 카드만 매칭 후보로 둔다. 비활성 카드로 매칭될 승인건은 미매칭 처리되어 적재되지 않는다. -->
+    <select id="findUserCardsForMatching" resultMap="userCardMatchRowMap">
+        SELECT user_card_id, issuer_id, card_name_from_codef, card_no
+        FROM user_cards
+        WHERE user_id = #{userId}
+          AND is_active = TRUE
+        ORDER BY display_order ASC, user_card_id ASC
+    </select>
+
+    <resultMap id="activeCardCredentialMap" type="com.moca.mocabe.domain.codef.model.ActiveCardCredential">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="card_number_enc" javaType="_byte[]"/>
+            <arg column="card_password_enc" javaType="_byte[]"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findActiveCardCredentialsByCredentialId" resultMap="activeCardCredentialMap">
+        SELECT user_card_id, card_number_enc, card_password_enc
+        FROM user_cards
+        WHERE codef_account_credential_id = #{codefAccountCredentialId}
+          AND is_active = TRUE
+        ORDER BY display_order ASC, user_card_id ASC
+    </select>
+
+    <select id="findExistingApprovalKeys" resultMap="existingApprovalKeyMap">
+        SELECT user_card_id, approval_number, approved_at, amount, merchant_name
+        FROM card_payment_approvals
+        WHERE user_id = #{userId}
+          AND approved_at &gt;= #{fromUtc}
+          AND approved_at &lt; #{toUtc}
+    </select>
+
+    <insert id="insertApproval">
+        INSERT INTO card_payment_approvals (
+            approval_id, user_id, user_card_id, merchant_id, approval_number,
+            approved_at, merchant_name, amount, approval_status, source_payload, created_at
+        ) VALUES (
+            #{approvalId}, #{userId}, #{userCardId}, #{merchantId}, #{approvalNumber},
+            #{approvedAt}, #{merchantName}, #{amount}, 'approved', #{sourcePayload}, UTC_TIMESTAMP(6)
+        )
+    </insert>
+</mapper>

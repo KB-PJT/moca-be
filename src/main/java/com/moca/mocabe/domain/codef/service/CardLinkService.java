@@ -9,11 +9,18 @@ import com.moca.mocabe.domain.codef.dto.CardOptionGroupResponse;
 import com.moca.mocabe.domain.codef.dto.CardOptionSelectionRequest;
 import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
 import com.moca.mocabe.domain.codef.dto.OptionSelectionRequest;
+import com.moca.mocabe.domain.codef.dto.SubmitCardCredentialsRequest;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
+import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
+import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefCredentialRequiredException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.CredentialHasher;
 import com.moca.mocabe.domain.codef.infra.Encryptor;
@@ -22,12 +29,15 @@ import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
 import com.moca.mocabe.domain.codef.model.CardCatalogEntry;
+import com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget;
 import com.moca.mocabe.domain.codef.model.CardOptionRow;
 import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
+import com.moca.mocabe.domain.codef.model.CodefConnection;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefIssuerPolicy;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import com.moca.mocabe.domain.codef.model.LinkedCardInsert;
+import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,12 +49,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Connected ID 생성·보유카드 적재(비활성)와 사용자 활성화·옵션 선택 유스케이스를 담당한다. */
 public class CardLinkService {
 
+    private static final Logger LOGGER = Logger.getLogger(CardLinkService.class.getName());
     private static final String STATUS_PENDING = "PENDING_CARD_ACTIVATION";
     private static final String HASH_TYPE_CARD_NO = "CARD_NO";
     private static final String HASH_TYPE_ACCOUNT_ID = "ACCOUNT_ID";
@@ -96,10 +109,95 @@ public class CardLinkService {
                 policy.getInstitutionCode(), request.getId(), request.getPassword(),
                 request.getCardNo(), request.getCardPassword(), request.getBirthDate());
         String connectedId = codefClient.createConnectedId(command);
-        List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(connectedId, policy.getInstitutionCode());
 
+        // connectedId 발급 직후 자격정보부터 커밋한다. 뒤이은 보유카드 조회가 실패해도
+        // 이미 발급받은 connectedId는 버려지지 않고, 사용자는 자격정보 재입력 없이
+        // POST /card-links/cards/sync로 보유카드만 다시 조회할 수 있다.
         String linkId = UUID.randomUUID().toString();
-        List<LinkedCardInsert> inserts = new ArrayList<>();
+        codefCredentialStore.saveCredential(buildCredential(
+                userId, request, policy.getIssuerId(), connectedId, linkId, credentialIdentityHash));
+
+        List<CardLinkCardResponse> cards = List.of();
+        try {
+            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                    connectedId, policy.getInstitutionCode(), request.getBirthDate(), null, null);
+            // 카드번호가 필요한 카드사면 방금 입력한 카드번호와 일치하는 보유카드를 즉시 활성화 대상으로 넘긴다.
+            String creatorCardNo = policy.isRequiresCardNo() ? request.getCardNo() : null;
+            String creatorCardPassword = policy.isRequiresCardNo() ? request.getCardPassword() : null;
+            cards = matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, creatorCardNo, creatorCardPassword);
+        } catch (RuntimeException exception) {
+            LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
+                    + describeException(exception));
+        }
+        return new CardLinkResponse(linkId, policy.getInstitutionCode(), STATUS_PENDING, cards);
+    }
+
+    /**
+     * 사용자의 활성 연동(카드사 계정)별로 보유카드를 다시 조회해 새로 매칭된 카드만 추가 적재한다.
+     * institutionCode를 주면 그 카드사 연동만, 생략하면 모든 활성 연동을 대상으로 한다.
+     * 연동 하나가 CODEF 조회 실패로 재시도가 필요한 상태와, 정상 조회했지만 매칭된 카드가 0건인
+     * 상태는 서로 다르므로(전자는 success=false, 후자는 cards가 빈 배열인 success=true) 구분해 응답한다.
+     */
+    public SyncOwnedCardsResponse syncOwnedCards(String userId, String institutionCode) {
+        List<CodefConnection> connections = codefCredentialMapper.findActiveConnectionsByUserId(userId);
+        if (institutionCode != null) {
+            connections = connections.stream()
+                    .filter(connection -> institutionCode.equals(connection.institutionCode()))
+                    .toList();
+            if (connections.isEmpty()) {
+                throw new CodefConnectionNotFoundException(institutionCode);
+            }
+        }
+
+        List<SyncOwnedCardsResult> results = new ArrayList<>();
+        for (CodefConnection connection : connections) {
+            results.add(syncOwnedCardsForConnection(userId, connection));
+        }
+        return new SyncOwnedCardsResponse(results);
+    }
+
+    private SyncOwnedCardsResult syncOwnedCardsForConnection(String userId, CodefConnection connection) {
+        try {
+            // findActiveConnectionsByUserId가 issuers와 INNER JOIN하므로 정책은 항상 존재한다.
+            CodefIssuerPolicy policy = issuerMapper.findCodefPolicyByInstitutionCode(connection.institutionCode());
+            String birthDate = encryptor.decrypt(connection.birthDateEnc());
+            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                    connection.connectedId(), connection.institutionCode(), birthDate, null, null);
+            // 재조회 시점엔 새로 입력된 카드번호가 없으므로 매칭 카드는 항상 비활성+크리덴셜 null로 적재한다.
+            List<CardLinkCardResponse> cards = matchAndPersistOwnedCards(
+                    userId, connection.codefAccountCredentialId(), policy, ownedCards, null, null);
+            return new SyncOwnedCardsResult(
+                    connection.codefAccountCredentialId(), connection.institutionCode(), true, cards);
+        } catch (RuntimeException exception) {
+            LOGGER.log(Level.WARNING, "보유카드 재조회에 실패했습니다. institutionCode="
+                    + connection.institutionCode() + " " + describeException(exception));
+            return new SyncOwnedCardsResult(
+                    connection.codefAccountCredentialId(), connection.institutionCode(), false, List.of());
+        }
+    }
+
+    /**
+     * CODEF 보유카드를 카탈로그와 매칭해 아직 적재되지 않은 카드만 새로 저장하고, 이미 적재된 카드는
+     * 기존 user_card_id를 그대로 재사용한다(재조회 시 중복 INSERT 방지). 매칭된 카드가 0건이어도
+     * 예외를 던지지 않고 빈 목록을 정상 반환한다.
+     *
+     * creatorCardNo/creatorCardPassword는 카드번호가 필요한 카드사에서 방금 계정 생성 시 입력한
+     * 카드번호/비밀번호다(그 외에는 null). 이 값과 마스킹 카드번호가 일치하는 보유카드는 이미 유효성이
+     * 검증된 카드번호이므로 크리덴셜을 미리 채워 적재해두면, 이후 PATCH /card-links/{linkId}/cards로
+     * 활성화를 요청할 때 카드정보 누락 검증을 그대로 통과한다(적재 자체는 여전히 비활성이며, 이 메서드가
+     * 직접 활성화하지는 않는다). 크리덴셜이 채워지지 않은 나머지 보유카드는 사용자가 추가로 카드번호를
+     * 입력해야 활성화할 수 있다.
+     */
+    private List<CardLinkCardResponse> matchAndPersistOwnedCards(String userId, String linkId,
+                                                                  CodefIssuerPolicy policy,
+                                                                  List<CodefOwnedCard> ownedCards,
+                                                                  String creatorCardNo,
+                                                                  String creatorCardPassword) {
+        // (user_id, codef_card_key_hash)가 DB에서 UNIQUE라 이 조회 이후 실제 적재 시점 사이에 다른
+        // 요청이 끼어들 수 있다(동시 재조회). 그 경우는 saveCard가 UNIQUE 충돌을 잡아 처리한다.
+        Map<String, String> existingUserCardIdByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
+                .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, LinkedCardKeyRow::userCardId));
+
         List<CardLinkCardResponse> cards = new ArrayList<>();
         Set<String> cardKeyHashes = new HashSet<>();
         int displayOrder = linkedCardMapper.findNextDisplayOrder(userId);
@@ -114,19 +212,37 @@ public class CardLinkService {
             if (!cardKeyHashes.add(cardKeyHash)) {
                 continue;
             }
-            String userCardId = null;
-            if (matched != null) {
-                userCardId = UUID.randomUUID().toString();
-                inserts.add(new LinkedCardInsert(userCardId, linkId, userId, policy.getIssuerId(),
-                        matched.cardId(), ownedCard.cardName(), blankToNull(ownedCard.cardNumber()),
-                        cardKeyHash, displayOrder++));
+            String userCardId = existingUserCardIdByHash.get(cardKeyHash);
+            if (userCardId == null && matched != null) {
+                boolean isCreatorCard = creatorCardNo != null
+                        && MaskedCardNoMatcher.matches(creatorCardNo, ownedCard.cardNumber());
+                byte[] cardNumberEnc = isCreatorCard ? encryptor.encrypt(creatorCardNo) : null;
+                byte[] cardPasswordEnc = isCreatorCard && policy.isRequiresCardPassword()
+                        ? encryptor.encrypt(creatorCardPassword) : null;
+                // 카드번호가 일치해도 이 시점엔 활성화하지 않는다(비활성으로 적재하고, 사용자가 이후
+                // PATCH /card-links/{linkId}/cards로 명시적으로 활성화해야 한다). 카드번호/비밀번호를
+                // 미리 채워두면 그 활성화 요청이 카드정보 누락 없이 통과한다.
+                LinkedCardInsert insert = new LinkedCardInsert(UUID.randomUUID().toString(), linkId, userId,
+                        policy.getIssuerId(), matched.cardId(), ownedCard.cardName(),
+                        blankToNull(ownedCard.cardNumber()), cardKeyHash, displayOrder++,
+                        cardNumberEnc, cardPasswordEnc, false);
+                // 동시 재조회로 다른 요청이 먼저 적재했다면 새로 만든 ID 대신 그 요청의 user_card_id를 받는다.
+                userCardId = codefCredentialStore.saveCard(insert);
             }
             cards.add(toResponse(userCardId, matched, ownedCard, policy));
         }
 
-        codefCredentialStore.save(buildCredential(
-                userId, request, policy.getIssuerId(), connectedId, linkId, credentialIdentityHash), inserts);
-        return new CardLinkResponse(linkId, policy.getInstitutionCode(), STATUS_PENDING, cards);
+        return cards;
+    }
+
+    /** 로그에 안전하게 남길 수 있는 예외 요약이다(CWE-532). 메시지 원문 대신 클래스명만 남긴다. */
+    private String describeException(Throwable exception) {
+        StringBuilder description = new StringBuilder(exception.getClass().getSimpleName());
+        Throwable cause = exception.getCause();
+        if (cause != null) {
+            description.append(" <- ").append(cause.getClass().getSimpleName());
+        }
+        return description.toString();
     }
 
     @Transactional
@@ -136,15 +252,18 @@ public class CardLinkService {
         if (codefCredentialMapper.lockOwnedLink(linkId, userId) == null) {
             throw new CardLinkNotFoundException();
         }
-        Map<String, String> cardIdByUserCard = linkedCardMapper.findByLinkIdAndUserId(linkId, userId).stream()
-                .collect(Collectors.toMap(LinkedCardRow::userCardId, LinkedCardRow::cardId));
+        Map<String, LinkedCardRow> cardsByUserCard = linkedCardMapper.findByLinkIdAndUserId(linkId, userId).stream()
+                .collect(Collectors.toMap(LinkedCardRow::userCardId, row -> row));
 
-        // 활성화 대상은 반드시 이 연동에 적재된 카드여야 한다.
+        // 활성화 대상은 반드시 이 연동에 적재된 카드여야 하고, 카드사가 요구하는 카드번호/비밀번호가
+        // 이미 저장돼 있어야 한다(없으면 PATCH /card-links/cards/{userCardId}/credentials로 먼저 채워야 함).
         Set<String> activeIds = new LinkedHashSet<>();
         for (String userCardId : request.getActiveUserCardIds()) {
-            if (!cardIdByUserCard.containsKey(userCardId)) {
+            LinkedCardRow card = cardsByUserCard.get(userCardId);
+            if (card == null) {
                 throw new InvalidCardSelectionException("현재 연동에 속하지 않은 카드입니다.");
             }
+            validateCardCredentialsPresent(card);
             activeIds.add(userCardId);
         }
 
@@ -164,19 +283,77 @@ public class CardLinkService {
         // 선택형 카드는 검증 완료(verified) 옵션을 그룹마다 하나씩 골랐는지 확인한다.
         for (String userCardId : activeIds) {
             List<CardOptionRow> options =
-                    cardCatalogMapper.findVerifiedOptionsByCardId(cardIdByUserCard.get(userCardId));
+                    cardCatalogMapper.findVerifiedOptionsByCardId(cardsByUserCard.get(userCardId).cardId());
             validateOptions(selectionsByCard.getOrDefault(userCardId, List.of()), options);
         }
 
         linkedCardMapper.activateCards(linkId, userId, new ArrayList<>(activeIds));
         for (String userCardId : activeIds) {
-            String cardId = cardIdByUserCard.get(userCardId);
+            String cardId = cardsByUserCard.get(userCardId).cardId();
             for (OptionSelectionRequest selection : selectionsByCard.getOrDefault(userCardId, List.of())) {
                 linkedCardMapper.upsertOptionSelection(
                         userCardId, selection.getOptionGroupId(), cardId, selection.getOptionChoiceId());
             }
         }
         return new ActivateCardLinkCardsResponse(linkId, new ArrayList<>(activeIds), activeIds.size());
+    }
+
+    /**
+     * 카드번호가 필요한 카드사에서, 계정 생성 시 입력한 카드가 아닌 다른 보유카드를 활성화하기 위해
+     * 카드번호/비밀번호를 추가로 입력받는다. 먼저 입력한 카드번호가 이 카드의 저장된 마스킹 카드번호
+     * (앞·뒤 노출 자리)와 일치하는지 로컬에서 확인해 다른 카드의 번호를 잘못 입력한 경우를 CODEF
+     * 호출 없이 걸러낸다. 그다음 그 카드사의 connectedId와 함께 보유카드 조회를 호출해 응답을
+     * 정상적으로 받으면(CODEF 예외 없이 성공하면) 카드번호·비밀번호 자체가 유효한 것으로 간주하고
+     * 암호화해 저장한다. 활성화는 여기서 하지 않는다 — 옵션 선택이 필수인 카드가 옵션 검증 없이
+     * 활성화되는 것을 막기 위해, 활성화는 항상 옵션 선택을 함께 받는 activateCards
+     * (PATCH /card-links/{linkId}/cards)로만 하도록 경로를 하나로 유지한다. 이 응답은 그 요청에
+     * 필요한 옵션 그룹을 포함해 돌려준다.
+     */
+    @Transactional
+    public CardLinkCardResponse submitCardCredentials(String userId, String userCardId,
+                                                       SubmitCardCredentialsRequest request) {
+        CardCredentialSubmissionTarget target =
+                linkedCardMapper.findCardForCredentialSubmission(userCardId, userId);
+        if (target == null) {
+            throw new UserCardNotFoundException();
+        }
+        if (!target.requiresCardNo()) {
+            throw new InvalidCardSelectionException("이 카드사는 카드번호 입력이 필요하지 않습니다.");
+        }
+        Map<String, String> fields = new LinkedHashMap<>();
+        require(fields, "cardNo", request.getCardNo(), true, "카드번호는 필수입니다.");
+        require(fields, "cardPassword", request.getCardPassword(), target.requiresCardPassword(),
+                "카드 비밀번호는 필수입니다.");
+        if (!fields.isEmpty()) {
+            throw new CardCredentialRequiredException(fields);
+        }
+        // 마스킹되지 않은 자리(앞·뒤)가 저장된 카드번호와 다르면 다른 카드의 번호를 입력한 것이므로
+        // CODEF를 호출하지 않고 바로 거부한다.
+        if (!MaskedCardNoMatcher.matches(request.getCardNo(), target.cardNo())) {
+            throw new CardNumberMismatchException();
+        }
+
+        String birthDate = encryptor.decrypt(target.birthDateEnc());
+        // CODEF에 실제로 조회를 성공하면(예외 없이 응답을 받으면) 카드번호/비밀번호가 유효한 것으로 본다.
+        codefClient.getOwnedCards(target.connectedId(), target.institutionCode(), birthDate,
+                request.getCardNo(), request.getCardPassword());
+
+        byte[] cardNumberEnc = encryptor.encrypt(request.getCardNo());
+        byte[] cardPasswordEnc = target.requiresCardPassword()
+                ? encryptor.encrypt(request.getCardPassword()) : null;
+        linkedCardMapper.updateCardCredentials(userCardId, userId, cardNumberEnc, cardPasswordEnc);
+        return buildSubmissionResponse(target);
+    }
+
+    /** 카드정보 저장 후, 활성화 요청(옵션 선택 포함)에 필요한 카드 정보를 옵션 그룹과 함께 돌려준다. */
+    private CardLinkCardResponse buildSubmissionResponse(CardCredentialSubmissionTarget target) {
+        CardCatalogEntry matched = cardCatalogMapper.findCardById(target.cardId());
+        List<CardOptionGroupResponse> options =
+                groupOptions(cardCatalogMapper.findVerifiedOptionsByCardId(target.cardId()));
+        return new CardLinkCardResponse(
+                target.userCardId(), target.cardId(), matched.cardName(), target.cardNo(),
+                target.institutionCode(), target.issuerName(), normalizeCardType(matched.cardType()),
+                blankToNull(matched.imageUrl()), true, true, options);
     }
 
     private List<CardOptionSelectionRequest> optionSelections(ActivateCardLinkCardsRequest request) {
@@ -210,6 +387,20 @@ public class CardLinkService {
         return groups.values().stream().map(OptionGroupBuilder::build).toList();
     }
 
+    /** 카드사가 요구하는 카드번호/비밀번호가 이 카드에 저장돼 있지 않으면 활성화를 막는다. */
+    private void validateCardCredentialsPresent(LinkedCardRow card) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        if (card.requiresCardNo() && !card.hasCardNumber()) {
+            fields.put("cardNo", "카드번호가 필요합니다.");
+        }
+        if (card.requiresCardPassword() && !card.hasCardPassword()) {
+            fields.put("cardPassword", "카드 비밀번호가 필요합니다.");
+        }
+        if (!fields.isEmpty()) {
+            throw new CardCredentialRequiredException(fields);
+        }
+    }
+
     private void validateOptions(List<OptionSelectionRequest> selections, List<CardOptionRow> rows) {
         Map<String, Set<String>> allowed = new HashMap<>();
         for (CardOptionRow row : rows) {
@@ -238,8 +429,6 @@ public class CardLinkService {
         credential.setConnectedId(connectedId);
         credential.setAccountIdEnc(encryptor.encrypt(request.getId()));
         credential.setAccountPasswordEnc(encryptor.encrypt(request.getPassword()));
-        credential.setCardNumberEnc(encryptor.encrypt(request.getCardNo()));
-        credential.setCardPasswordEnc(encryptor.encrypt(request.getCardPassword()));
         credential.setBirthDateEnc(encryptor.encrypt(request.getBirthDate()));
         credential.setCredentialIdentityHash(credentialIdentityHash);
         credential.setStatus("active");

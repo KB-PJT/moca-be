@@ -1,12 +1,20 @@
 package com.moca.mocabe.domain.codef.infra;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.moca.mocabe.domain.codef.exception.CodefAccountLockedException;
+import com.moca.mocabe.domain.codef.exception.CodefInvalidCredentialsException;
+import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
+import com.moca.mocabe.domain.codef.model.CodefApproval;
+import com.moca.mocabe.domain.codef.model.CodefCardPerformance;
 import com.moca.mocabe.domain.codef.model.CodefConnectionCommand;
 import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import java.net.URLEncoder;
@@ -19,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -29,6 +38,8 @@ class CodefClientTest {
     private static final String BASE_URL = "https://api.example.com";
     private static final String CREATE_URL = BASE_URL + "/v1/account/create";
     private static final String CARD_LIST_URL = BASE_URL + "/v1/kr/card/p/account/card-list";
+    private static final String APPROVAL_URL = BASE_URL + "/v1/kr/card/p/account/approval-list";
+    private static final String PERFORMANCE_URL = BASE_URL + "/v1/kr/card/p/account/result-check-list";
     private static final String TOKEN_RESPONSE = "{\"access_token\":\"tok-1\"}";
     private static final String PUBLIC_KEY_BASE64 = generatePublicKey();
 
@@ -56,25 +67,79 @@ class CodefClientTest {
     }
 
     @Test
-    @DisplayName("HTTP는 200이어도 result.code가 실패면 connectedId가 있어도 예외를 던진다")
+    @DisplayName("HTTP는 200이어도 result.code가 실패면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
     void throwsWhenResultCodeIsFailureEvenIfConnectedIdPresent() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
         when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-94002\",\"message\":\"실패\"},"
                         + "\"data\":{\"connectedId\":\"cid-xyz\"}}")));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(CodefUnavailableException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
     }
 
     @Test
-    @DisplayName("result.code가 실패면 응답에 connectedId가 없어도 그 자체로 예외를 던진다")
+    @DisplayName("errorList에 아이디/비밀번호 오류 코드가 있으면 CODEF 장애가 아니라 사용자 입력 오류로 변환한다")
+    void throwsInvalidCredentialsWhenErrorListHasWrongIdOrPassword() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\",\"message\":\"사용자 계정정보 등록에 실패했습니다.\"},"
+                        + "\"data\":{\"successList\":[],\"errorList\":["
+                        + "{\"code\":\"CF-12803\",\"message\":\"아이디 또는 비밀번호 오류입니다.\"}"
+                        + "]}}")));
+
+        assertThrows(CodefInvalidCredentialsException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("errorList에 비밀번호 오류 횟수 초과 코드가 있으면 CODEF 장애가 아니라 계정 잠김 오류로 변환한다")
+    void throwsAccountLockedWhenErrorListHasPasswordAttemptsExceeded() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\",\"message\":\"사용자 계정정보 등록에 실패했습니다.\"},"
+                        + "\"data\":{\"errorList\":["
+                        + "{\"code\":\"CF-12802\",\"message\":\"비밀번호 오류 횟수 초과입니다.\"}"
+                        + "]}}")));
+
+        assertThrows(CodefAccountLockedException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("errorList에 아이디/비밀번호 오류가 아닌 다른 코드만 있으면 CODEF 일시 장애 오류로 남긴다")
+    void throwsUnavailableWhenErrorListHasOtherCode() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\"},"
+                        + "\"data\":{\"errorList\":["
+                        + "{\"code\":\"CF-03001\",\"message\":\"사이트 점검중입니다.\"}"
+                        + "]}}")));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("errorList가 배열이 아니라 단일 객체로 와도 아이디/비밀번호 오류를 인식한다")
+    void throwsInvalidCredentialsWhenErrorListIsSingleObject() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-04000\"},"
+                        + "\"data\":{\"errorList\":{\"code\":\"CF-12803\",\"message\":\"오류\"}}}")));
+
+        assertThrows(CodefInvalidCredentialsException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+    }
+
+    @Test
+    @DisplayName("result.code가 실패면 응답에 connectedId가 없어도 CODEF 일시 장애 오류로 변환한다")
     void throwsWhenConnectedIdMissing() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
         when(httpClient.post(eq(CREATE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-12345\",\"message\":\"실패\"}}")));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(CodefUnavailableException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
     }
 
@@ -133,15 +198,27 @@ class CodefClientTest {
     }
 
     @Test
-    @DisplayName("CODEF가 비 2xx 상태를 반환하면 상태 코드를 포함해 실패한다")
+    @DisplayName("CODEF가 비 2xx 상태를 반환하면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
     void throwsWhenHttpStatusIsNotSuccessful() {
         when(httpClient.post(eq(TOKEN_URL), any(), anyString()))
                 .thenReturn(new CodefHttpResponse(401, "{\"error\":\"unauthorized\"}"));
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class,
+        CodefUnavailableException exception = assertThrows(CodefUnavailableException.class,
                 () -> codefClient.createConnectedId(command("pw", null, null, null)));
 
-        assertEquals("CODEF HTTP 요청에 실패했습니다. status=401", exception.getMessage());
+        assertEquals("CODEF 요청이 실패했습니다(HTTP 401). 잠시 후 다시 시도해주세요.", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("CODEF가 404를 반환해도 동일하게 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void throwsCodefUnavailableWhenNotFound() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString()))
+                .thenReturn(new CodefHttpResponse(404, "{\"error\":\"not found\"}"));
+
+        CodefUnavailableException exception = assertThrows(CodefUnavailableException.class,
+                () -> codefClient.createConnectedId(command("pw", null, null, null)));
+
+        assertEquals("CODEF 요청이 실패했습니다(HTTP 404). 잠시 후 다시 시도해주세요.", exception.getMessage());
     }
 
     @Test
@@ -154,7 +231,7 @@ class CodefClientTest {
                         + "\"resCardType\":\"신용/본인\",\"resImageLink\":\"https://codef/a.png\"},"
                         + "{\"resCardName\":\"카드 B\",\"resImageLink\":\"\"}]}")));
 
-        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301");
+        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301", null, null, null);
 
         assertEquals(2, cards.size());
         assertEquals("카드 A", cards.get(0).cardName());
@@ -171,7 +248,7 @@ class CodefClientTest {
                         + "\"resCardName\":\"노리2 체크카드(KB Pay)_비교통\",\"resCardNo\":\"943646******1069\","
                         + "\"resCardType\":\"\",\"resImageLink\":\"\"}}")));
 
-        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301");
+        List<CodefOwnedCard> cards = codefClient.getOwnedCards("cid-1", "0301", null, null, null);
 
         assertEquals(1, cards.size());
         assertEquals("노리2 체크카드(KB Pay)_비교통", cards.get(0).cardName());
@@ -185,8 +262,8 @@ class CodefClientTest {
         when(httpClient.post(eq(CARD_LIST_URL), any(), anyString())).thenReturn(ok(urlEncoded(
                 "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
 
-        assertThrows(IllegalStateException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getOwnedCards("cid-1", "0301", null, null, null));
     }
 
     @Test
@@ -197,7 +274,7 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards("cid-1", "0301", null, null, null));
     }
 
     @Test
@@ -208,7 +285,244 @@ class CodefClientTest {
                 "{\"result\":{\"code\":\"CF-00000\"},\"data\":[{\"resCardName\":\" \"}]}")));
 
         assertThrows(IllegalStateException.class,
-                () -> codefClient.getOwnedCards("cid-1", "0301"));
+                () -> codefClient.getOwnedCards("cid-1", "0301", null, null, null));
+    }
+
+    @Test
+    @DisplayName("승인내역을 내부 모델로 변환하고 빈 승인번호는 null로 만든다")
+    void returnsApprovals() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":["
+                        + "{\"resUsedDate\":\"20260801\",\"resUsedTime\":\"120117\",\"resCardNo\":\"1234****5678\","
+                        + "\"resCardName\":\"카드 A\",\"resMemberStoreName\":\"온라인예매\",\"resUsedAmount\":\"22000\","
+                        + "\"resApprovalNo\":\"69331111\",\"resHomeForeignType\":\"1\",\"resCancelYN\":\"0\"},"
+                        + "{\"resUsedDate\":\"20260802\",\"resMemberStoreName\":\"카페\",\"resUsedAmount\":\"3000\","
+                        + "\"resApprovalNo\":\"\",\"resHomeForeignType\":\"1\",\"resCancelYN\":\"0\"}]}")));
+
+        List<CodefApproval> approvals =
+                codefClient.getApprovals("cid-1", "0301", "900101", "20260801", "20260803", null, null);
+
+        assertEquals(2, approvals.size());
+        assertEquals("온라인예매", approvals.get(0).memberStoreName());
+        assertEquals("69331111", approvals.get(0).approvalNo());
+        assertEquals(null, approvals.get(1).approvalNo());
+        assertEquals(true, approvals.get(0).isNormalApproval());
+        assertEquals(true, approvals.get(0).isDomestic());
+    }
+
+    @Test
+    @DisplayName("승인내역이 1건이면 data가 단일 객체여도 한 건으로 파싱한다")
+    void returnsSingleApprovalFromObject() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{"
+                        + "\"resUsedDate\":\"20260801\",\"resMemberStoreName\":\"편의점\",\"resUsedAmount\":\"1500\","
+                        + "\"resApprovalNo\":\"1\",\"resHomeForeignType\":\"1\",\"resCancelYN\":\"0\"}}")));
+
+        List<CodefApproval> approvals =
+                codefClient.getApprovals("cid-1", "0301", null, "20260801", "20260803", null, null);
+
+        assertEquals(1, approvals.size());
+        assertEquals("편의점", approvals.get(0).memberStoreName());
+    }
+
+    @Test
+    @DisplayName("조회 기간에 승인내역이 없어 빈 객체면 빈 목록을 반환한다")
+    void returnsEmptyApprovalsForEmptyObject() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
+
+        List<CodefApproval> approvals =
+                codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803", null, null);
+
+        assertEquals(0, approvals.size());
+    }
+
+    @Test
+    @DisplayName("승인내역 결과 코드가 실패면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsFailedApprovalResult() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803", null, null));
+    }
+
+    @Test
+    @DisplayName("승인내역 data가 해석 불가한 객체면 예외를 던진다")
+    void rejectsInvalidApprovalData() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{\"unexpected\":\"x\"}}")));
+
+        assertThrows(IllegalStateException.class,
+                () -> codefClient.getApprovals("cid-1", "0301", "", "20260801", "20260803", null, null));
+    }
+
+    @Test
+    @DisplayName("실적조회 응답에서 혜택별 실적 중 가장 큰 현재이용금액을 카드의 대표 실적으로 고른다")
+    void returnsPerformanceWithMaxCurrentUseAmt() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":["
+                        + "{\"resCardName\":\"** 체크카드\",\"resCardNo\":\"601234567891011\","
+                        + "\"resCardBenefitList\":["
+                        + "{\"resCardPerformanceList\":[{\"resCurrentUseAmt\":\"100000\"}]},"
+                        + "{\"resCardPerformanceList\":[{\"resCurrentUseAmt\":\"300000\"},"
+                        + "{\"resCurrentUseAmt\":\"250000\"},{\"resCurrentUseAmt\":\"\"},"
+                        + "{\"resCurrentUseAmt\":\"99999999999999\"}]}]}]}")));
+
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608");
+
+        assertEquals(1, performances.size());
+        assertEquals("** 체크카드", performances.get(0).cardName());
+        assertEquals("601234567891011", performances.get(0).cardNo());
+        assertEquals(300000, performances.get(0).currentSpendAmount());
+    }
+
+    @Test
+    @DisplayName("카드가 1장이면 data가 단일 객체여도, 혜택·실적 목록이 단일 객체여도 한 장으로 파싱한다")
+    void returnsSinglePerformanceFromNestedSingleObjects() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{"
+                        + "\"resCardName\":\"노리2 체크카드(KB Pay)_비교통\",\"resCardNo\":\"943646******1069\","
+                        + "\"resCardBenefitList\":{\"resCardPerformanceList\":"
+                        + "{\"resCurrentUseAmt\":\"212000\"}}}}")));
+
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608");
+
+        assertEquals(1, performances.size());
+        assertEquals("노리2 체크카드(KB Pay)_비교통", performances.get(0).cardName());
+        assertEquals(212000, performances.get(0).currentSpendAmount());
+    }
+
+    @Test
+    @DisplayName("혜택 목록이 없으면 currentSpendAmount는 null이다")
+    void returnsNullCurrentSpendAmountWhenNoBenefits() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{"
+                        + "\"resCardName\":\"카드 A\",\"resCardNo\":\"1234****5678\"}}")));
+
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", null, null, null, null);
+
+        assertEquals(1, performances.size());
+        assertEquals(null, performances.get(0).currentSpendAmount());
+    }
+
+    @Test
+    @DisplayName("조회 대상 카드가 없어 빈 객체면 빈 목록을 반환한다")
+    void returnsEmptyPerformanceForEmptyObject() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
+
+        List<CodefCardPerformance> performances =
+                codefClient.getPerformance("cid-1", "0301", "", "", "", "");
+
+        assertEquals(0, performances.size());
+    }
+
+    @Test
+    @DisplayName("cardNo가 있으면 그대로, cardPassword가 있으면 RSA 암호화해 요청에 담는다")
+    void includesCardNoAndEncryptedCardPasswordWhenPresent() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+
+        codefClient.getPerformance("cid-1", "0301", "900101", "1234567890123456", "12", "202608");
+
+        verify(httpClient).post(eq(PERFORMANCE_URL), any(), bodyCaptor.capture());
+        String body = bodyCaptor.getValue();
+        assertTrue(body.contains("\"cardNo\":\"1234567890123456\""));
+        assertTrue(body.contains("\"cardPassword\""));
+        assertFalse(body.contains("\"cardPassword\":\"12\""));
+    }
+
+    @Test
+    @DisplayName("보유카드 조회에 cardNo가 있으면 그대로, cardPassword가 있으면 RSA 암호화해 요청에 담는다")
+    void includesCardNoAndEncryptedCardPasswordInOwnedCardsRequestWhenPresent() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(CARD_LIST_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")));
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+
+        codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+
+        verify(httpClient).post(eq(CARD_LIST_URL), any(), bodyCaptor.capture());
+        String body = bodyCaptor.getValue();
+        assertTrue(body.contains("\"cardNo\":\"1234567890123456\""));
+        assertTrue(body.contains("\"cardPassword\""));
+        assertFalse(body.contains("\"cardPassword\":\"12\""));
+    }
+
+    @Test
+    @DisplayName("승인내역 조회에 cardNo가 있으면 그대로, cardPassword가 있으면 RSA 암호화해 요청에 담는다")
+    void includesCardNoAndEncryptedCardPasswordInApprovalsRequestWhenPresent() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")));
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+
+        codefClient.getApprovals("cid-1", "0301", "900101", "20260801", "20260803",
+                "1234567890123456", "12");
+
+        verify(httpClient).post(eq(APPROVAL_URL), any(), bodyCaptor.capture());
+        String body = bodyCaptor.getValue();
+        assertTrue(body.contains("\"cardNo\":\"1234567890123456\""));
+        assertTrue(body.contains("\"cardPassword\""));
+        assertFalse(body.contains("\"cardPassword\":\"12\""));
+    }
+
+    @Test
+    @DisplayName("실적조회 결과 코드가 실패면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsFailedPerformanceResult() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-12345\"},\"data\":[]}")));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
+    }
+
+    @Test
+    @DisplayName("실적조회 data가 해석 불가한 형식이면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsInvalidPerformanceData() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":\"unexpected\"}")));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
+    }
+
+    @Test
+    @DisplayName("실적조회 응답 JSON이 손상되면 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsMalformedPerformanceResponse() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded("not-json")));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
+    }
+
+    @Test
+    @DisplayName("실적조회 응답에 잘못된 %이스케이프가 있어 URL 디코딩에 실패해도 재시도 가능한 CODEF 일시 장애 오류로 변환한다")
+    void rejectsPerformanceResponseWithInvalidPercentEscape() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        // "%zz"는 유효한 %escape가 아니라서 URLDecoder.decode가 IllegalArgumentException을 던진다.
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok("%zz"));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
     }
 
     private CodefConnectionCommand command(String password, String cardNo, String cardPassword,

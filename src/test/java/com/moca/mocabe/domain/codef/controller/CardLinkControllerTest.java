@@ -15,10 +15,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsRequest;
 import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsResponse;
+import com.moca.mocabe.domain.codef.dto.CardLinkCardResponse;
 import com.moca.mocabe.domain.codef.dto.CardLinkResponse;
 import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
+import com.moca.mocabe.domain.codef.dto.SubmitCardCredentialsRequest;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
+import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.InvalidCardSelectionException;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
@@ -193,5 +198,83 @@ class CardLinkControllerTest {
 
         assertEquals("INVALID_CARD_SELECTION",
                 new ObjectMapper().readTree(response).path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("보유카드 재조회 요청을 institutionCode와 함께 서비스에 전달한다")
+    void syncsOwnedCards() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardLinkService.syncOwnedCards(USER_ID, INSTITUTION_CODE)).thenReturn(new SyncOwnedCardsResponse(
+                List.of(new SyncOwnedCardsResult("link-1", INSTITUTION_CODE, true, List.of()))));
+
+        String response = mockMvc.perform(post("/card-links/cards/sync")
+                        .param("institutionCode", INSTITUTION_CODE))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode root = new ObjectMapper().readTree(response);
+        assertTrue(root.path("data").path("results").get(0).path("success").asBoolean());
+        verify(cardLinkService).syncOwnedCards(USER_ID, INSTITUTION_CODE);
+    }
+
+    @Test
+    @DisplayName("인증 정보가 없으면 서비스를 호출하지 않고 401을 반환한다")
+    void rejectsUnauthenticatedSyncRequest() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
+
+        mockMvc.perform(post("/card-links/cards/sync")
+                        .param("institutionCode", INSTITUTION_CODE))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(cardLinkService);
+    }
+
+    @Test
+    @DisplayName("institutionCode 없이 재조회하면 null로 서비스에 전달한다")
+    void syncsOwnedCardsWithoutInstitutionCode() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardLinkService.syncOwnedCards(USER_ID, null)).thenReturn(new SyncOwnedCardsResponse(List.of()));
+
+        mockMvc.perform(post("/card-links/cards/sync"))
+                .andExpect(status().isOk());
+
+        verify(cardLinkService).syncOwnedCards(USER_ID, null);
+    }
+
+    @Test
+    @DisplayName("지정한 기관코드로 연동된 계정이 없으면 404를 반환한다")
+    void rejectsSyncWithUnknownInstitutionCode() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardLinkService.syncOwnedCards(USER_ID, INSTITUTION_CODE))
+                .thenThrow(new CodefConnectionNotFoundException(INSTITUTION_CODE));
+
+        String response = mockMvc.perform(post("/card-links/cards/sync")
+                        .param("institutionCode", INSTITUTION_CODE))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("CODEF_CONNECTION_NOT_FOUND",
+                new ObjectMapper().readTree(response).path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("카드정보 추가 입력 요청을 현재 사용자·userCardId 기준으로 서비스에 전달한다")
+    void submitsCardCredentials() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardLinkService.submitCardCredentials(
+                eq(USER_ID), eq("uc-1"), any(SubmitCardCredentialsRequest.class)))
+                .thenReturn(new CardLinkCardResponse("uc-1", "card-1", "정식 카드명", "9999****6666",
+                        INSTITUTION_CODE, "KB국민카드", "CREDIT", null, true, true, List.of()));
+
+        String response = mockMvc.perform(patch("/card-links/cards/uc-1/credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cardNo\":\"9999888877776666\",\"cardPassword\":\"1234\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode root = new ObjectMapper().readTree(response);
+        assertEquals("uc-1", root.path("data").path("userCardId").asText());
+        verify(cardLinkService).submitCardCredentials(
+                eq(USER_ID), eq("uc-1"), any(SubmitCardCredentialsRequest.class));
     }
 }

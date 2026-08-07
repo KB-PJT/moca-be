@@ -28,8 +28,11 @@ class AuthControllerTest {
         AuthController controller = new AuthController(authApplicationService, new OpaqueTokenPolicy(1800, 1209600),
                 new RefreshCookiePolicy(false));
         GoogleLoginRequest request = new GoogleLoginRequest();
-        request.setIdToken("google-id-token");
-        when(authApplicationService.login("google-id-token")).thenReturn(loginResponse());
+        request.setCode("google-code");
+        request.setCodeVerifier("code-verifier");
+        request.setRedirectUri("http://localhost:5173/auth/callback");
+        when(authApplicationService.login("google-code", "code-verifier", "http://localhost:5173/auth/callback"))
+                .thenReturn(loginResponse());
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         servletRequest.setContextPath("/moca-be");
 
@@ -39,6 +42,7 @@ class AuthControllerTest {
         assertTrue(setCookie.contains("Path=/moca-be/api/v1/auth"));
         assertFalse(setCookie.contains("Secure"));
         assertTrue(setCookie.contains("HttpOnly"));
+        assertTrue(setCookie.contains("SameSite=Lax"));
     }
 
     @Test
@@ -58,6 +62,7 @@ class AuthControllerTest {
 
         assertTrue(refreshedCookie.contains("new-refresh"));
         assertTrue(refreshedCookie.contains("Secure"));
+        assertTrue(refreshedCookie.contains("SameSite=None"));
         assertTrue(expiredCookie.contains("Max-Age=0"));
         verify(authApplicationService).logout("access", "refresh");
         verify(authApplicationService).logout(null, null);

@@ -12,4 +12,9 @@ public class RefreshCookiePolicy {
     public boolean isSecure() {
         return secure;
     }
+
+    /** HTTPS 배포에서는 cross-site refresh 요청을 위해 None을 사용한다. */
+    public String getSameSite() {
+        return secure ? "None" : "Lax";
+    }
 }
