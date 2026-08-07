@@ -1,9 +1,11 @@
 package com.moca.mocabe.domain.user.service;
 
+import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.model.NotificationSettings;
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.LocationSettingsResponse;
+import com.moca.mocabe.domain.user.dto.NewUserCheckResponse;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsResponse;
 import com.moca.mocabe.domain.user.dto.UpdateNicknameRequest;
@@ -18,10 +20,13 @@ public class UserApplicationService {
 
     private final UserDomainService userDomainService;
     private final OpaqueTokenService opaqueTokenService;
+    private final UserCardMapper userCardMapper;
 
-    public UserApplicationService(UserDomainService userDomainService, OpaqueTokenService opaqueTokenService) {
+    public UserApplicationService(UserDomainService userDomainService, OpaqueTokenService opaqueTokenService,
+                                  UserCardMapper userCardMapper) {
         this.userDomainService = userDomainService;
         this.opaqueTokenService = opaqueTokenService;
+        this.userCardMapper = userCardMapper;
     }
 
     @Transactional(readOnly = true)
@@ -71,6 +76,12 @@ public class UserApplicationService {
         settings.setLocationRecommendationEnabled(request.isLocationRecommendationEnabled());
         userDomainService.updateLocationRecommendationEnabled(userId, settings.isLocationRecommendationEnabled());
         return new LocationSettingsResponse(settings);
+    }
+
+    @Transactional(readOnly = true)
+    public NewUserCheckResponse isNewUser(String userId) {
+        boolean hasAnyCard = userCardMapper.existsByUserId(userId);
+        return new NewUserCheckResponse(!hasAnyCard);
     }
 
     @Transactional

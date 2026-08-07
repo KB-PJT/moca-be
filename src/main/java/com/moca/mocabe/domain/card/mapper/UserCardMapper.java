@@ -15,4 +15,6 @@ public interface UserCardMapper {
 
     List<UserCardListRow> findHomeCardsByUserId(@Param("userId") String userId,
                                                 @Param("orderMode") String orderMode);
+
+    boolean existsByUserId(@Param("userId") String userId);
 }

@@ -754,6 +754,25 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
+  /me/onboarding-status:
+    get:
+      tags: [User]
+      summary: 신규 사용자 여부 조회
+      description: 보유 카드가(활성·비활성 무관) 하나도 없으면 신규 사용자로 판단합니다.
+      operationId: getMyOnboardingStatus
+      security:
+        - MocaBearerAuth: []
+      responses:
+        '200':
+          description: 신규 사용자 여부 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStatusApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
   /me/location-settings:
     get:
       tags: [User]
@@ -1499,6 +1518,20 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/NotificationSettingsResponse'
+    OnboardingStatusResponse:
+      type: object
+      required: [newUser]
+      properties:
+        newUser:
+          type: boolean
+    OnboardingStatusApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/OnboardingStatusResponse'
     LocationSettingsRequest:
       type: object
       properties:
