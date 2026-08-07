@@ -7,12 +7,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
+import com.moca.mocabe.domain.report.dto.BenefitCategoriesReportResponse;
 import com.moca.mocabe.domain.report.dto.BenefitSummaryReportResponse;
 import com.moca.mocabe.domain.report.dto.MissedBenefitsReportResponse;
 import com.moca.mocabe.domain.report.dto.PerformanceCardsReportResponse;
 import com.moca.mocabe.domain.report.dto.PerformanceSummaryReportResponse;
 import com.moca.mocabe.domain.report.mapper.ReportMapper;
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
+import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
 import com.moca.mocabe.domain.report.model.MissedBenefitRow;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
@@ -72,6 +74,59 @@ class ReportQueryServiceTest {
     assertEquals(2_000, response.totalMissedBenefitAmount());
     assertEquals(2_000, response.benefits().get(0).remainingAmount());
     assertEquals("KRW", response.benefits().get(0).unit());
+  }
+
+  @Test
+  void numbersBenefitCategoriesAndExcludesExhaustedLimits() {
+    when(reportMapper.findBenefitAmountsByCategory(eq(USER_ID), any(), any(), eq(3)))
+        .thenReturn(
+            List.of(
+                new CategoryBenefitRow("CAFE", "카페", 1_000),
+                new CategoryBenefitRow("TRANSPORT", "교통", 500)));
+    PerformanceCardRow card = new PerformanceCardRow(CARD_ID, "카드", null, 0, 0, 0);
+    when(reportMapper.findPerformanceCard(USER_ID, CARD_ID, "2026-07")).thenReturn(card);
+    when(reportMapper.findMonthlyRemainingBenefits(USER_ID, CARD_ID, "2026-07"))
+        .thenReturn(List.of(new MissedBenefitRow("rule", "소진", "DISCOUNT", 1_000, 1_000)));
+
+    BenefitCategoriesReportResponse categories =
+        service.getBenefitCategories(USER_ID, "2026-07", 3);
+    MissedBenefitsReportResponse missed = service.getMissedBenefits(USER_ID, "2026-07", CARD_ID);
+
+    assertEquals(1, categories.categories().get(0).rank());
+    assertEquals(2, categories.categories().get(1).rank());
+    assertEquals(0, missed.totalMissedBenefitAmount());
+    assertEquals(List.of(), missed.benefits());
+  }
+
+  @Test
+  void rejectsUnknownUserAndMissingMissedCardParameter() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(null);
+
+    assertThrows(
+        com.moca.mocabe.global.exception.user.UserNotFoundException.class,
+        () -> service.getBenefitSummary(USER_ID, "2026-07"));
+    when(userMapper.findProfileById(USER_ID)).thenReturn(new UserProfile());
+    assertThrows(
+        InvalidReportQueryException.class,
+        () -> service.getMissedBenefits(USER_ID, "2026-07", " "));
+  }
+
+  @Test
+  void usesDefaultMonthAndKeepsUnknownBenefitTypeLabel() {
+    when(reportMapper.findBenefitAmountsByType(eq(USER_ID), any(), any()))
+        .thenReturn(List.of(new BenefitTypeAmountRow("ETC", 1)));
+
+    BenefitSummaryReportResponse response = service.getBenefitSummary(USER_ID, null);
+
+    assertEquals("ETC", response.breakdown().get(0).label());
+  }
+
+  @Test
+  void labelsCashbackBenefitType() {
+    when(reportMapper.findBenefitAmountsByType(eq(USER_ID), any(), any()))
+        .thenReturn(List.of(new BenefitTypeAmountRow("CASHBACK", 1)));
+
+    assertEquals("캐시백", service.getBenefitSummary(USER_ID, "2026-07").breakdown().get(0).label());
   }
 
   @Test

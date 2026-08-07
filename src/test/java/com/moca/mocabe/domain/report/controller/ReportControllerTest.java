@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.moca.mocabe.domain.report.dto.BenefitCategoriesReportResponse;
 import com.moca.mocabe.domain.report.dto.BenefitSummaryReportResponse;
+import com.moca.mocabe.domain.report.dto.MissedBenefitsReportResponse;
 import com.moca.mocabe.domain.report.dto.PerformanceCardsReportResponse;
 import com.moca.mocabe.domain.report.dto.PerformanceSummaryReportResponse;
 import com.moca.mocabe.domain.report.service.ReportQueryService;
@@ -47,6 +48,8 @@ class ReportControllerTest {
         .thenReturn(new PerformanceSummaryReportResponse("2026-07", 0, 0, List.of()));
     when(reportQueryService.getPerformanceCards(USER_ID, "2026-07"))
         .thenReturn(new PerformanceCardsReportResponse("2026-07", List.of()));
+    when(reportQueryService.getMissedBenefits(USER_ID, "2026-07", "card-1"))
+        .thenReturn(new MissedBenefitsReportResponse("2026-07", null, 0, List.of()));
 
     mockMvc
         .perform(get("/reports/benefits/summary").param("yearMonth", "2026-07"))
@@ -61,10 +64,17 @@ class ReportControllerTest {
     mockMvc
         .perform(get("/reports/performances/cards").param("yearMonth", "2026-07"))
         .andExpect(status().isOk());
+    mockMvc
+        .perform(
+            get("/reports/benefits/missed")
+                .param("yearMonth", "2026-07")
+                .param("userCardId", "card-1"))
+        .andExpect(status().isOk());
 
     verify(reportQueryService).getBenefitSummary(USER_ID, "2026-07");
     verify(reportQueryService).getBenefitCategories(USER_ID, "2026-07", 2);
     verify(reportQueryService).getPerformanceSummary(USER_ID, "2026-07");
     verify(reportQueryService).getPerformanceCards(USER_ID, "2026-07");
+    verify(reportQueryService).getMissedBenefits(USER_ID, "2026-07", "card-1");
   }
 }

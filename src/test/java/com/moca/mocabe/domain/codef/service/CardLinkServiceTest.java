@@ -288,6 +288,28 @@ class CardLinkServiceTest {
   }
 
   @Test
+  @DisplayName("생성자 카드가 비밀번호 필수 카드사에 일치하면 카드번호와 비밀번호를 함께 암호화해 보관한다")
+  void encryptsCreatorCardPasswordWhenRequired() {
+    when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
+    when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("credential-hash");
+    when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("card-hash");
+    when(codefClient.createConnectedId(any(CodefConnectionCommand.class)))
+        .thenReturn("cid-password");
+    when(codefClient.getOwnedCards("cid-password", "0301", "900101", null, null))
+        .thenReturn(List.of(new CodefOwnedCard("매칭 카드", "1234****3456", "신용", null)));
+    CardCatalogEntry card = new CardCatalogEntry("card-1", ISSUER_ID, "카드", "credit", null);
+    when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(card));
+    when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(card);
+    when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1});
+
+    cardLinkService.createLink(USER_ID, request());
+
+    ArgumentCaptor<LinkedCardInsert> insertCaptor = ArgumentCaptor.forClass(LinkedCardInsert.class);
+    verify(codefCredentialStore).saveCard(insertCaptor.capture());
+    assertNotNull(insertCaptor.getValue().cardPasswordEnc());
+  }
+
+  @Test
   @DisplayName("같은 CODEF 카드 키가 반복되면 응답·적재 모두 한 건만 남긴다")
   void removesDuplicatedOwnedCards() {
     CodefIssuerPolicy policy = accountPolicy();

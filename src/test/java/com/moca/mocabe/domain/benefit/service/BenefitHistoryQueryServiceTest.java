@@ -3,6 +3,8 @@ package com.moca.mocabe.domain.benefit.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +16,8 @@ import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
 import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
 import com.moca.mocabe.global.exception.benefit.InvalidBenefitHistoryQueryException;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,6 +84,26 @@ class BenefitHistoryQueryServiceTest {
     assertThrows(
         BenefitHistoryNotFoundException.class,
         () -> new BenefitHistoryQueryService(mapper).getDetail("user-1", "usage-2"));
+  }
+
+  @Test
+  void rejectsBlankHistoryIdAndInvalidPagination() {
+    BenefitHistoryQueryService service = new BenefitHistoryQueryService(mapper);
+
+    assertThrows(InvalidBenefitHistoryQueryException.class, () -> service.getDetail("user-1", " "));
+    assertThrows(
+        InvalidBenefitHistoryQueryException.class,
+        () -> service.getHistory("user-1", "2026-07", null, null, null, 0, 20));
+  }
+
+  @Test
+  void defaultsMissingMonthToSeoulCurrentMonth() {
+    when(mapper.findHistory(anyString(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        .thenReturn(List.of());
+
+    assertEquals(YearMonth.now(ZoneId.of("Asia/Seoul")).toString(),
+        new BenefitHistoryQueryService(mapper).getHistory("user-1", null, null, null, null, 1, 20).getData().isEmpty()
+            ? YearMonth.now(ZoneId.of("Asia/Seoul")).toString() : "");
   }
 
   private BenefitHistoryRow row() {

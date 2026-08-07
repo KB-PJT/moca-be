@@ -55,6 +55,18 @@ class HomeQueryServiceTest {
   }
 
   @Test
+  @DisplayName("놓친 혜택이 있으면 금액을 포함한 인사 문구를 반환한다")
+  void includesMissedBenefitAmountInGreeting() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+    when(homeMapper.sumMissedBenefitAmount(USER_ID, "2026-07")).thenReturn(8_200L);
+
+    HomeGreetingResponse response = homeQueryService.getGreeting(USER_ID, "2026-07");
+
+    assertEquals(8_200L, response.getMissedBenefitAmount());
+    assertEquals("이번 달 혜택 8,200원을 놓치고 있어요!", response.getMessage());
+  }
+
+  @Test
   @DisplayName("카드 조회는 저장된 정렬 모드와 카드 배열의 선택 카드를 반환한다")
   void returnsCardsWithSavedOrderMode() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "MANUAL"));
@@ -119,6 +131,21 @@ class HomeQueryServiceTest {
   }
 
   @Test
+  @DisplayName("최근 혜택 조회 결과가 null이면 빈 배열로 처리한다")
+  void treatsNullRecentBenefitsAsEmpty() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+    when(homeMapper.findRecentBenefits(
+            org.mockito.ArgumentMatchers.eq(USER_ID),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(5)))
+        .thenReturn(null);
+
+    assertEquals(
+        List.of(), homeQueryService.getRecentBenefits(USER_ID, "2026-07", 5).getBenefits());
+  }
+
+  @Test
   @DisplayName("존재하지 않는 사용자의 홈 조회는 사용자 없음 오류로 거절한다")
   void rejectsUnknownUser() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(null);
@@ -173,6 +200,21 @@ class HomeQueryServiceTest {
     assertEquals(
         "월 최대 30,000원", cards.getCards().get(0).getHighlightBenefit().getMonthlyLimitText());
     assertEquals("2026-07-27T14:30:00+09:00", benefits.getBenefits().get(0).getOccurredAt());
+  }
+
+  @Test
+  @DisplayName("실적 목표가 없는 카드는 자동 정렬 뒤로 보내고 달성률을 0으로 표시한다")
+  void sortsCardsWithoutPerformanceTargetLast() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+    HomeCardRow withoutTarget = card("no-target", "목표 없음", 1, 0, 0, 0, 0);
+    HomeCardRow withTarget = card("target", "목표 있음", 2, 0, 0, 1, 100);
+    when(homeMapper.findHomeCards(USER_ID, "2026-07"))
+        .thenReturn(List.of(withoutTarget, withTarget));
+
+    HomeCardsResponse response = homeQueryService.getCards(USER_ID, "2026-07", "AUTO");
+
+    assertEquals("target", response.getCards().get(0).getUserCardId());
+    assertEquals(0, response.getCards().get(1).getSummary().getPerformanceRate());
   }
 
   private HomeCardRow card(

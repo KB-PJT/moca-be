@@ -5,14 +5,18 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
+import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
+import com.moca.mocabe.domain.benefit.model.BenefitRule;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -20,6 +24,80 @@ import org.mockito.Mockito;
 class BenefitUsageCalculationServiceTest {
   private final BenefitCalculationMapper mapper = Mockito.mock(BenefitCalculationMapper.class);
   private final BenefitUsageCalculationService service = new BenefitUsageCalculationService(mapper);
+
+  @Test
+  void ignoresEmptyApprovalListsAndReportsNoopServiceAsDisabled() {
+    BenefitUsageCalculationService noop = BenefitUsageCalculationService.noop();
+
+    service.calculateAndPersist(List.of());
+    service.calculateAndPersist(null);
+
+    verify(mapper, never()).findApprovalsForCalculation(any());
+    org.junit.jupiter.api.Assertions.assertFalse(noop.isEnabled());
+  }
+
+  @Test
+  void convertsPointMileageAndCashbackRulesAndKeepsZeroRewardOutcomesSilent() throws Exception {
+    java.lang.reflect.Method benefitType =
+        BenefitUsageCalculationService.class.getDeclaredMethod(
+            "benefitType", String.class, com.moca.mocabe.domain.benefit.type.RewardUnit.class);
+    benefitType.setAccessible(true);
+    assertEquals(
+        com.moca.mocabe.domain.benefit.type.BenefitType.MILEAGE,
+        benefitType.invoke(service, "discount", com.moca.mocabe.domain.benefit.type.RewardUnit.MILE));
+    assertEquals(
+        com.moca.mocabe.domain.benefit.type.BenefitType.CASHBACK,
+        benefitType.invoke(service, "cashback", com.moca.mocabe.domain.benefit.type.RewardUnit.KRW));
+    assertEquals(
+        com.moca.mocabe.domain.benefit.type.BenefitType.POINT,
+        benefitType.invoke(service, "points", com.moca.mocabe.domain.benefit.type.RewardUnit.POINT));
+    java.lang.reflect.Method toRule =
+        BenefitUsageCalculationService.class.getDeclaredMethod(
+            "toRule", List.class, BigDecimal.class, BigDecimal.class);
+    toRule.setAccessible(true);
+    BenefitRule pointRule =
+        (BenefitRule)
+            toRule.invoke(
+                service,
+                List.of(
+                    new SimpleBenefitRuleRow(
+                        "point", "offer", "points", "point", BigDecimal.ONE, null, null, null,
+                        "all_merchants", "ALL", 1)),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
+    BenefitRule perSpendRule =
+        (BenefitRule)
+            toRule.invoke(
+                service,
+                List.of(
+                    new SimpleBenefitRuleRow(
+                        "cash", "offer", "cashback", "KRW", BigDecimal.ONE, new BigDecimal("1000"),
+                        null, null, "all_merchants", "ALL", 1)),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
+    assertEquals(com.moca.mocabe.domain.benefit.type.RewardUnit.POINT, pointRule.rewardUnit());
+    assertEquals(
+        com.moca.mocabe.domain.benefit.type.BenefitBasis.PER_SPEND_UNIT,
+        perSpendRule.benefitBasis());
+    java.lang.reflect.Method persistOutcome = BenefitUsageCalculationService.class.getDeclaredMethod(
+        "persistOutcome", BenefitApprovalRow.class, LocalDate.class, SimpleBenefitRuleRow.class,
+        MonthlyBenefitLimit.class, BenefitCalculationResult.class);
+    persistOutcome.setAccessible(true);
+    persistOutcome.invoke(
+        service,
+        new BenefitApprovalRow("a", "c", 1, LocalDateTime.now(), null),
+        LocalDate.now(),
+        new SimpleBenefitRuleRow(
+            "r", "o", "discount", "percent", BigDecimal.ZERO, null, null, null, "all_merchants", "ALL", 1),
+        null,
+        new BenefitCalculationResult(
+            "r", com.moca.mocabe.domain.benefit.type.BenefitType.DISCOUNT,
+            com.moca.mocabe.domain.benefit.type.RewardUnit.KRW, true, BigDecimal.ZERO, BigDecimal.ZERO,
+            BigDecimal.ZERO, com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.NONE));
+    verify(mapper, never())
+        .insertCalculationOutcome(
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
 
   @Test
   void appliesSeededAllMerchantsPercentageRuleToNewApprovalOnly() {
