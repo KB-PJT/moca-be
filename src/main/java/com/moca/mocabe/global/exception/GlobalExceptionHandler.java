@@ -25,6 +25,8 @@ import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
 import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
+import com.moca.mocabe.global.exception.merchant.KakaoUnavailableException;
+import com.moca.mocabe.global.exception.merchant.MerchantCategoryNotFoundException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
@@ -116,6 +118,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidMerchantQueryException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidMerchantQuery(InvalidMerchantQueryException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_MERCHANT_QUERY", exception.getMessage());
+    }
+
+    @ExceptionHandler(MerchantCategoryNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleMerchantCategoryNotFound(
+            MerchantCategoryNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "MERCHANT_CATEGORY_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(KakaoUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleKakaoUnavailable(KakaoUnavailableException exception) {
+        // 상류(카카오맵) 일시 장애·지연이므로 500이 아니라 재시도 가능한 503으로 안내한다.
+        LOGGER.log(Level.WARNING, "카카오맵 연동 상류 오류로 503을 반환합니다. " + describeException(exception));
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "KAKAO_UNAVAILABLE", exception.getMessage());
     }
 
     @ExceptionHandler(CodefCredentialRequiredException.class)

@@ -41,8 +41,11 @@ public class MerchantCandidateSnapshot {
         String bestMerchantId = null;
         int bestLength = 0;
         for (MerchantNameCandidate candidate : candidates) {
-            String candidateName = candidate.normalizedName();
-            if (candidateName != null && !candidateName.isEmpty()
+            // DB의 normalized_name/normalized_alias_name이 실제로는 정규화 규칙(대문자·특수문자 제거)과
+            // 어긋나게 저장돼 있을 수 있으므로(예: 시드 데이터 오류), 저장값을 그대로 신뢰하지 않고
+            // 비교 시점에 다시 정규화한다.
+            String candidateName = merchantNameNormalizer.normalize(candidate.normalizedName());
+            if (!candidateName.isEmpty()
                     && normalizedApprovalName.startsWith(candidateName)
                     && candidateName.length() > bestLength) {
                 bestLength = candidateName.length();

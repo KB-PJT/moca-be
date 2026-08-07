@@ -8,10 +8,14 @@ import com.moca.mocabe.domain.codef.service.ApprovalCardMatcher;
 import com.moca.mocabe.domain.codef.service.ApprovalIngestStore;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.domain.codef.service.PerformanceSnapshotStore;
+import com.moca.mocabe.domain.merchant.infra.JdkKakaoHttpClient;
+import com.moca.mocabe.domain.merchant.infra.KakaoHttpClient;
+import com.moca.mocabe.domain.merchant.infra.KakaoLocalClient;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantMapper;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
+import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNameNormalizer;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
@@ -55,6 +59,9 @@ public class AppConfig {
     // CODEF(특히 개발계)는 카드사 인증 콜백을 기다려 응답이 느릴 수 있어 응답 대기를 넉넉히 둔다.
     // .env.example 기본값과 일치시킨다. 필요 시 MOCA_CODEF_REQUEST_TIMEOUT_MS 환경변수로 재정의한다.
     private static final long DEFAULT_CODEF_REQUEST_TIMEOUT_MS = 30_000L;
+
+    private static final long DEFAULT_KAKAO_CONNECT_TIMEOUT_MS = 3_000L;
+    private static final long DEFAULT_KAKAO_REQUEST_TIMEOUT_MS = 5_000L;
 
     // CODEF baseUrl/tokenUrl은 환경변수로 주입되므로, 설정 실수(오타·오설정)로 Bearer 토큰이나
     // Basic 자격증명이 CODEF가 아닌 외부 host로 전송되는 것을 막기 위해 host를 고정 허용목록으로 제한한다.
@@ -180,8 +187,39 @@ public class AppConfig {
     }
 
     @Bean
-    public MerchantQueryService merchantQueryService(MerchantMapper merchantMapper) {
-        return new MerchantQueryService(merchantMapper);
+    public MerchantQueryService merchantQueryService(MerchantMapper merchantMapper,
+                                                      MerchantCategoryMapper merchantCategoryMapper) {
+        return new MerchantQueryService(merchantMapper, merchantCategoryMapper);
+    }
+
+    @Bean
+    public HttpClient kakaoJavaHttpClient(Environment environment) {
+        return HttpClient.newBuilder()
+                .connectTimeout(timeoutProperty(
+                        environment, "MOCA_KAKAO_CONNECT_TIMEOUT_MS", DEFAULT_KAKAO_CONNECT_TIMEOUT_MS))
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
+    }
+
+    @Bean
+    public KakaoHttpClient kakaoHttpClient(HttpClient kakaoJavaHttpClient, Environment environment) {
+        return new JdkKakaoHttpClient(
+                kakaoJavaHttpClient,
+                timeoutProperty(environment, "MOCA_KAKAO_REQUEST_TIMEOUT_MS", DEFAULT_KAKAO_REQUEST_TIMEOUT_MS));
+    }
+
+    @Bean
+    public KakaoLocalClient kakaoLocalClient(KakaoHttpClient kakaoHttpClient, Environment environment) {
+        return new KakaoLocalClient(kakaoHttpClient, requiredProperty(environment, "MOCA_KAKAO_REST_API_KEY"));
+    }
+
+    @Bean
+    public MerchantNearbyQueryService merchantNearbyQueryService(MerchantCategoryMapper merchantCategoryMapper,
+                                                                  MerchantMapper merchantMapper,
+                                                                  MerchantLookup merchantLookup,
+                                                                  KakaoLocalClient kakaoLocalClient) {
+        return new MerchantNearbyQueryService(merchantCategoryMapper, merchantMapper, merchantLookup,
+                kakaoLocalClient);
     }
 
     @Bean
