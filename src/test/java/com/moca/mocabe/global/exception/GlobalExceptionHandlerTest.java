@@ -17,6 +17,7 @@ import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
+import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -28,6 +29,7 @@ import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
@@ -238,16 +240,36 @@ class GlobalExceptionHandlerTest {
         fields.put("cardNo", "카드번호가 필요합니다.");
 
         ResponseEntity<ApiErrorResponse> requiredResponse = handler.handleCardCredentialRequired(
-                new CardCredentialRequiredException(fields));
+                new CardCredentialRequiredException(List.of(new CardCredentialIssue("uc-1", fields))));
         ResponseEntity<ApiErrorResponse> mismatchResponse = handler.handleCardNumberMismatch(
                 new CardNumberMismatchException());
         ResponseEntity<ApiErrorResponse> notFoundResponse = handler.handleUserCardNotFound(
                 new UserCardNotFoundException());
 
         assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
-        assertEquals("카드번호가 필요합니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
+        assertEquals("카드 활성화에 필요한 카드번호/비밀번호가 없습니다.",
+                requiredResponse.getBody().getError().getMessage());
+        assertEquals("uc-1", requiredResponse.getBody().getError().getFields().get("userCardId"));
         assertError(mismatchResponse, HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH");
         assertError(notFoundResponse, HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("카드정보 부족한 카드가 여러 개면 userCardId를 콤마로 묶어 내려준다")
+    void handlesCardCredentialRequiredWithMultipleCards() {
+        Map<String, String> firstFields = new LinkedHashMap<String, String>();
+        firstFields.put("cardNo", "카드번호가 필요합니다.");
+        Map<String, String> secondFields = new LinkedHashMap<String, String>();
+        secondFields.put("cardNo", "카드번호가 필요합니다.");
+        secondFields.put("cardPassword", "카드 비밀번호가 필요합니다.");
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleCardCredentialRequired(
+                new CardCredentialRequiredException(List.of(
+                        new CardCredentialIssue("uc-1", firstFields),
+                        new CardCredentialIssue("uc-2", secondFields))));
+
+        assertError(response, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
+        assertEquals("uc-1,uc-2", response.getBody().getError().getFields().get("userCardId"));
     }
 
     @Test

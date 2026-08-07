@@ -29,6 +29,7 @@ import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
 import com.moca.mocabe.domain.codef.model.CardCatalogEntry;
+import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget;
 import com.moca.mocabe.domain.codef.model.CardOptionRow;
 import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
@@ -257,14 +258,25 @@ public class CardLinkService {
 
         // 활성화 대상은 반드시 이 연동에 적재된 카드여야 하고, 카드사가 요구하는 카드번호/비밀번호가
         // 이미 저장돼 있어야 한다(없으면 PATCH /card-links/cards/{userCardId}/credentials로 먼저 채워야 함).
+        // 카드정보가 부족한 카드는 첫 건에서 바로 던지지 않고 전부 모아서, 여러 카드를 한 번에
+        // 활성화하는 요청이면 어느 카드들이 문제인지 한 번에 알려준다.
         Set<String> activeIds = new LinkedHashSet<>();
+        List<CardCredentialIssue> credentialIssues = new ArrayList<>();
         for (String userCardId : request.getActiveUserCardIds()) {
+            if (!activeIds.add(userCardId)) {
+                continue; // 같은 카드 ID가 요청에 중복돼 있으면 한 번만 검사한다.
+            }
             LinkedCardRow card = cardsByUserCard.get(userCardId);
             if (card == null) {
                 throw new InvalidCardSelectionException("현재 연동에 속하지 않은 카드입니다.");
             }
-            validateCardCredentialsPresent(card);
-            activeIds.add(userCardId);
+            Map<String, String> missingFields = missingCredentialFields(card);
+            if (!missingFields.isEmpty()) {
+                credentialIssues.add(new CardCredentialIssue(userCardId, missingFields));
+            }
+        }
+        if (!credentialIssues.isEmpty()) {
+            throw new CardCredentialRequiredException(credentialIssues);
         }
 
         // 옵션은 활성화하는 카드에 대해서만, 카드당 한 번만 받는다.
@@ -325,7 +337,7 @@ public class CardLinkService {
         require(fields, "cardPassword", request.getCardPassword(), target.requiresCardPassword(),
                 "카드 비밀번호는 필수입니다.");
         if (!fields.isEmpty()) {
-            throw new CardCredentialRequiredException(fields);
+            throw new CardCredentialRequiredException(List.of(new CardCredentialIssue(userCardId, fields)));
         }
         // 마스킹되지 않은 자리(앞·뒤)가 저장된 카드번호와 다르면 다른 카드의 번호를 입력한 것이므로
         // CODEF를 호출하지 않고 바로 거부한다.
@@ -387,8 +399,8 @@ public class CardLinkService {
         return groups.values().stream().map(OptionGroupBuilder::build).toList();
     }
 
-    /** 카드사가 요구하는 카드번호/비밀번호가 이 카드에 저장돼 있지 않으면 활성화를 막는다. */
-    private void validateCardCredentialsPresent(LinkedCardRow card) {
+    /** 카드사가 요구하는데 이 카드에 저장돼 있지 않은 카드번호/비밀번호 필드를 반환한다. 문제없으면 빈 맵이다. */
+    private Map<String, String> missingCredentialFields(LinkedCardRow card) {
         Map<String, String> fields = new LinkedHashMap<>();
         if (card.requiresCardNo() && !card.hasCardNumber()) {
             fields.put("cardNo", "카드번호가 필요합니다.");
@@ -396,9 +408,7 @@ public class CardLinkService {
         if (card.requiresCardPassword() && !card.hasCardPassword()) {
             fields.put("cardPassword", "카드 비밀번호가 필요합니다.");
         }
-        if (!fields.isEmpty()) {
-            throw new CardCredentialRequiredException(fields);
-        }
+        return fields;
     }
 
     private void validateOptions(List<OptionSelectionRequest> selections, List<CardOptionRow> rows) {
