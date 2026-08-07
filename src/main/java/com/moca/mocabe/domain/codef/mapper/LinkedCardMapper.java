@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.codef.mapper;
 
+import com.moca.mocabe.domain.codef.model.ActiveCardCredential;
 import com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget;
 import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
@@ -57,4 +58,11 @@ public interface LinkedCardMapper {
                               @Param("userId") String userId,
                               @Param("cardNumberEnc") byte[] cardNumberEnc,
                               @Param("cardPasswordEnc") byte[] cardPasswordEnc);
+
+    /**
+     * 카드번호가 필요한 카드사에서 보유카드를 재조회할 때, CODEF에 계정을 식별시킬 카드번호를 이미
+     * 저장된 카드 중 하나에서 가져오는 데 쓰인다. 계정 생성 시 적재된 크리에이터 카드는 아직
+     * 비활성 상태일 수 있으므로 is_active로 거르지 않는다.
+     */
+    ActiveCardCredential findAnyCardCredentialByLinkId(@Param("linkId") String linkId);
 }

@@ -43,6 +43,7 @@ import com.moca.mocabe.domain.codef.mapper.CardCatalogMapper;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
+import com.moca.mocabe.domain.codef.model.ActiveCardCredential;
 import com.moca.mocabe.domain.codef.model.CardCatalogEntry;
 import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget;
@@ -363,6 +364,30 @@ class CardLinkServiceTest {
         assertEquals(1, response.results().size());
         assertEquals("link-kb", response.results().get(0).linkId());
         verify(codefClient, never()).getOwnedCards("cid-shinhan", "0302", null, null, null);
+    }
+
+    @Test
+    @DisplayName("카드번호가 필요한 카드사는 이미 저장된 카드번호로 CODEF 재조회를 요청한다")
+    void syncsWithStoredCardCredentialsWhenIssuerRequiresCardNo() {
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], true, true);
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
+        byte[] cardNumberEnc = {9, 9};
+        byte[] cardPasswordEnc = {8, 8};
+        when(linkedCardMapper.findAnyCardCredentialByLinkId("link-kb"))
+                .thenReturn(new ActiveCardCredential("uc-existing", cardNumberEnc, cardPasswordEnc));
+        when(encryptor.decrypt(kbConnection.birthDateEnc())).thenReturn(null);
+        when(encryptor.decrypt(cardNumberEnc)).thenReturn("1234567890123456");
+        when(encryptor.decrypt(cardPasswordEnc)).thenReturn("1234");
+        when(codefClient.getOwnedCards("cid-kb", "0301", null, "1234567890123456", "1234"))
+                .thenReturn(List.of());
+
+        SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
+
+        assertEquals(1, response.results().size());
+        assertTrue(response.results().get(0).success());
+        verify(codefClient).getOwnedCards("cid-kb", "0301", null, "1234567890123456", "1234");
     }
 
     @Test

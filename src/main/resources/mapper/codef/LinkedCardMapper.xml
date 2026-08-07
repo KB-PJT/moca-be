@@ -130,4 +130,21 @@
         WHERE user_card_id = #{userCardId}
           AND user_id = #{userId}
     </update>
+
+    <resultMap id="linkedCardCredentialMap" type="com.moca.mocabe.domain.codef.model.ActiveCardCredential">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="card_number_enc" javaType="_byte[]"/>
+            <arg column="card_password_enc" javaType="_byte[]"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findAnyCardCredentialByLinkId" resultMap="linkedCardCredentialMap">
+        SELECT user_card_id, card_number_enc, card_password_enc
+        FROM user_cards
+        WHERE codef_account_credential_id = #{linkId}
+          AND card_number_enc IS NOT NULL
+        ORDER BY display_order ASC, user_card_id ASC
+        LIMIT 1
+    </select>
 </mapper>
