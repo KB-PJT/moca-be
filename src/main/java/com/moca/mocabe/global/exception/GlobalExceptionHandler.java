@@ -127,12 +127,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleCardCredentialRequired(
             CardCredentialRequiredException exception) {
         // 여러 카드를 한 번에 활성화하는 요청에서도 어느 카드가 문제인지 응답만으로 알 수 있도록
-        // userCardId/cardId를 필드 검증 메시지와 함께 fields에 담는다.
+        // userCardId를 필드 검증 메시지와 함께 fields에 담는다.
         Map<String, String> fields = new LinkedHashMap<>(exception.getFields());
         fields.put("userCardId", exception.getUserCardId());
-        if (exception.getCardId() != null) {
-            fields.put("cardId", exception.getCardId());
-        }
         return error(HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED", exception.getMessage(), fields);
     }
 

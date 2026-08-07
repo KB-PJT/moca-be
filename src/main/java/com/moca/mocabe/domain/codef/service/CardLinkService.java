@@ -325,7 +325,7 @@ public class CardLinkService {
         require(fields, "cardPassword", request.getCardPassword(), target.requiresCardPassword(),
                 "카드 비밀번호는 필수입니다.");
         if (!fields.isEmpty()) {
-            throw new CardCredentialRequiredException(userCardId, target.cardId(), fields);
+            throw new CardCredentialRequiredException(userCardId, fields);
         }
         // 마스킹되지 않은 자리(앞·뒤)가 저장된 카드번호와 다르면 다른 카드의 번호를 입력한 것이므로
         // CODEF를 호출하지 않고 바로 거부한다.
@@ -397,7 +397,7 @@ public class CardLinkService {
             fields.put("cardPassword", "카드 비밀번호가 필요합니다.");
         }
         if (!fields.isEmpty()) {
-            throw new CardCredentialRequiredException(card.userCardId(), card.cardId(), fields);
+            throw new CardCredentialRequiredException(card.userCardId(), fields);
         }
     }
 
