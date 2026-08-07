@@ -28,6 +28,7 @@ import com.moca.mocabe.domain.codef.mapper.CardCatalogMapper;
 import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
+import com.moca.mocabe.domain.codef.model.ActiveCardCredential;
 import com.moca.mocabe.domain.codef.model.CardCatalogEntry;
 import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget;
@@ -162,8 +163,21 @@ public class CardLinkService {
             // findActiveConnectionsByUserId가 issuers와 INNER JOIN하므로 정책은 항상 존재한다.
             CodefIssuerPolicy policy = issuerMapper.findCodefPolicyByInstitutionCode(connection.institutionCode());
             String birthDate = encryptor.decrypt(connection.birthDateEnc());
+            String cardNo = null;
+            String cardPassword = null;
+            if (policy.isRequiresCardNo()) {
+                // 카드번호가 필요한 카드사는 재조회 호출에도 CODEF가 계정을 식별할 카드번호를 요구하므로,
+                // 이 연동에 이미 저장된 카드번호 중 하나를 그대로 재사용한다.
+                ActiveCardCredential stored = linkedCardMapper.findAnyCardCredentialByLinkId(
+                        connection.codefAccountCredentialId());
+                if (stored != null) {
+                    cardNo = encryptor.decrypt(stored.cardNumberEnc());
+                    cardPassword = stored.cardPasswordEnc() == null
+                            ? null : encryptor.decrypt(stored.cardPasswordEnc());
+                }
+            }
             List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
-                    connection.connectedId(), connection.institutionCode(), birthDate, null, null);
+                    connection.connectedId(), connection.institutionCode(), birthDate, cardNo, cardPassword);
             // 재조회 시점엔 새로 입력된 카드번호가 없으므로 매칭 카드는 항상 비활성+크리덴셜 null로 적재한다.
             List<CardLinkCardResponse> cards = matchAndPersistOwnedCards(
                     userId, connection.codefAccountCredentialId(), policy, ownedCards, null, null);
