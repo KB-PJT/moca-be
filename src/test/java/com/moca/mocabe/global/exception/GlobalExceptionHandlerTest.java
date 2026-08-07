@@ -238,7 +238,7 @@ class GlobalExceptionHandlerTest {
         fields.put("cardNo", "카드번호가 필요합니다.");
 
         ResponseEntity<ApiErrorResponse> requiredResponse = handler.handleCardCredentialRequired(
-                new CardCredentialRequiredException(fields));
+                new CardCredentialRequiredException("uc-1", "card-1", fields));
         ResponseEntity<ApiErrorResponse> mismatchResponse = handler.handleCardNumberMismatch(
                 new CardNumberMismatchException());
         ResponseEntity<ApiErrorResponse> notFoundResponse = handler.handleUserCardNotFound(
@@ -246,6 +246,9 @@ class GlobalExceptionHandlerTest {
 
         assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
         assertEquals("카드번호가 필요합니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
+        // 여러 카드를 한 번에 활성화하는 요청에서도 어느 카드가 문제인지 fields만 보고 알 수 있어야 한다.
+        assertEquals("uc-1", requiredResponse.getBody().getError().getFields().get("userCardId"));
+        assertEquals("card-1", requiredResponse.getBody().getError().getFields().get("cardId"));
         assertError(mismatchResponse, HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH");
         assertError(notFoundResponse, HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND");
     }

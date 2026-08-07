@@ -8,14 +8,28 @@ import java.util.Map;
  * 카드사가 요구하는 카드번호/비밀번호가 저장돼 있지 않은 카드를 활성화하려 할 때 발생한다.
  * 계정 생성 단계의 {@link CodefCredentialRequiredException}과 달리, 특정 카드(user_card_id)에
  * 대한 것이라 PATCH /card-links/cards/{userCardId}/credentials로 값을 채운 뒤 다시 활성화해야 한다.
+ * userCardId/cardId를 함께 담아, 여러 카드를 한 번에 활성화하는 요청에서도 어느 카드가 문제인지
+ * 응답만으로 알 수 있게 한다.
  */
 public class CardCredentialRequiredException extends RuntimeException {
 
+    private final String userCardId;
+    private final String cardId;
     private final Map<String, String> fields;
 
-    public CardCredentialRequiredException(Map<String, String> fields) {
-        super("카드 활성화에 필요한 카드번호/비밀번호가 없습니다.");
+    public CardCredentialRequiredException(String userCardId, String cardId, Map<String, String> fields) {
+        super("카드 활성화에 필요한 카드번호/비밀번호가 없습니다. userCardId=" + userCardId);
+        this.userCardId = userCardId;
+        this.cardId = cardId;
         this.fields = Collections.unmodifiableMap(new LinkedHashMap<>(fields));
+    }
+
+    public String getUserCardId() {
+        return userCardId;
+    }
+
+    public String getCardId() {
+        return cardId;
     }
 
     public Map<String, String> getFields() {

@@ -287,8 +287,9 @@ paths:
           description: >-
             요청값 검증 실패(code=VALIDATION_FAILED), 연동에 속하지 않은 카드·옵션 오류
             (code=INVALID_CARD_SELECTION), 또는 카드사가 요구하는 카드번호/비밀번호가 이 카드에
-            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — PATCH /card-links/cards/{userCardId}/credentials로
-            먼저 채워야 합니다)
+            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — 여러 카드를 한 번에 활성화하는 요청이라도
+            error.fields.userCardId/cardId로 어느 카드가 문제인지 알 수 있습니다. PATCH
+            /card-links/cards/{userCardId}/credentials로 먼저 채워야 합니다)
           content:
             application/json:
               schema:

@@ -567,6 +567,8 @@ class CardLinkServiceTest {
 
         assertEquals("카드번호가 필요합니다.", exception.getFields().get("cardNo"));
         assertEquals("카드 비밀번호가 필요합니다.", exception.getFields().get("cardPassword"));
+        assertEquals("uc-1", exception.getUserCardId());
+        assertEquals("card-1", exception.getCardId());
         verify(linkedCardMapper, never()).activateCards(any(), any(), any());
     }
 
@@ -637,6 +639,8 @@ class CardLinkServiceTest {
                 () -> cardLinkService.submitCardCredentials(USER_ID, "uc-1", request));
 
         assertEquals("카드 비밀번호는 필수입니다.", exception.getFields().get("cardPassword"));
+        assertEquals("uc-1", exception.getUserCardId());
+        assertEquals("card-1", exception.getCardId());
         verifyNoInteractions(codefClient);
     }
 
