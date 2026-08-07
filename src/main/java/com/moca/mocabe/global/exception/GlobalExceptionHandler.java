@@ -128,13 +128,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CardCredentialRequiredException.class)
     public ResponseEntity<ApiErrorResponse> handleCardCredentialRequired(
             CardCredentialRequiredException exception) {
-        // 여러 카드를 한 번에 활성화하는 요청이면, 어느 카드가 문제인지 콤마로 구분해 userCardId에
-        // 담는다. cardNo/cardPassword는 카드별로 구분하지 않고, 문제 있는 카드 중 하나라도 그 필드가
-        // 부족하면 공통 메시지를 한 번만 담는다(메시지 문자열 파싱 없이 fields로 바로 분기하도록).
+        // 여러 카드를 한 번에 활성화하는 요청이면, 어느 카드가 문제인지 콤마로 구분해 userCardId에 담는다.
         Map<String, String> fields = new LinkedHashMap<>();
-        for (CardCredentialIssue issue : exception.getIssues()) {
-            fields.putAll(issue.fields());
-        }
         fields.put("userCardId", exception.getIssues().stream()
                 .map(CardCredentialIssue::userCardId)
                 .collect(Collectors.joining(",")));

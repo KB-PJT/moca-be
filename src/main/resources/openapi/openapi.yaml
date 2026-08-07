@@ -288,9 +288,8 @@ paths:
             요청값 검증 실패(code=VALIDATION_FAILED), 연동에 속하지 않은 카드·옵션 오류
             (code=INVALID_CARD_SELECTION), 또는 카드사가 요구하는 카드번호/비밀번호가 이 카드에
             저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — error.fields.userCardId에 문제 있는
-            카드의 user_card_id를 콤마로 구분해 담습니다(카드 한 장이면 한 개만). cardNo/cardPassword는
-            카드별로 구분하지 않고, 그 필드가 부족한 카드가 하나라도 있으면 공통 메시지를 한 번만
-            담습니다. PATCH /card-links/cards/{userCardId}/credentials로 채운 뒤 다시 시도해야 합니다)
+            카드의 user_card_id를 콤마로 구분해 담습니다(카드 한 장이면 한 개만). PATCH
+            /card-links/cards/{userCardId}/credentials로 채운 뒤 다시 시도해야 합니다)
           content:
             application/json:
               schema:

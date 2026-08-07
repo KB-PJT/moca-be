@@ -247,7 +247,8 @@ class GlobalExceptionHandlerTest {
                 new UserCardNotFoundException());
 
         assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
-        assertEquals("카드번호가 필요합니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
+        assertEquals("카드 활성화에 필요한 카드번호/비밀번호가 없습니다.",
+                requiredResponse.getBody().getError().getMessage());
         assertEquals("uc-1", requiredResponse.getBody().getError().getFields().get("userCardId"));
         assertError(mismatchResponse, HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH");
         assertError(notFoundResponse, HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND");
@@ -269,8 +270,6 @@ class GlobalExceptionHandlerTest {
 
         assertError(response, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
         assertEquals("uc-1,uc-2", response.getBody().getError().getFields().get("userCardId"));
-        assertEquals("카드번호가 필요합니다.", response.getBody().getError().getFields().get("cardNo"));
-        assertEquals("카드 비밀번호가 필요합니다.", response.getBody().getError().getFields().get("cardPassword"));
     }
 
     @Test
