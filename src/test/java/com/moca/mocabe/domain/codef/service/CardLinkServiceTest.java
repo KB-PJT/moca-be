@@ -113,7 +113,8 @@ class CardLinkServiceTest {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
         when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
-        when(codefClient.getOwnedCards("cid-1", "0301", "900101", null, null)).thenReturn(List.of());
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of());
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 
         CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
@@ -302,7 +303,7 @@ class CardLinkServiceTest {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
         when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
-        when(codefClient.getOwnedCards("cid-1", "0301", "900101", null, null))
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
                 .thenThrow(new CodefUnavailableException("upstream timeout"));
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 

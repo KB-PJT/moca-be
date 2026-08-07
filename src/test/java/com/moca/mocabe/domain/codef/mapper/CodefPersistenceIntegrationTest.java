@@ -164,8 +164,9 @@ class CodefPersistenceIntegrationTest {
                 OPTION_CHOICE_ID, OPTION_GROUP_ID);
         // 계정 생성 시 입력한 카드번호(요청)와 마스킹 카드번호(응답)의 앞6·뒤4자리가 일치해 카드번호/비밀번호가
         // 미리 채워지지만, 활성화 자체는 이 시점에 일어나지 않고 여전히 명시적인 활성화 요청이 필요하다.
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", null, null)).thenReturn(List.of(
-                new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "943646******1069", "체크/본인", "")));
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "9436461234561069", "1234"))
+                .thenReturn(List.of(
+                        new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "943646******1069", "체크/본인", "")));
 
         CreateCardLinkRequest request = request();
         request.setCardNo("9436461234561069");
@@ -216,8 +217,9 @@ class CodefPersistenceIntegrationTest {
                 "0000000000000000000000000000000000000000000000000000000000000000",
                 "노리2 체크카드(KB Pay)", "https://gorilla/card.png");
         // 계정 생성 시 입력한 카드번호(9436461234561069)와 마스킹 카드번호의 앞뒤 자리가 일치하지 않는 카드다.
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", null, null)).thenReturn(List.of(
-                new CodefOwnedCard("노리2 체크카드(KB Pay)_흑기사", "111122******3344", "체크/본인", "")));
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "9436461234561069", "1234"))
+                .thenReturn(List.of(
+                        new CodefOwnedCard("노리2 체크카드(KB Pay)_흑기사", "111122******3344", "체크/본인", "")));
 
         CreateCardLinkRequest request = request();
         request.setCardNo("9436461234561069");

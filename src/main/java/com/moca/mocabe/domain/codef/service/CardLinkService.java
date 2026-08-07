@@ -121,11 +121,13 @@ public class CardLinkService {
 
         List<CardLinkCardResponse> cards = List.of();
         try {
-            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
-                    connectedId, policy.getInstitutionCode(), request.getBirthDate(), null, null);
-            // 카드번호가 필요한 카드사면 방금 입력한 카드번호와 일치하는 보유카드를 즉시 활성화 대상으로 넘긴다.
+            // 카드번호가 필요한 카드사면 방금 입력받아 계정 생성에도 쓴 카드번호를 CODEF 조회에도
+            // 그대로 전달한다(계정 식별용). 매칭은 별도로, 응답 카드번호와 로컬에서 비교해 판단한다.
             String creatorCardNo = policy.isRequiresCardNo() ? request.getCardNo() : null;
             String creatorCardPassword = policy.isRequiresCardNo() ? request.getCardPassword() : null;
+            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                    connectedId, policy.getInstitutionCode(), request.getBirthDate(),
+                    creatorCardNo, creatorCardPassword);
             cards = matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, creatorCardNo, creatorCardPassword);
         } catch (RuntimeException exception) {
             LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
