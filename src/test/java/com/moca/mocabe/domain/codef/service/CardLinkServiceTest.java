@@ -602,6 +602,22 @@ class CardLinkServiceTest {
     }
 
     @Test
+    @DisplayName("요청에 같은 카드 ID가 중복돼 있으면 문제 카드 목록에도 한 번만 담긴다")
+    void deduplicatesCredentialIssuesForRepeatedUserCardId() {
+        String linkId = "link-1";
+        when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
+        when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID)).thenReturn(
+                List.of(new LinkedCardRow("uc-1", "card-1", true, true, false, false)));
+
+        CardCredentialRequiredException exception = assertThrows(CardCredentialRequiredException.class,
+                () -> cardLinkService.activateCards(
+                        USER_ID, linkId, activateRequest(List.of("uc-1", "uc-1"))));
+
+        assertEquals(1, exception.getIssues().size());
+        assertEquals("uc-1", exception.getIssues().get(0).userCardId());
+    }
+
+    @Test
     @DisplayName("카드번호가 이미 저장돼 있으면 카드사가 요구하더라도 정상 활성화된다")
     void activatesWhenCardNumberAlreadyStored() {
         String linkId = "link-1";

@@ -263,6 +263,9 @@ public class CardLinkService {
         Set<String> activeIds = new LinkedHashSet<>();
         List<CardCredentialIssue> credentialIssues = new ArrayList<>();
         for (String userCardId : request.getActiveUserCardIds()) {
+            if (!activeIds.add(userCardId)) {
+                continue; // 같은 카드 ID가 요청에 중복돼 있으면 한 번만 검사한다.
+            }
             LinkedCardRow card = cardsByUserCard.get(userCardId);
             if (card == null) {
                 throw new InvalidCardSelectionException("현재 연동에 속하지 않은 카드입니다.");
@@ -271,7 +274,6 @@ public class CardLinkService {
             if (!missingFields.isEmpty()) {
                 credentialIssues.add(new CardCredentialIssue(userCardId, missingFields));
             }
-            activeIds.add(userCardId);
         }
         if (!credentialIssues.isEmpty()) {
             throw new CardCredentialRequiredException(credentialIssues);
