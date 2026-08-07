@@ -13,15 +13,10 @@
         </constructor>
     </resultMap>
 
-    <!-- kakao_category_maps에 활성 매핑이 없는 카테고리(간편결제/OTT 등 물리적 위치가 없는 카테고리)는
-         지도에서 검색할 방법이 없으므로 제외한다. -->
     <select id="findAllOrderedByDisplayOrder" resultMap="merchantCategoryRowMap">
-        SELECT mc.merchant_category_id, mc.category_code, mc.category_name, mc.display_order
-        FROM merchant_categories mc
-        WHERE EXISTS (
-            SELECT 1 FROM kakao_category_maps k
-            WHERE k.merchant_category_id = mc.merchant_category_id AND k.enabled = TRUE
-        )
-        ORDER BY mc.display_order ASC
+        SELECT merchant_category_id, category_code, category_name, display_order
+        FROM merchant_categories
+        WHERE is_map_visible = TRUE
+        ORDER BY display_order ASC
     </select>
 </mapper>

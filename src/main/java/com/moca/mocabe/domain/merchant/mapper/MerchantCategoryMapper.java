@@ -7,6 +7,6 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MerchantCategoryMapper {
 
-    /** 대/하위 카테고리 전체를 parent_id, display_order 기준으로 조회한다. */
+    /** 지도에 노출할 카테고리 전체를 display_order 기준으로 조회한다. */
     List<MerchantCategoryRow> findAllOrderedByDisplayOrder();
 }

@@ -47,14 +47,11 @@ class MerchantCategoryMapperPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("kakao_category_maps에 활성 매핑이 있는 카테고리만 display_order 순으로 조회한다")
-    void findsMappedCategories() {
-        insertCategory(MART_ID, "MART", "대형마트", 1);
-        insertCategory(CAFE_ID, "CAFE", "카페", 2);
-        insertCategory(SIMPLEPAY_ID, "SIMPLEPAY", "간편결제", 3);
-        insertKakaoCategoryMap(MART_ID, "MT1");
-        insertKakaoCategoryMap(CAFE_ID, "CE7");
-        // SIMPLEPAY_ID는 매핑을 넣지 않는다 = 지도 대상 아님
+    @DisplayName("is_map_visible=TRUE인 카테고리만 display_order 순으로 조회한다")
+    void findsMapVisibleCategories() {
+        insertCategory(MART_ID, "MART", "대형마트", 1, true);
+        insertCategory(CAFE_ID, "CAFE", "카페", 2, true);
+        insertCategory(SIMPLEPAY_ID, "SIMPLEPAY", "간편결제", 3, false);
 
         List<MerchantCategoryRow> rows = merchantCategoryMapper.findAllOrderedByDisplayOrder();
 
@@ -73,33 +70,12 @@ class MerchantCategoryMapperPersistenceIntegrationTest {
         assertEquals(0, merchantCategoryMapper.findAllOrderedByDisplayOrder().size());
     }
 
-    @Test
-    @DisplayName("kakao_category_maps 매핑이 비활성(enabled=false)이면 제외한다")
-    void excludesCategoriesWithDisabledMapping() {
-        insertCategory(MART_ID, "MART", "대형마트", 1);
-        jdbcTemplate.update("INSERT INTO kakao_category_maps "
-                        + "(kakao_category_map_id, merchant_category_id, kakao_category_group_code, "
-                        + "kakao_category_name_pattern, priority, enabled, created_at, updated_at) "
-                        + "VALUES (?, ?, 'MT1', '대형마트', 1, FALSE, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                "k0000000-0000-4000-8000-000000000001", MART_ID);
-
-        assertEquals(0, merchantCategoryMapper.findAllOrderedByDisplayOrder().size());
-    }
-
-    private void insertCategory(String id, String code, String name, int displayOrder) {
+    private void insertCategory(String id, String code, String name, int displayOrder, boolean mapVisible) {
         jdbcTemplate.update("INSERT INTO merchant_categories "
-                        + "(merchant_category_id, category_code, category_name, display_order, "
+                        + "(merchant_category_id, category_code, category_name, display_order, is_map_visible, "
                         + "created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                id, code, name, displayOrder);
-    }
-
-    private void insertKakaoCategoryMap(String categoryId, String groupCode) {
-        jdbcTemplate.update("INSERT INTO kakao_category_maps "
-                        + "(kakao_category_map_id, merchant_category_id, kakao_category_group_code, "
-                        + "kakao_category_name_pattern, priority, enabled, created_at, updated_at) "
-                        + "VALUES (UUID(), ?, ?, ?, 1, TRUE, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
-                categoryId, groupCode, groupCode);
+                        + "VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                id, code, name, displayOrder, mapVisible);
     }
 
     private void deleteTestData() {
