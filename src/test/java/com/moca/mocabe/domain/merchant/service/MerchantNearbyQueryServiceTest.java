@@ -53,7 +53,7 @@ class MerchantNearbyQueryServiceTest {
 
         assertEquals(1, results.size());
         assertEquals("m-starbucks", results.get(0).merchantId());
-        assertEquals("스타벅스", results.get(0).name());
+        assertEquals("스타벅스 강남점", results.get(0).name());
         assertEquals(120, results.get(0).distanceMeters());
         verify(kakaoLocalClient, never()).searchByKeyword(anyString(), anyDouble(), anyDouble(), anyInt());
     }

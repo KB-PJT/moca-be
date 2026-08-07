@@ -106,8 +106,6 @@ public class MerchantNearbyQueryService {
         Set<String> categoryMerchantIds = categoryMerchants.stream()
                 .map(MerchantListRow::merchantId)
                 .collect(Collectors.toSet());
-        Map<String, String> merchantNamesById = categoryMerchants.stream()
-                .collect(Collectors.toMap(MerchantListRow::merchantId, MerchantListRow::name));
 
         MerchantCandidateSnapshot snapshot = merchantLookup.loadCandidates();
         Map<String, KakaoPlace> closestPlaceByMerchantId = new LinkedHashMap<>();
@@ -125,7 +123,7 @@ public class MerchantNearbyQueryService {
         }
 
         return closestPlaceByMerchantId.entrySet().stream()
-                .map(entry -> new NearbyMerchantResponse(entry.getKey(), merchantNamesById.get(entry.getKey()),
+                .map(entry -> new NearbyMerchantResponse(entry.getKey(), entry.getValue().placeName(),
                         entry.getValue().latitude(), entry.getValue().longitude(),
                         entry.getValue().distanceMeters()))
                 .sorted(Comparator.comparing(NearbyMerchantResponse::distanceMeters,
