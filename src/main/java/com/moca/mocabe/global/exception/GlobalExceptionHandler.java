@@ -27,6 +27,7 @@ import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -126,11 +127,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CardCredentialRequiredException.class)
     public ResponseEntity<ApiErrorResponse> handleCardCredentialRequired(
             CardCredentialRequiredException exception) {
-        // 여러 카드를 한 번에 활성화하는 요청에서도 어느 카드가 문제인지 응답만으로 알 수 있도록
-        // userCardId를 필드 검증 메시지와 함께 fields에 담는다.
-        Map<String, String> fields = new LinkedHashMap<>(exception.getFields());
-        fields.put("userCardId", exception.getUserCardId());
-        return error(HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED", exception.getMessage(), fields);
+        // 여러 카드를 한 번에 활성화하는 요청이면 문제 있는 카드를 모두 배열로 내려준다(하나면 한 건만).
+        List<ApiErrorResponse.CardFieldError> cards = exception.getIssues().stream()
+                .map(issue -> new ApiErrorResponse.CardFieldError(issue.userCardId(), issue.fields()))
+                .toList();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiErrorResponse.ofCards("CARD_CREDENTIAL_REQUIRED", exception.getMessage(), cards));
     }
 
     @ExceptionHandler(CardNumberMismatchException.class)

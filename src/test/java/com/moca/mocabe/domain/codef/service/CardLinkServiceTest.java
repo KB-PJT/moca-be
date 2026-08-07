@@ -44,6 +44,7 @@ import com.moca.mocabe.domain.codef.mapper.CodefCredentialMapper;
 import com.moca.mocabe.domain.codef.mapper.IssuerMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
 import com.moca.mocabe.domain.codef.model.CardCatalogEntry;
+import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.domain.codef.model.CardCredentialSubmissionTarget;
 import com.moca.mocabe.domain.codef.model.CardOptionRow;
 import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
@@ -565,9 +566,38 @@ class CardLinkServiceTest {
         CardCredentialRequiredException exception = assertThrows(CardCredentialRequiredException.class,
                 () -> cardLinkService.activateCards(USER_ID, linkId, activateRequest(List.of("uc-1"))));
 
-        assertEquals("카드번호가 필요합니다.", exception.getFields().get("cardNo"));
-        assertEquals("카드 비밀번호가 필요합니다.", exception.getFields().get("cardPassword"));
-        assertEquals("uc-1", exception.getUserCardId());
+        assertEquals(1, exception.getIssues().size());
+        CardCredentialIssue issue = exception.getIssues().get(0);
+        assertEquals("uc-1", issue.userCardId());
+        assertEquals("카드번호가 필요합니다.", issue.fields().get("cardNo"));
+        assertEquals("카드 비밀번호가 필요합니다.", issue.fields().get("cardPassword"));
+        verify(linkedCardMapper, never()).activateCards(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("여러 카드를 한 번에 활성화할 때 카드정보가 부족한 카드가 여럿이면 전부 모아서 알려준다")
+    void rejectsActivationWithAllCardsMissingCredentials() {
+        String linkId = "link-1";
+        when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
+        when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID)).thenReturn(List.of(
+                new LinkedCardRow("uc-1", "card-1", true, true, false, false),
+                new LinkedCardRow("uc-2", "card-2", true, false, false, true),
+                new LinkedCardRow("uc-3", "card-3", true, true, true, true)));
+
+        CardCredentialRequiredException exception = assertThrows(CardCredentialRequiredException.class,
+                () -> cardLinkService.activateCards(
+                        USER_ID, linkId, activateRequest(List.of("uc-1", "uc-2", "uc-3"))));
+
+        // uc-3은 카드번호·비밀번호가 모두 있으므로 문제 목록에 포함되지 않는다.
+        assertEquals(2, exception.getIssues().size());
+        CardCredentialIssue first = exception.getIssues().get(0);
+        assertEquals("uc-1", first.userCardId());
+        assertEquals("카드번호가 필요합니다.", first.fields().get("cardNo"));
+        assertEquals("카드 비밀번호가 필요합니다.", first.fields().get("cardPassword"));
+        CardCredentialIssue second = exception.getIssues().get(1);
+        assertEquals("uc-2", second.userCardId());
+        assertEquals("카드번호가 필요합니다.", second.fields().get("cardNo"));
+        assertNull(second.fields().get("cardPassword"));
         verify(linkedCardMapper, never()).activateCards(any(), any(), any());
     }
 
@@ -637,8 +667,9 @@ class CardLinkServiceTest {
         CardCredentialRequiredException exception = assertThrows(CardCredentialRequiredException.class,
                 () -> cardLinkService.submitCardCredentials(USER_ID, "uc-1", request));
 
-        assertEquals("카드 비밀번호는 필수입니다.", exception.getFields().get("cardPassword"));
-        assertEquals("uc-1", exception.getUserCardId());
+        assertEquals(1, exception.getIssues().size());
+        assertEquals("uc-1", exception.getIssues().get(0).userCardId());
+        assertEquals("카드 비밀번호는 필수입니다.", exception.getIssues().get(0).fields().get("cardPassword"));
         verifyNoInteractions(codefClient);
     }
 

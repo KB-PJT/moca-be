@@ -17,6 +17,7 @@ import com.moca.mocabe.domain.codef.exception.IssuerNotFoundException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
+import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
@@ -28,6 +29,7 @@ import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
@@ -238,16 +240,18 @@ class GlobalExceptionHandlerTest {
         fields.put("cardNo", "카드번호가 필요합니다.");
 
         ResponseEntity<ApiErrorResponse> requiredResponse = handler.handleCardCredentialRequired(
-                new CardCredentialRequiredException("uc-1", fields));
+                new CardCredentialRequiredException(List.of(new CardCredentialIssue("uc-1", fields))));
         ResponseEntity<ApiErrorResponse> mismatchResponse = handler.handleCardNumberMismatch(
                 new CardNumberMismatchException());
         ResponseEntity<ApiErrorResponse> notFoundResponse = handler.handleUserCardNotFound(
                 new UserCardNotFoundException());
 
         assertError(requiredResponse, HttpStatus.BAD_REQUEST, "CARD_CREDENTIAL_REQUIRED");
-        assertEquals("카드번호가 필요합니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
-        // 여러 카드를 한 번에 활성화하는 요청에서도 어느 카드가 문제인지 fields만 보고 알 수 있어야 한다.
-        assertEquals("uc-1", requiredResponse.getBody().getError().getFields().get("userCardId"));
+        // 여러 카드를 한 번에 활성화하는 요청이면 카드별로 배열에 담겨 내려온다(하나면 한 건만).
+        assertEquals(1, requiredResponse.getBody().getError().getCards().size());
+        assertEquals("uc-1", requiredResponse.getBody().getError().getCards().get(0).getUserCardId());
+        assertEquals("카드번호가 필요합니다.",
+                requiredResponse.getBody().getError().getCards().get(0).getFields().get("cardNo"));
         assertError(mismatchResponse, HttpStatus.BAD_REQUEST, "CARD_NUMBER_MISMATCH");
         assertError(notFoundResponse, HttpStatus.NOT_FOUND, "USER_CARD_NOT_FOUND");
     }
