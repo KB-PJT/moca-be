@@ -1,21 +1,24 @@
 package com.moca.mocabe.domain.home.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
-import com.moca.mocabe.domain.card.mapper.UserCardMapper;
-import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
+import com.moca.mocabe.domain.home.dto.RecentBenefitsResponse;
+import com.moca.mocabe.domain.home.mapper.HomeMapper;
+import com.moca.mocabe.domain.home.model.HomeCardRow;
+import com.moca.mocabe.domain.home.model.RecentBenefitRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
-import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.util.List;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,13 +35,13 @@ class HomeQueryServiceTest {
     private UserMapper userMapper;
 
     @Mock
-    private UserCardMapper userCardMapper;
+    private HomeMapper homeMapper;
 
     private HomeQueryService homeQueryService;
 
     @BeforeEach
     void setUp() {
-        homeQueryService = new HomeQueryService(userMapper, userCardMapper);
+        homeQueryService = new HomeQueryService(userMapper, homeMapper);
     }
 
     @Test
@@ -57,10 +60,8 @@ class HomeQueryServiceTest {
     @DisplayName("카드 조회는 저장된 정렬 모드와 카드 배열의 선택 카드를 반환한다")
     void returnsCardsWithSavedOrderMode() {
         when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "MANUAL"));
-        UserCardListRow row = new UserCardListRow();
-        row.setUserCardId("01980d6a-5c0c-7aaf-9b85-010203040531");
-        row.setCardName("신한 Mr.Life");
-        when(userCardMapper.findHomeCardsByUserId(USER_ID, "MANUAL")).thenReturn(List.of(row));
+        HomeCardRow row = card("01980d6a-5c0c-7aaf-9b85-010203040531", "신한 Mr.Life", 1, 0, 0, 0, 0);
+        when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of(row));
 
         HomeCardsResponse response = homeQueryService.getCards(USER_ID, "2026-07", null);
 
@@ -74,44 +75,45 @@ class HomeQueryServiceTest {
     @DisplayName("자동 정렬을 명시하면 첫 카드에 자동 정렬 안내를 표시한다")
     void returnsCardsWithRequestedAutoOrderMode() {
         when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "MANUAL"));
-        UserCardListRow row = new UserCardListRow();
-        row.setUserCardId("01980d6a-5c0c-7aaf-9b85-010203040532");
-        row.setCardName("신한 Deep Dream");
-        when(userCardMapper.findHomeCardsByUserId(USER_ID, "AUTO")).thenReturn(List.of(row));
+        HomeCardRow row = card("01980d6a-5c0c-7aaf-9b85-010203040532", "신한 Deep Dream", 1, 0, 0, 0, 0);
+        when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of(row));
 
         HomeCardsResponse response = homeQueryService.getCards(USER_ID, "2026-07", "auto");
 
         assertEquals("AUTO", response.getOrderMode());
-        assertEquals("사용자가 저장한 자동 정렬 순서", response.getCards().get(0).getAutoOrderReason());
+        assertEquals("다음 실적 구간까지 남은 금액이 가장 적은 카드", response.getCards().get(0).getAutoOrderReason());
     }
 
     @Test
-    @DisplayName("보유 카드가 없으면 404용 예외를 반환한다")
-    void rejectsWhenCardsAreEmpty() {
+    @DisplayName("보유 카드가 없으면 빈 캐러셀을 반환한다")
+    void returnsEmptyCardsWhenNoCardsExist() {
         when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
-        when(userCardMapper.findHomeCardsByUserId(USER_ID, "AUTO")).thenReturn(List.of());
+        when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of());
 
-        assertThrows(HomeDataNotFoundException.class,
-                () -> homeQueryService.getCards(USER_ID, "2026-07", null));
+        HomeCardsResponse response = homeQueryService.getCards(USER_ID, "2026-07", null);
+
+        assertNull(response.getSelectedUserCardId());
+        assertEquals(List.of(), response.getCards());
     }
 
     @Test
     @DisplayName("저장된 카드 정렬 방식이 없으면 자동 정렬을 기본값으로 사용한다")
     void defaultsToAutoOrderWhenSavedModeIsMissing() {
         when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", null));
-        when(userCardMapper.findHomeCardsByUserId(USER_ID, "AUTO")).thenReturn(List.of());
+        when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of());
 
-        assertThrows(HomeDataNotFoundException.class,
-                () -> homeQueryService.getCards(USER_ID, "2026-07", null));
+        assertEquals("AUTO", homeQueryService.getCards(USER_ID, "2026-07", null).getOrderMode());
     }
 
     @Test
-    @DisplayName("최근 혜택 내역이 없으면 404용 예외를 반환한다")
-    void rejectsWhenRecentBenefitsAreEmpty() {
+    @DisplayName("최근 혜택 내역이 없으면 빈 배열을 반환한다")
+    void returnsEmptyRecentBenefits() {
         when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+        when(homeMapper.findRecentBenefits(org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(5))).thenReturn(List.of());
 
-        assertThrows(HomeDataNotFoundException.class,
-                () -> homeQueryService.getRecentBenefits(USER_ID, "2026-07", 5));
+        assertEquals(List.of(), homeQueryService.getRecentBenefits(USER_ID, "2026-07", 5).getBenefits());
     }
 
     @Test
@@ -133,6 +135,48 @@ class HomeQueryServiceTest {
                 () -> homeQueryService.getCards(USER_ID, "2026-07", "RANDOM"));
         assertThrows(InvalidHomeQueryException.class,
                 () -> homeQueryService.getRecentBenefits(USER_ID, "2026-07", 6));
+    }
+
+    @Test
+    @DisplayName("카드 요약과 최근 혜택을 실제 집계값으로 변환한다")
+    void mapsHomeAggregates() {
+        when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+        HomeCardRow row = card("card-1", "신한 Mr.Life", 1, 30000, 21800, 382000, 500000);
+        row.setHighlightBenefitTitle("스타벅스 10% 할인");
+        when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of(row));
+        RecentBenefitRow recentBenefit = new RecentBenefitRow();
+        recentBenefit.setBenefitHistoryId("usage-1");
+        recentBenefit.setMerchantName("스타벅스");
+        recentBenefit.setBenefitType("DISCOUNT");
+        recentBenefit.setBenefitTitle("카페 10% 할인");
+        recentBenefit.setCardName("신한 Mr.Life");
+        recentBenefit.setPaymentAmount(15000);
+        recentBenefit.setBenefitAmount(1500);
+        recentBenefit.setOccurredAt(LocalDateTime.of(2026, 7, 27, 5, 30));
+        when(homeMapper.findRecentBenefits(org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(5))).thenReturn(List.of(recentBenefit));
+
+        HomeCardsResponse cards = homeQueryService.getCards(USER_ID, "2026-07", "AUTO");
+        RecentBenefitsResponse benefits = homeQueryService.getRecentBenefits(USER_ID, "2026-07", 5);
+
+        assertEquals(8200, cards.getCards().get(0).getSummary().getAvailableBenefitAmount());
+        assertEquals(76, cards.getCards().get(0).getSummary().getPerformanceRate());
+        assertEquals("월 최대 30,000원", cards.getCards().get(0).getHighlightBenefit().getMonthlyLimitText());
+        assertEquals("2026-07-27T14:30:00+09:00", benefits.getBenefits().get(0).getOccurredAt());
+    }
+
+    private HomeCardRow card(String userCardId, String cardName, int displayOrder,
+                             long maximumBenefit, long receivedBenefit, long currentSpend, long targetSpend) {
+        HomeCardRow row = new HomeCardRow();
+        row.setUserCardId(userCardId);
+        row.setCardName(cardName);
+        row.setDisplayOrder(displayOrder);
+        row.setMaximumMonthlyBenefitAmount(maximumBenefit);
+        row.setReceivedBenefitAmount(receivedBenefit);
+        row.setPerformanceCurrentAmount(currentSpend);
+        row.setPerformanceTargetAmount(targetSpend);
+        return row;
     }
 
     private UserProfile profile(String nickname, String cardSortMode) {

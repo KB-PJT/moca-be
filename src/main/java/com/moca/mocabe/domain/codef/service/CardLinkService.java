@@ -280,10 +280,10 @@ public class CardLinkService {
             }
         }
 
-        // 선택형 카드는 검증 완료(verified) 옵션을 그룹마다 하나씩 골랐는지 확인한다.
+        // 선택형 카드는 관리자가 등록한 옵션을 그룹마다 하나씩 골랐는지 확인한다.
         for (String userCardId : activeIds) {
             List<CardOptionRow> options =
-                    cardCatalogMapper.findVerifiedOptionsByCardId(cardsByUserCard.get(userCardId).cardId());
+                    cardCatalogMapper.findOptionsByCardId(cardsByUserCard.get(userCardId).cardId());
             validateOptions(selectionsByCard.getOrDefault(userCardId, List.of()), options);
         }
 
@@ -349,7 +349,7 @@ public class CardLinkService {
     private CardLinkCardResponse buildSubmissionResponse(CardCredentialSubmissionTarget target) {
         CardCatalogEntry matched = cardCatalogMapper.findCardById(target.cardId());
         List<CardOptionGroupResponse> options =
-                groupOptions(cardCatalogMapper.findVerifiedOptionsByCardId(target.cardId()));
+                groupOptions(cardCatalogMapper.findOptionsByCardId(target.cardId()));
         return new CardLinkCardResponse(
                 target.userCardId(), target.cardId(), matched.cardName(), target.cardNo(),
                 target.institutionCode(), target.issuerName(), normalizeCardType(matched.cardType()),
@@ -367,7 +367,7 @@ public class CardLinkService {
         // 이미지: 카탈로그(카드고릴라) → CODEF resImageLink 순. 둘 다 없으면 null을 주고 기본 이미지는 프론트가 처리한다.
         String imageUrl = blankToNull(matchedCard ? matched.imageUrl() : ownedCard.imageUrl());
         List<CardOptionGroupResponse> options = matchedCard
-                ? groupOptions(cardCatalogMapper.findVerifiedOptionsByCardId(matched.cardId())) : List.of();
+                ? groupOptions(cardCatalogMapper.findOptionsByCardId(matched.cardId())) : List.of();
         // 매칭 성공 카드는 카탈로그의 card_type가 정확하므로 그것을 쓴다. CODEF resCardType는 비어 오기도 한다.
         String cardType = normalizeCardType(matchedCard ? matched.cardType() : ownedCard.cardType());
         return new CardLinkCardResponse(

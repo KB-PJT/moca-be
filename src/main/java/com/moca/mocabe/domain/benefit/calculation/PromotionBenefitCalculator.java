@@ -29,6 +29,11 @@ public class PromotionBenefitCalculator implements BenefitCalculator {
 
     @Override
     public BenefitCalculationResult calculate(BenefitRule rule, BenefitCalculationContext context) {
+        if (context.foreignTransaction()) {
+            return new BenefitCalculationResult(rule.ruleId(), rule.benefitType(), rule.rewardUnit(), false,
+                    BigDecimal.ZERO, BigDecimal.ZERO, remainingLimit(rule),
+                    BenefitRejectionReason.FOREIGN_TRANSACTION_NOT_SUPPORTED);
+        }
         if (!matchesPromotionCondition(rule, context)) {
             return new BenefitCalculationResult(rule.ruleId(), rule.benefitType(), rule.rewardUnit(), false,
                     BigDecimal.ZERO, BigDecimal.ZERO, remainingLimit(rule), BenefitRejectionReason.CONDITION_NOT_MET);

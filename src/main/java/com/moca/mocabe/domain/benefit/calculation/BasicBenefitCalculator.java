@@ -15,8 +15,23 @@ import com.moca.mocabe.domain.benefit.type.RewardUnit;
  */
 public class BasicBenefitCalculator implements BenefitCalculator {
 
+    private final BenefitRuleTargetEvaluator targetEvaluator = new BenefitRuleTargetEvaluator();
+    private final BenefitRuleScheduleEvaluator scheduleEvaluator = new BenefitRuleScheduleEvaluator();
+
     @Override
     public BenefitCalculationResult calculate(BenefitRule rule, BenefitCalculationContext context) {
+        if (context.foreignTransaction()) {
+            return reject(rule, BenefitRejectionReason.FOREIGN_TRANSACTION_NOT_SUPPORTED);
+        }
+
+        if (!targetEvaluator.matches(rule.targets(), context)) {
+            return reject(rule, BenefitRejectionReason.TARGET_NOT_MATCHED);
+        }
+
+        if (!scheduleEvaluator.matches(rule.schedules(), context.approvedAt())) {
+            return reject(rule, BenefitRejectionReason.CONDITION_NOT_MET);
+        }
+
         // 계산보다 먼저 적용 가능 조건을 확인해 사용자에게 명확한 미적용 사유를 돌려준다.
         if (rule.merchantEligibilityRequired() && !context.merchantEligible()) {
             return reject(rule, BenefitRejectionReason.MERCHANT_NOT_ELIGIBLE);
@@ -52,7 +67,10 @@ public class BasicBenefitCalculator implements BenefitCalculator {
         BigDecimal appliedRewardValue = applyMonthlyLimit(rule, rawRewardValue);
 
         if (isPositive(rawRewardValue) && isZero(appliedRewardValue)) {
-            return reject(rule, BenefitRejectionReason.MONTHLY_LIMIT_EXHAUSTED);
+            // 한도가 소진돼 적용되지 않아도 산식으로 계산된 예상 혜택은 missed 원장에 남겨야 한다.
+            return new BenefitCalculationResult(rule.ruleId(), rule.benefitType(), rule.rewardUnit(), false,
+                    rawRewardValue, BigDecimal.ZERO, remainingLimitAfter(rule, BigDecimal.ZERO),
+                    BenefitRejectionReason.MONTHLY_LIMIT_EXHAUSTED);
         }
 
         return new BenefitCalculationResult(rule.ruleId(), rule.benefitType(), rule.rewardUnit(), true,

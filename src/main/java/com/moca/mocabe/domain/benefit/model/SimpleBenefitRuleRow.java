@@ -1,0 +1,10 @@
+package com.moca.mocabe.domain.benefit.model;
+
+import java.math.BigDecimal;
+
+/** 자동 계산이 허용된 단순 혜택 룰의 평탄화 조회 행이다. */
+public record SimpleBenefitRuleRow(String ruleId, String offerId, String rewardType, String rewardUnit,
+                                   BigDecimal rewardValue, BigDecimal rewardBasisAmount,
+                                   BigDecimal previousSpendMinKrw, BigDecimal transactionMinKrw,
+                                   String targetType, String targetCode, int conditionGroup) {
+}

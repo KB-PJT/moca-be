@@ -155,12 +155,12 @@ class CodefPersistenceIntegrationTest {
                 "0000000000000000000000000000000000000000000000000000000000000000",
                 "노리2 체크카드(KB Pay)", "https://gorilla/card.png");
         jdbcTemplate.update("INSERT INTO card_option_groups "
-                        + "(option_group_id, card_id, group_key, group_name, parse_status, parse_confidence) "
-                        + "VALUES (?, ?, 'main', '혜택 팩', 'verified', 0.9900)",
+                        + "(option_group_id, card_id, group_key, group_name) "
+                        + "VALUES (?, ?, 'main', '혜택 팩')",
                 OPTION_GROUP_ID, CARD_ID);
         jdbcTemplate.update("INSERT INTO card_option_choices "
-                        + "(option_choice_id, option_group_id, choice_key, choice_name, "
-                        + "parse_status, parse_confidence) VALUES (?, ?, 'a', 'A팩', 'verified', 0.9900)",
+                        + "(option_choice_id, option_group_id, choice_key, choice_name) "
+                        + "VALUES (?, ?, 'a', 'A팩')",
                 OPTION_CHOICE_ID, OPTION_GROUP_ID);
         // 계정 생성 시 입력한 카드번호(요청)와 마스킹 카드번호(응답)의 앞6·뒤4자리가 일치해 카드번호/비밀번호가
         // 미리 채워지지만, 활성화 자체는 이 시점에 일어나지 않고 여전히 명시적인 활성화 요청이 필요하다.

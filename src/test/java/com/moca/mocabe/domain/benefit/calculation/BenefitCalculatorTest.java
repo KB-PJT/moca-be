@@ -204,6 +204,9 @@ class BenefitCalculatorTest {
         BenefitCalculationResult result = calculator.calculate(rule, context);
 
         assertFalse(result.applicable());
+        assertBigDecimalEquals("1000", result.rawRewardValue());
+        assertBigDecimalEquals("0", result.appliedRewardValue());
+        assertBigDecimalEquals("0", result.remainingLimitValue());
         assertEquals(BenefitRejectionReason.MONTHLY_LIMIT_EXHAUSTED, result.rejectionReason());
     }
 

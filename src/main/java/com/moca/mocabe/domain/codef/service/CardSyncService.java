@@ -20,6 +20,7 @@ import com.moca.mocabe.domain.codef.model.PerformanceSnapshotUpsert;
 import com.moca.mocabe.domain.codef.model.UserCardMatchRow;
 import com.moca.mocabe.domain.merchant.service.MerchantCandidateSnapshot;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
+import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * POST /me/cards/sync에서 CODEF 승인내역을 조회해 새 건만 card_payment_approvals에 적재하고,
@@ -49,7 +51,8 @@ import java.util.logging.Logger;
  * 비씨카드(0305)는 CODEF가 startDate 기준 "전월" 실적을 주는 카드사라 조회 대상 월보다 한 달 뒤를
  * startDate로 보내야 하며, 이 보정은 이 카드사에만 적용한다.
  *
- * 취소·부분취소·거절 및 해외결제는 제외하고, 정상 국내 승인건만 적재한다.
+ * 취소·부분취소·거절 및 해외결제는 반전 처리하지 않고 완전히 제외한다. 따라서 이 항목들은 승인 적재,
+ * 혜택 계산, 미적용 혜택 집계 어느 단계에도 들어가지 않으며 정상 국내 승인건만 적재한다.
  * 카드 매칭은 {@link ApprovalCardMatcher}, 가맹점 매칭은 {@link MerchantLookup}에 위임하며,
  * 이미 적재된 건은 (카드+승인번호) 또는 (카드+시각+금액+가맹점명)으로 중복을 걸러낸다.
  */
@@ -75,11 +78,21 @@ public class CardSyncService {
     private final ApprovalIngestStore approvalIngestStore;
     private final PerformanceSnapshotStore performanceSnapshotStore;
     private final Encryptor encryptor;
+    private final BenefitUsageCalculationService benefitUsageCalculationService;
 
     public CardSyncService(CodefClient codefClient, CodefCredentialMapper codefCredentialMapper,
                            CardApprovalMapper cardApprovalMapper, ApprovalCardMatcher approvalCardMatcher,
                            MerchantLookup merchantLookup, ApprovalIngestStore approvalIngestStore,
                            PerformanceSnapshotStore performanceSnapshotStore, Encryptor encryptor) {
+        this(codefClient, codefCredentialMapper, cardApprovalMapper, approvalCardMatcher, merchantLookup,
+                approvalIngestStore, performanceSnapshotStore, encryptor, BenefitUsageCalculationService.noop());
+    }
+
+    public CardSyncService(CodefClient codefClient, CodefCredentialMapper codefCredentialMapper,
+                           CardApprovalMapper cardApprovalMapper, ApprovalCardMatcher approvalCardMatcher,
+                           MerchantLookup merchantLookup, ApprovalIngestStore approvalIngestStore,
+                           PerformanceSnapshotStore performanceSnapshotStore, Encryptor encryptor,
+                           BenefitUsageCalculationService benefitUsageCalculationService) {
         this.codefClient = codefClient;
         this.codefCredentialMapper = codefCredentialMapper;
         this.cardApprovalMapper = cardApprovalMapper;
@@ -88,9 +101,15 @@ public class CardSyncService {
         this.approvalIngestStore = approvalIngestStore;
         this.performanceSnapshotStore = performanceSnapshotStore;
         this.encryptor = encryptor;
+        this.benefitUsageCalculationService = benefitUsageCalculationService;
     }
 
-    /** startDate/endDate는 KST 기준이며, null이면 이번 달 1일~오늘로 기본값을 채운다. */
+    /**
+     * startDate/endDate는 KST 기준이며, null이면 이번 달 1일~오늘로 기본값을 채운다.
+     * 승인 적재·혜택 계산·실적 스냅샷은 하나의 트랜잭션으로 확정한다. 계산이 실패하면 승인만 남아
+     * 재동기화에서 영구적으로 계산이 누락되는 상태를 막기 위해 전체를 롤백한다.
+     */
+    @Transactional
     public SyncMyCardsResponse sync(String userId, LocalDate startDate, LocalDate endDate) {
         LocalDate today = LocalDate.now(KST);
         LocalDate from = startDate != null ? startDate : today.withDayOfMonth(1);
@@ -168,7 +187,15 @@ public class CardSyncService {
                         inserts, performanceUpserts);
             }
         }
-        int inserted = approvalIngestStore.insertAll(inserts);
+        int inserted;
+        if (benefitUsageCalculationService.isEnabled()) {
+            List<ApprovalInsert> insertedApprovals = approvalIngestStore.insertAllReturningInserted(inserts);
+            inserted = insertedApprovals.size();
+            benefitUsageCalculationService.calculateAndPersist(insertedApprovals);
+        } else {
+            // 기존 단위 테스트와 혜택 계산을 구성하지 않은 실행 환경의 동기화 계약을 그대로 보존한다.
+            inserted = approvalIngestStore.insertAll(inserts);
+        }
         int upsertedPerformances = performanceSnapshotStore.upsertAll(performanceUpserts);
         // 승인내역이 왜 적재되지 않는지 진단할 수 있도록 드랍 사유별 집계를 한 줄로 남긴다.
         LOGGER.info(String.format(

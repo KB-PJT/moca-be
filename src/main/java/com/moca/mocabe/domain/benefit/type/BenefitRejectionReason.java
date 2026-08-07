@@ -5,6 +5,8 @@ package com.moca.mocabe.domain.benefit.type;
  */
 public enum BenefitRejectionReason {
     NONE,
+    FOREIGN_TRANSACTION_NOT_SUPPORTED,
+    TARGET_NOT_MATCHED,
     CATEGORY_NOT_MATCHED,
     MIN_PAYMENT_NOT_MET,
     PERFORMANCE_NOT_MET,

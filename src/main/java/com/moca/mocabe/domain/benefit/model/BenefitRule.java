@@ -35,7 +35,9 @@ public record BenefitRule(
         int dailyUsageLimit,
         int monthlyUsageLimit,
         boolean merchantEligibilityRequired,
-        boolean paymentChannelEligibilityRequired
+        boolean paymentChannelEligibilityRequired,
+        Set<BenefitRuleTarget> targets,
+        Set<BenefitRuleSchedule> schedules
 ) {
 
     public BenefitRule(String ruleId, BenefitType benefitType, BenefitBasis benefitBasis, RewardUnit rewardUnit,
@@ -45,7 +47,19 @@ public record BenefitRule(
             BenefitPromotionCondition promotionCondition, Set<String> mocaCategories) {
         this(ruleId, benefitType, benefitBasis, rewardUnit, rewardRate, rewardValue, spendUnitAmount,
                 maximumBenefitBaseAmount, minimumPaymentAmount, requiredPreviousMonthSpend, monthlyLimitValue,
-                usedMonthlyValue, promotionCondition, mocaCategories, 0, 0, false, false);
+                usedMonthlyValue, promotionCondition, mocaCategories, 0, 0, false, false, Set.of(), Set.of());
+    }
+
+    public BenefitRule(String ruleId, BenefitType benefitType, BenefitBasis benefitBasis, RewardUnit rewardUnit,
+            BigDecimal rewardRate, BigDecimal rewardValue, BigDecimal spendUnitAmount,
+            BigDecimal maximumBenefitBaseAmount, BigDecimal minimumPaymentAmount,
+            BigDecimal requiredPreviousMonthSpend, BigDecimal monthlyLimitValue, BigDecimal usedMonthlyValue,
+            BenefitPromotionCondition promotionCondition, Set<String> mocaCategories, int dailyUsageLimit,
+            int monthlyUsageLimit, boolean merchantEligibilityRequired, boolean paymentChannelEligibilityRequired) {
+        this(ruleId, benefitType, benefitBasis, rewardUnit, rewardRate, rewardValue, spendUnitAmount,
+                maximumBenefitBaseAmount, minimumPaymentAmount, requiredPreviousMonthSpend, monthlyLimitValue,
+                usedMonthlyValue, promotionCondition, mocaCategories, dailyUsageLimit, monthlyUsageLimit,
+                merchantEligibilityRequired, paymentChannelEligibilityRequired, Set.of(), Set.of());
     }
 
     public BenefitRule {
@@ -60,6 +74,8 @@ public record BenefitRule(
         usedMonthlyValue = usedMonthlyValue == null ? BigDecimal.ZERO : usedMonthlyValue;
         promotionCondition = promotionCondition == null ? BenefitPromotionCondition.NONE : promotionCondition;
         mocaCategories = mocaCategories == null ? Set.of() : Set.copyOf(mocaCategories);
+        targets = targets == null ? Set.of() : Set.copyOf(targets);
+        schedules = schedules == null ? Set.of() : Set.copyOf(schedules);
         dailyUsageLimit = Math.max(dailyUsageLimit, 0);
         monthlyUsageLimit = Math.max(monthlyUsageLimit, 0);
     }

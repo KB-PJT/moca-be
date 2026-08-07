@@ -1,23 +1,27 @@
 package com.moca.mocabe.domain.home.service;
 
-import com.moca.mocabe.domain.card.mapper.UserCardMapper;
-import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.home.dto.HomeBenefitHighlightResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardSummaryResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
 import com.moca.mocabe.domain.home.dto.RecentBenefitsResponse;
+import com.moca.mocabe.domain.home.dto.RecentBenefitItemResponse;
+import com.moca.mocabe.domain.home.mapper.HomeMapper;
+import com.moca.mocabe.domain.home.model.HomeCardRow;
+import com.moca.mocabe.domain.home.model.RecentBenefitRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
-import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,20 +34,25 @@ public class HomeQueryService {
             DateTimeFormatter.ofPattern("uuuu-MM", Locale.ROOT)
                     .withResolverStyle(ResolverStyle.STRICT);
 
-    private final UserMapper userMapper;
-    private final UserCardMapper userCardMapper;
+    private static final DateTimeFormatter OCCURRED_AT_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
-    public HomeQueryService(UserMapper userMapper, UserCardMapper userCardMapper) {
+    private final UserMapper userMapper;
+    private final HomeMapper homeMapper;
+
+    public HomeQueryService(UserMapper userMapper, HomeMapper homeMapper) {
         this.userMapper = userMapper;
-        this.userCardMapper = userCardMapper;
+        this.homeMapper = homeMapper;
     }
 
     @Transactional(readOnly = true)
     public HomeGreetingResponse getGreeting(String userId, String requestedYearMonth) {
         String yearMonth = normalizeYearMonth(requestedYearMonth);
         UserProfile profile = requireProfile(userId);
-        long missedBenefitAmount = 0L;
-        String message = "이번 달 놓친 혜택이 없습니다.";
+        Long missed = homeMapper.sumMissedBenefitAmount(userId, yearMonth);
+        long missedBenefitAmount = missed == null ? 0L : missed;
+        String message = missedBenefitAmount > 0
+                ? String.format(Locale.KOREA, "이번 달 혜택 %,d원을 놓치고 있어요!", missedBenefitAmount)
+                : "이번 달 놓친 혜택이 없습니다.";
         return new HomeGreetingResponse(profile.getNickname(), yearMonth, missedBenefitAmount, message);
     }
 
@@ -52,24 +61,28 @@ public class HomeQueryService {
         String yearMonth = normalizeYearMonth(requestedYearMonth);
         UserProfile profile = requireProfile(userId);
         String orderMode = normalizeOrderMode(requestedOrderMode, profile.getCardSortMode());
-        List<UserCardListRow> rows = userCardMapper.findHomeCardsByUserId(userId, orderMode);
-        if (rows == null || rows.isEmpty()) {
-            throw new HomeDataNotFoundException("홈 화면에 표시할 보유 카드가 없습니다.");
-        }
+        List<HomeCardRow> rows = homeMapper.findHomeCards(userId, yearMonth);
         List<HomeCardResponse> cards = mapCards(rows, orderMode);
-        String selectedUserCardId = cards.get(0).getUserCardId();
+        String selectedUserCardId = cards.isEmpty() ? null : cards.get(0).getUserCardId();
         return new HomeCardsResponse(yearMonth, orderMode, selectedUserCardId, cards);
     }
 
     @Transactional(readOnly = true)
     public RecentBenefitsResponse getRecentBenefits(String userId, String requestedYearMonth, int limit) {
         requireProfile(userId);
-        normalizeYearMonth(requestedYearMonth);
+        YearMonth yearMonth = parseYearMonth(requestedYearMonth);
         if (limit < 1 || limit > 5) {
             throw new InvalidHomeQueryException("limit은 1에서 5 사이여야 합니다.");
         }
-        // 혜택 원천 거래/계산 테이블이 도입되기 전에는 표시할 데이터가 없다.
-        throw new HomeDataNotFoundException("최근 혜택 내역이 없습니다.");
+        LocalDateTime fromUtc = yearMonth.atDay(1).atStartOfDay(SEOUL)
+                .withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+        LocalDateTime toUtc = yearMonth.plusMonths(1).atDay(1).atStartOfDay(SEOUL)
+                .withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+        List<RecentBenefitRow> rows = homeMapper.findRecentBenefits(userId, fromUtc, toUtc, limit);
+        List<RecentBenefitItemResponse> benefits = (rows == null ? List.<RecentBenefitRow>of() : rows).stream()
+                .map(this::toRecentBenefit)
+                .toList();
+        return new RecentBenefitsResponse(benefits);
     }
 
     private UserProfile requireProfile(String userId) {
@@ -80,28 +93,82 @@ public class HomeQueryService {
         return profile;
     }
 
-    private List<HomeCardResponse> mapCards(List<UserCardListRow> rows, String orderMode) {
-        return java.util.stream.IntStream.range(0, rows.size())
-                .mapToObj(index -> toHomeCard(rows.get(index), index + 1, orderMode))
+    private List<HomeCardResponse> mapCards(List<HomeCardRow> rows, String orderMode) {
+        List<HomeCardRow> orderedRows = rows == null ? List.of() : rows.stream()
+                .sorted(cardComparator(orderMode))
+                .toList();
+        return java.util.stream.IntStream.range(0, orderedRows.size())
+                .mapToObj(index -> toHomeCard(orderedRows.get(index), index + 1, orderMode))
                 .toList();
     }
 
-    private HomeCardResponse toHomeCard(UserCardListRow row, int order, String orderMode) {
+    private Comparator<HomeCardRow> cardComparator(String orderMode) {
+        if (!"AUTO".equals(orderMode)) {
+            return Comparator.comparingInt(HomeCardRow::getDisplayOrder)
+                    .thenComparing(HomeCardRow::getUserCardId);
+        }
+        return Comparator.comparing((HomeCardRow row) -> !hasPerformanceTarget(row))
+                .thenComparingLong(this::performanceRemainingAmount)
+                .thenComparing(Comparator.comparingLong(this::availableBenefitAmount).reversed())
+                .thenComparingInt(HomeCardRow::getDisplayOrder)
+                .thenComparing(HomeCardRow::getUserCardId);
+    }
+
+    private HomeCardResponse toHomeCard(HomeCardRow row, int order, String orderMode) {
         String reason = "AUTO".equals(orderMode) && order == 1
-                ? "사용자가 저장한 자동 정렬 순서"
+                ? "다음 실적 구간까지 남은 금액이 가장 적은 카드"
                 : null;
-        HomeBenefitHighlightResponse highlight = new HomeBenefitHighlightResponse(null, null);
-        HomeCardSummaryResponse summary = new HomeCardSummaryResponse(0, 0, 0, 0, 0, 0, 0);
-        return new HomeCardResponse(row.getUserCardId(), order, row.getCardName(), row.getMemo(),
+        long availableBenefitAmount = availableBenefitAmount(row);
+        long remainingAmount = performanceRemainingAmount(row);
+        int performanceRate = performanceRate(row.getPerformanceCurrentAmount(), row.getPerformanceTargetAmount());
+        String monthlyLimitText = row.getMaximumMonthlyBenefitAmount() > 0
+                ? String.format(Locale.KOREA, "월 최대 %,d원", row.getMaximumMonthlyBenefitAmount())
+                : null;
+        HomeBenefitHighlightResponse highlight = new HomeBenefitHighlightResponse(
+                row.getHighlightBenefitTitle(), monthlyLimitText);
+        HomeCardSummaryResponse summary = new HomeCardSummaryResponse(
+                row.getReceivedBenefitAmount(), availableBenefitAmount, row.getMaximumMonthlyBenefitAmount(),
+                row.getPerformanceCurrentAmount(), row.getPerformanceTargetAmount(), performanceRate, remainingAmount);
+        return new HomeCardResponse(row.getUserCardId(), order, row.getCardName(), row.getAlias(),
                 row.getCardImageUrl(), reason, highlight, summary);
     }
 
+    private RecentBenefitItemResponse toRecentBenefit(RecentBenefitRow row) {
+        String occurredAt = row.getOccurredAt().atZone(ZoneOffset.UTC)
+                .withZoneSameInstant(SEOUL).format(OCCURRED_AT_FORMATTER);
+        return new RecentBenefitItemResponse(row.getBenefitHistoryId(), row.getMerchantName(), row.getBenefitType(),
+                row.getBenefitTitle(), row.getCardName(), row.getPaymentAmount(), row.getBenefitAmount(), occurredAt);
+    }
+
+    private long performanceRemainingAmount(HomeCardRow row) {
+        return Math.max(0, row.getPerformanceTargetAmount() - row.getPerformanceCurrentAmount());
+    }
+
+    private boolean hasPerformanceTarget(HomeCardRow row) {
+        return row.getPerformanceTargetAmount() > 0;
+    }
+
+    private long availableBenefitAmount(HomeCardRow row) {
+        return Math.max(0, row.getMaximumMonthlyBenefitAmount() - row.getReceivedBenefitAmount());
+    }
+
+    private int performanceRate(long currentAmount, long targetAmount) {
+        if (targetAmount <= 0) {
+            return 0;
+        }
+        return (int) Math.min(100, currentAmount * 100 / targetAmount);
+    }
+
     private String normalizeYearMonth(String requestedYearMonth) {
+        return parseYearMonth(requestedYearMonth).format(YEAR_MONTH_FORMATTER);
+    }
+
+    private YearMonth parseYearMonth(String requestedYearMonth) {
         if (requestedYearMonth == null || requestedYearMonth.isBlank()) {
-            return YearMonth.now(SEOUL).format(YEAR_MONTH_FORMATTER);
+            return YearMonth.now(SEOUL);
         }
         try {
-            return YearMonth.parse(requestedYearMonth, YEAR_MONTH_FORMATTER).format(YEAR_MONTH_FORMATTER);
+            return YearMonth.parse(requestedYearMonth, YEAR_MONTH_FORMATTER);
         } catch (DateTimeParseException exception) {
             throw new InvalidHomeQueryException("yearMonth는 YYYY-MM 형식이어야 합니다.");
         }

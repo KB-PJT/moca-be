@@ -241,7 +241,7 @@ class CardLinkServiceTest {
                 "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
         when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
         when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of(
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of(
                 new CardOptionRow("group-1", "main", "혜택 팩", "choice-1", "a", "A팩"),
                 new CardOptionRow("group-1", "main", "혜택 팩", "choice-2", "b", "B팩")));
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1});
@@ -421,7 +421,7 @@ class CardLinkServiceTest {
                 "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
         when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
         when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of());
         when(linkedCardMapper.findLinkedCardKeysByLinkId("link-kb", USER_ID))
                 .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key")));
 
@@ -448,7 +448,7 @@ class CardLinkServiceTest {
                 "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
         when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
         when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of());
         // 사전 조회 시점(findLinkedCardKeysByLinkId)엔 아직 없었지만, 실제 INSERT 시점엔 동시 요청이
         // 먼저 커밋해 UNIQUE 충돌이 나고, saveCard는 그 요청의 기존 userCardId를 돌려준다.
         when(codefCredentialStore.saveCard(any(LinkedCardInsert.class))).thenReturn("uc-from-other-request");
@@ -467,9 +467,9 @@ class CardLinkServiceTest {
         when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
         when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID)).thenReturn(List.of(
                 linkedCardRow("uc-1", "card-1"), linkedCardRow("uc-2", "card-2")));
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of(
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of(
                 new CardOptionRow("group-1", "main", "혜택 팩", "choice-1", "a", "A팩")));
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-2")).thenReturn(List.of());
+        when(cardCatalogMapper.findOptionsByCardId("card-2")).thenReturn(List.of());
         ActivateCardLinkCardsRequest request = activateRequest(List.of("uc-1", "uc-2"),
                 optionFor("uc-1", selection("group-1", "choice-1")));
 
@@ -489,7 +489,7 @@ class CardLinkServiceTest {
         when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
         when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID))
                 .thenReturn(List.of(linkedCardRow("uc-1", "card-1")));
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of());
 
         ActivateCardLinkCardsResponse response = cardLinkService.activateCards(
                 USER_ID, linkId, activateRequest(List.of("uc-1")));
@@ -544,7 +544,7 @@ class CardLinkServiceTest {
         when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
         when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID))
                 .thenReturn(List.of(linkedCardRow("uc-1", "card-1")));
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of(
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of(
                 new CardOptionRow("group-1", "main", "혜택 팩", "choice-1", "a", "A팩")));
 
         assertThrows(InvalidCardSelectionException.class, () -> cardLinkService.activateCards(
@@ -577,7 +577,7 @@ class CardLinkServiceTest {
         when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
         when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID)).thenReturn(
                 List.of(new LinkedCardRow("uc-1", "card-1", true, true, true, true)));
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of());
 
         ActivateCardLinkCardsResponse response = cardLinkService.activateCards(
                 USER_ID, linkId, activateRequest(List.of("uc-1")));
@@ -601,7 +601,7 @@ class CardLinkServiceTest {
         CardCatalogEntry matched = new CardCatalogEntry(
                 "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
         when(cardCatalogMapper.findCardById("card-1")).thenReturn(matched);
-        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of(
+        when(cardCatalogMapper.findOptionsByCardId("card-1")).thenReturn(List.of(
                 new CardOptionRow("group-1", "main", "혜택 팩", "choice-1", "a", "A팩")));
         SubmitCardCredentialsRequest request = new SubmitCardCredentialsRequest();
         request.setCardNo("9999888877776666");
