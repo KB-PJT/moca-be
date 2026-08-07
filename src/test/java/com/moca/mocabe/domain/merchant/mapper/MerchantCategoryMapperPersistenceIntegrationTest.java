@@ -70,6 +70,52 @@ class MerchantCategoryMapperPersistenceIntegrationTest {
         assertEquals(0, merchantCategoryMapper.findAllOrderedByDisplayOrder().size());
     }
 
+    @Test
+    @DisplayName("활성 카카오 그룹코드를 priority 순으로 조회한다")
+    void findsEnabledKakaoGroupCodes() {
+        insertCategory(MART_ID, "MART", "대형마트", 1, true);
+        insertKakaoCategoryMap(MART_ID, "PM9", 2, true);
+        insertKakaoCategoryMap(MART_ID, "HP8", 1, true);
+        insertKakaoCategoryMap(MART_ID, "MT1", 3, false);
+
+        List<String> groupCodes = merchantCategoryMapper.findEnabledKakaoGroupCodes(MART_ID);
+
+        assertEquals(List.of("HP8", "PM9"), groupCodes);
+    }
+
+    @Test
+    @DisplayName("활성 그룹코드 매핑이 없으면 빈 목록을 반환한다(2안 대상)")
+    void returnsEmptyGroupCodesWhenNotMapped() {
+        insertCategory(CAFE_ID, "CAFE", "카페", 1, true);
+
+        assertEquals(0, merchantCategoryMapper.findEnabledKakaoGroupCodes(CAFE_ID).size());
+    }
+
+    @Test
+    @DisplayName("is_map_visible=TRUE인 카테고리는 존재하는 것으로 판단한다")
+    void existsMapVisibleCategoryReturnsTrue() {
+        insertCategory(CAFE_ID, "CAFE", "카페", 1, true);
+
+        assertEquals(true, merchantCategoryMapper.existsMapVisibleCategory(CAFE_ID));
+    }
+
+    @Test
+    @DisplayName("is_map_visible=FALSE이거나 존재하지 않는 카테고리는 존재하지 않는 것으로 판단한다")
+    void existsMapVisibleCategoryReturnsFalse() {
+        insertCategory(SIMPLEPAY_ID, "SIMPLEPAY", "간편결제", 1, false);
+
+        assertEquals(false, merchantCategoryMapper.existsMapVisibleCategory(SIMPLEPAY_ID));
+        assertEquals(false, merchantCategoryMapper.existsMapVisibleCategory("no-such-id"));
+    }
+
+    private void insertKakaoCategoryMap(String categoryId, String groupCode, int priority, boolean enabled) {
+        jdbcTemplate.update("INSERT INTO kakao_category_maps "
+                        + "(kakao_category_map_id, merchant_category_id, kakao_category_group_code, "
+                        + "kakao_category_name_pattern, priority, enabled, created_at, updated_at) "
+                        + "VALUES (UUID(), ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                categoryId, groupCode, groupCode, priority, enabled);
+    }
+
     private void insertCategory(String id, String code, String name, int displayOrder, boolean mapVisible) {
         jdbcTemplate.update("INSERT INTO merchant_categories "
                         + "(merchant_category_id, category_code, category_name, display_order, is_map_visible, "

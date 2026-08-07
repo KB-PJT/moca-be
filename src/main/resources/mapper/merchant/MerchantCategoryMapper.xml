@@ -19,4 +19,20 @@
         WHERE is_map_visible = TRUE
         ORDER BY display_order ASC
     </select>
+
+    <select id="findEnabledKakaoGroupCodes" resultType="java.lang.String">
+        SELECT kakao_category_group_code
+        FROM kakao_category_maps
+        WHERE merchant_category_id = #{merchantCategoryId}
+          AND enabled = TRUE
+          AND kakao_category_group_code IS NOT NULL
+        ORDER BY priority ASC
+    </select>
+
+    <select id="existsMapVisibleCategory" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM merchant_categories
+            WHERE merchant_category_id = #{merchantCategoryId} AND is_map_visible = TRUE
+        )
+    </select>
 </mapper>
