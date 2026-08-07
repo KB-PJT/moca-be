@@ -928,7 +928,7 @@ components:
           type: string
         name:
           type: string
-          description: 카카오맵이 내려준 지점명 그대로입니다(예: "강남점" 포함). 브랜드명만 필요하면 merchantId로 조회하세요.
+          description: '카카오맵이 내려준 지점명 그대로입니다(예: "강남점" 포함). 브랜드명만 필요하면 merchantId로 조회하세요.'
           example: 스타벅스 강남점
         latitude:
           type: number
