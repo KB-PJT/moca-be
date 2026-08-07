@@ -754,6 +754,25 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
+  /me/onboarding-status:
+    get:
+      tags: [User]
+      summary: 신규 사용자 여부 조회
+      description: 보유 카드가(활성·비활성 무관) 하나도 없으면 신규 사용자로 판단합니다.
+      operationId: getMyOnboardingStatus
+      security:
+        - MocaBearerAuth: []
+      responses:
+        '200':
+          description: 신규 사용자 여부 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStatusApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
   /me/location-settings:
     get:
       tags: [User]
@@ -928,7 +947,7 @@ components:
           type: string
         name:
           type: string
-          description: 카카오맵이 내려준 지점명 그대로입니다(예: "강남점" 포함). 브랜드명만 필요하면 merchantId로 조회하세요.
+          description: '카카오맵이 내려준 지점명 그대로입니다(예: "강남점" 포함). 브랜드명만 필요하면 merchantId로 조회하세요.'
           example: 스타벅스 강남점
         latitude:
           type: number
@@ -1499,6 +1518,20 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/NotificationSettingsResponse'
+    OnboardingStatusResponse:
+      type: object
+      required: [newUser]
+      properties:
+        newUser:
+          type: boolean
+    OnboardingStatusApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/OnboardingStatusResponse'
     LocationSettingsRequest:
       type: object
       properties:

@@ -81,4 +81,11 @@
             </otherwise>
         </choose>
     </select>
+
+    <select id="existsByUserId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM user_cards uc
+            WHERE <include refid="userCardCondition"/>
+        )
+    </select>
 </mapper>

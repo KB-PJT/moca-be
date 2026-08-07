@@ -2,6 +2,7 @@ package com.moca.mocabe.domain.user.controller;
 
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.LocationSettingsResponse;
+import com.moca.mocabe.domain.user.dto.NewUserCheckResponse;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsResponse;
 import com.moca.mocabe.domain.user.dto.SuccessResponse;
@@ -53,6 +54,12 @@ public class UserController {
             @Valid @RequestBody UpdateCardSortModeRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 userApplicationService.updateCardSortMode(currentUserProvider.getCurrentUserId(), request)));
+    }
+
+    @GetMapping("/onboarding-status")
+    public ResponseEntity<ApiResponse<NewUserCheckResponse>> isNewUser() {
+        return ResponseEntity.ok(ApiResponse.success(
+                userApplicationService.isNewUser(currentUserProvider.getCurrentUserId())));
     }
 
     @GetMapping("/notification-settings")
