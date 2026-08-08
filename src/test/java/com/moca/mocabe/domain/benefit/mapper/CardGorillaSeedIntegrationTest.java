@@ -8,6 +8,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -16,6 +17,7 @@ import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Tag("integration")
+@EnabledIf(value = "isSeedScriptAvailable", disabledReason = "로컬 생성 seed SQL이 없어 검증을 건너뜁니다.")
 @DisplayName("카드고릴라 seed SQL")
 class CardGorillaSeedIntegrationTest {
 
@@ -23,6 +25,10 @@ class CardGorillaSeedIntegrationTest {
   private static final String EXISTING_ISSUER_ID = "01980d6a-5c0c-7aaf-9b85-010203040301";
   private static final String EXISTING_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040302";
   private static final String EXISTING_CONTENT_ID = "01980d6a-5c0c-7aaf-9b85-010203040303";
+
+  static boolean isSeedScriptAvailable() {
+    return new ClassPathResource(SEED_PATH).exists();
+  }
 
   @Test
   @DisplayName("MySQL 8에 카드 원문과 보수적으로 구조화한 계산 룰을 중복 없이 적재한다")
