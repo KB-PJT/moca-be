@@ -27,6 +27,7 @@ import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.merchant.KakaoUnavailableException;
 import com.moca.mocabe.global.exception.merchant.MerchantCategoryNotFoundException;
+import com.moca.mocabe.global.exception.merchant.MerchantNotFoundException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
@@ -124,6 +125,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleMerchantCategoryNotFound(
             MerchantCategoryNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, "MERCHANT_CATEGORY_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(MerchantNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleMerchantNotFound(MerchantNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "MERCHANT_NOT_FOUND", exception.getMessage());
     }
 
     @ExceptionHandler(KakaoUnavailableException.class)
