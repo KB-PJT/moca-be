@@ -21,6 +21,9 @@ import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
+import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
+import com.moca.mocabe.global.exception.benefit.InvalidBenefitHistoryQueryException;
+import com.moca.mocabe.global.exception.report.InvalidReportQueryException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
@@ -111,6 +114,24 @@ class GlobalExceptionHandlerTest {
     void handlesHomeDataNotFound() {
         assertError(handler.handleHomeDataNotFound(new HomeDataNotFoundException("empty")),
                 HttpStatus.NOT_FOUND, "HOME_DATA_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("혜택 이력과 리포트 조회 조건 오류를 공통 JSON 응답으로 변환한다")
+    void handlesBenefitHistoryAndReportQueryErrors() {
+        assertError(
+                handler.handleInvalidBenefitHistoryQuery(
+                        new InvalidBenefitHistoryQueryException("invalid history")),
+                HttpStatus.BAD_REQUEST,
+                "INVALID_BENEFIT_HISTORY_QUERY");
+        assertError(
+                handler.handleBenefitHistoryNotFound(new BenefitHistoryNotFoundException()),
+                HttpStatus.NOT_FOUND,
+                "BENEFIT_HISTORY_NOT_FOUND");
+        assertError(
+                handler.handleInvalidReportQuery(new InvalidReportQueryException("invalid report")),
+                HttpStatus.BAD_REQUEST,
+                "INVALID_REPORT_QUERY");
     }
 
     @Test

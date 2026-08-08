@@ -76,6 +76,8 @@ docs(github-flow): 이슈 템플릿 보완
 - 저장소의 Pull Request 템플릿을 사용한다.
 - 자식 이슈는 `Closes #번호`로 연결한다.
 - 변경 내용과 실행한 검증을 작성한다.
+- `git push` 전에는 `./gradlew check`를 통과해야 한다. pre-push 훅의 JaCoCo 100% 기준을
+  `--no-verify`로 우회해 push하지 않는다.
 
 ## Basic verification
 
@@ -92,4 +94,5 @@ docs(github-flow): 이슈 템플릿 보완
 
 - `spring-api`: Spring MVC API 작업
 - `mybatis-feature`: MyBatis Mapper와 SQL 작업
+- `benefit-calculation-test`: 카드 혜택 계산 규칙과 CODEF 역산 테스트 작업
 - `github-issue-writing`: GitHub 부모·작업 이슈 작성 전 템플릿을 읽고 형식에 맞춰 작성

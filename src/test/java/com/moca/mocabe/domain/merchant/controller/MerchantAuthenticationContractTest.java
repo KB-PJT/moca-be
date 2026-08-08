@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
+import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
@@ -17,6 +18,7 @@ import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
+import com.moca.mocabe.domain.report.service.ReportQueryService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.AuthenticatedUser;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
@@ -132,6 +134,16 @@ class MerchantAuthenticationContractTest {
         @Bean
         public HomeQueryService homeQueryService() {
             return mock(HomeQueryService.class);
+        }
+
+        @Bean
+        public BenefitHistoryQueryService benefitHistoryQueryService() {
+            return mock(BenefitHistoryQueryService.class);
+        }
+
+        @Bean
+        public ReportQueryService reportQueryService() {
+            return mock(ReportQueryService.class);
         }
 
         @Bean

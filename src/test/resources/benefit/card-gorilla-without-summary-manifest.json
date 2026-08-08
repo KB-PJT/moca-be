@@ -1,0 +1,1614 @@
+{
+  "metadata": {
+    "sourceFileName": "card_gorilla_without_summary_benefits.json",
+    "sourceSha256": "7ef0f1f4fe285f75486cc20b7abf596824fa08ec2d3f64d9cc5dfc065d7cadaa",
+    "sourceCardCount": 200,
+    "sourceBenefitCount": 1198,
+    "creditCardCount": 100,
+    "checkCardCount": 100,
+    "missingDetailTextCount": 5,
+    "summaryBenefitsExcluded": true
+  },
+  "cards": [
+    {
+      "cardId": "13",
+      "cardType": "credit",
+      "ranking": 1,
+      "name": "신한카드 Mr.Life",
+      "benefitCount": 11,
+      "benefitsSha256": "e4cceb21e9b090253b770c138ee4e4a7d46b8c10dcaa358428ad899e34a666bb"
+    },
+    {
+      "cardId": "2885",
+      "cardType": "credit",
+      "ranking": 2,
+      "name": "삼성 iD SELECT ALL 카드",
+      "benefitCount": 11,
+      "benefitsSha256": "2505cba8e7f453626708b8dd88018df101c1f9458b5069ddff20501f0dec7615"
+    },
+    {
+      "cardId": "106",
+      "cardType": "credit",
+      "ranking": 3,
+      "name": "굿데이카드",
+      "benefitCount": 6,
+      "benefitsSha256": "c1d64ef9ffcd6e3fb48b1b6a97e135af777ac62f939edceb142558f77288ddd6"
+    },
+    {
+      "cardId": "49",
+      "cardType": "credit",
+      "ranking": 4,
+      "name": "삼성카드 & MILEAGE PLATINUM (스카이패스)",
+      "benefitCount": 13,
+      "benefitsSha256": "7f28b9dccee08afc20899bd5ccaaf1dd7ee13468fddb8167c6ed4b99cfd2064c"
+    },
+    {
+      "cardId": "2441",
+      "cardType": "credit",
+      "ranking": 5,
+      "name": "KB국민 My WE:SH 카드",
+      "benefitCount": 10,
+      "benefitsSha256": "575c8a68c1363df72591f6eda1a5488bac6b7ef412eebf4158e32cdd5f6a2fac"
+    },
+    {
+      "cardId": "2930",
+      "cardType": "credit",
+      "ranking": 6,
+      "name": "KB YOU Prime 카드",
+      "benefitCount": 6,
+      "benefitsSha256": "57132dcb8ec26ab031dde934dec294ea27ff3389703a25174a0d6727ffa59041"
+    },
+    {
+      "cardId": "2881",
+      "cardType": "credit",
+      "ranking": 7,
+      "name": "알파벳카드S",
+      "benefitCount": 4,
+      "benefitsSha256": "c8687d4828dbd0fe31e915562fbae2b66f76f301810ec93f672909886d0516fc"
+    },
+    {
+      "cardId": "2663",
+      "cardType": "credit",
+      "ranking": 8,
+      "name": "American Express® Gold Card Edition2",
+      "benefitCount": 7,
+      "benefitsSha256": "952e9b9d02d0c7a1c1a0acc6aa85e95d2e2a77a05e2ed5dd0b7005e8fbf487ad"
+    },
+    {
+      "cardId": "2559",
+      "cardType": "credit",
+      "ranking": 9,
+      "name": "K-패스 (신용)",
+      "benefitCount": 11,
+      "benefitsSha256": "8504e20152bf80ed06f3d2e827809d64a694a08aebc4fd7163fad20e61262705"
+    },
+    {
+      "cardId": "2964",
+      "cardType": "credit",
+      "ranking": 10,
+      "name": "KB NEED Pay 카드",
+      "benefitCount": 6,
+      "benefitsSha256": "76495c86b2897a97a65ce134880d7d42fee04735bfa7753a4efb021568f6573f"
+    },
+    {
+      "cardId": "2986",
+      "cardType": "credit",
+      "ranking": 11,
+      "name": "삼성 iD SELECT UP 카드",
+      "benefitCount": 9,
+      "benefitsSha256": "1366590ec10de2ab5975f518074869405110540f99dec0c6477d18684de74fc7"
+    },
+    {
+      "cardId": "51",
+      "cardType": "credit",
+      "ranking": 12,
+      "name": "삼성카드 taptap O",
+      "benefitCount": 6,
+      "benefitsSha256": "f22b7a93c16646d53727e1f383108512e3d6585e149a5144372f851a4ade5a8e"
+    },
+    {
+      "cardId": "2961",
+      "cardType": "credit",
+      "ranking": 13,
+      "name": "트래블로그+(플러스) 신용카드",
+      "benefitCount": 3,
+      "benefitsSha256": "16ccaba6e8a885cdeac94f47c1e304fa6aaf7ee2d8a3ffececcc401c4f0273c5"
+    },
+    {
+      "cardId": "2970",
+      "cardType": "credit",
+      "ranking": 14,
+      "name": "KB YOU Wish 카드",
+      "benefitCount": 10,
+      "benefitsSha256": "8367371dfe4758005806fd09648e7683ec352e1a0cae65ac608d93fee34ac834"
+    },
+    {
+      "cardId": "2759",
+      "cardType": "credit",
+      "ranking": 15,
+      "name": "신한카드 처음(ANNIVERSE)",
+      "benefitCount": 6,
+      "benefitsSha256": "19a4386146dee126c3e415818fd90dbada5037c65d6ac61f714bdfb56bea3c9d"
+    },
+    {
+      "cardId": "52",
+      "cardType": "credit",
+      "ranking": 16,
+      "name": "삼성카드 taptap S",
+      "benefitCount": 4,
+      "benefitsSha256": "ac6616cfea23f2d88de54f45ee8cfaf65541ed669a01e01c3542a14c9eec3403"
+    },
+    {
+      "cardId": "2835",
+      "cardType": "credit",
+      "ranking": 17,
+      "name": "신한카드 Discount Plan+",
+      "benefitCount": 10,
+      "benefitsSha256": "a795fb88be6929d701b8168cb3802097aa106cb790d02abc3e44b91aa0ae399b"
+    },
+    {
+      "cardId": "2711",
+      "cardType": "credit",
+      "ranking": 18,
+      "name": "대한항공카드 300",
+      "benefitCount": 6,
+      "benefitsSha256": "8cd3bdcc122be74f79669396ccd4313b7a6fec5aeaf2d01319b28be3990236c0"
+    },
+    {
+      "cardId": "2969",
+      "cardType": "credit",
+      "ranking": 19,
+      "name": "알파벳카드R",
+      "benefitCount": 4,
+      "benefitsSha256": "0a701392938e9a3de55916c39fc717511556675440803697f421338f21ef1e00"
+    },
+    {
+      "cardId": "2886",
+      "cardType": "credit",
+      "ranking": 20,
+      "name": "삼성 iD SELECT ON 카드",
+      "benefitCount": 8,
+      "benefitsSha256": "fc65ab8ac99055853b802e43b6dd567fbb23f3970e0212740ac728e9bb0a004f"
+    },
+    {
+      "cardId": "2915",
+      "cardType": "credit",
+      "ranking": 21,
+      "name": "THE iD. 1st",
+      "benefitCount": 5,
+      "benefitsSha256": "5bd13ddcf2c80bf17fa609bff3bef6891da67a9f6e41ce1f8b70d0304322ed43"
+    },
+    {
+      "cardId": "39",
+      "cardType": "credit",
+      "ranking": 22,
+      "name": "신한카드 Deep Oil",
+      "benefitCount": 7,
+      "benefitsSha256": "89a8dc2c76203d82528637af6227d1bdfbd1ad7cc9a6d050d5ad87185b2173ea"
+    },
+    {
+      "cardId": "2980",
+      "cardType": "credit",
+      "ranking": 23,
+      "name": "카드의정석2 SUPER",
+      "benefitCount": 5,
+      "benefitsSha256": "3ea2dffe534d053ce46bd40b9d68116ffbad657192c868725b1c1a4c6e11d890"
+    },
+    {
+      "cardId": "666",
+      "cardType": "credit",
+      "ranking": 24,
+      "name": "올바른 FLEX 카드",
+      "benefitCount": 8,
+      "benefitsSha256": "840072d626e048fa9ace79ce90878d063ea0224f935b74d519d502fe2289acab"
+    },
+    {
+      "cardId": "2676",
+      "cardType": "credit",
+      "ranking": 25,
+      "name": "삼성 iD GLOBAL 카드",
+      "benefitCount": 8,
+      "benefitsSha256": "eb0b45bd9f3f2f445ab3ceb30aa27d6567099ac16173305f5a8d3100baf01c8a"
+    },
+    {
+      "cardId": "2987",
+      "cardType": "credit",
+      "ranking": 26,
+      "name": "LOCA LIKIT 2.0",
+      "benefitCount": 4,
+      "benefitsSha256": "ac2b10ff65a61576b12566fe3dccb09b2966342904fcbfc46dd04d323dd0569c"
+    },
+    {
+      "cardId": "2950",
+      "cardType": "credit",
+      "ranking": 27,
+      "name": "신한카드 Simple Plan+",
+      "benefitCount": 5,
+      "benefitsSha256": "0dd392bf2faab5a15226d50f1ff99146ea81f65c453452c390c17254ae0da04e"
+    },
+    {
+      "cardId": "2712",
+      "cardType": "credit",
+      "ranking": 28,
+      "name": "대한항공카드 the First Edition2",
+      "benefitCount": 6,
+      "benefitsSha256": "953fc8b6d7fcc5d9540fe4025a66c1d7379f3cbd6cc6260f0d1da07c920e7929"
+    },
+    {
+      "cardId": "2657",
+      "cardType": "credit",
+      "ranking": 29,
+      "name": "JADE Classic",
+      "benefitCount": 8,
+      "benefitsSha256": "ee05cadb46cc0689fc4b7016f4a93784ed7632dd51b2a59e99bec1b329672148"
+    },
+    {
+      "cardId": "2666",
+      "cardType": "credit",
+      "ranking": 30,
+      "name": "신한카드 Point Plan",
+      "benefitCount": 4,
+      "benefitsSha256": "c14ef40cd2cedff5cb7673ad8b15bc03503a421387e2247f9e2385e95289af3f"
+    },
+    {
+      "cardId": "2880",
+      "cardType": "credit",
+      "ranking": 31,
+      "name": "알파벳카드O",
+      "benefitCount": 4,
+      "benefitsSha256": "61ac6c09a8321323a33f84e24fc2aca681edc763b8b719891d8248b78c23af4b"
+    },
+    {
+      "cardId": "2609",
+      "cardType": "credit",
+      "ranking": 32,
+      "name": "쿠팡 와우카드",
+      "benefitCount": 4,
+      "benefitsSha256": "be6228b9a72d8156bae343fa7ab2cb6287c23085a1e421fd3bcd0ed4c0dd4d46"
+    },
+    {
+      "cardId": "2330",
+      "cardType": "credit",
+      "ranking": 33,
+      "name": "LOCA 365 카드",
+      "benefitCount": 10,
+      "benefitsSha256": "0444d91069b35f17ad19f40b772df31963da131a6bdea2ee91e13b1b48937fcc"
+    },
+    {
+      "cardId": "8",
+      "cardType": "credit",
+      "ranking": 34,
+      "name": "신한카드 The CLASSIC-Y",
+      "benefitCount": 9,
+      "benefitsSha256": "2e8a6461e7badb48afa259aa09a0b2321d0b503429d04204fd7bf49b70b6e282"
+    },
+    {
+      "cardId": "466",
+      "cardType": "credit",
+      "ranking": 35,
+      "name": "신한카드 Air One",
+      "benefitCount": 3,
+      "benefitsSha256": "a1a5d32c7785622872c76cd651b68152ef6318d2ac2dbfcde1f6d3fc4724bb72"
+    },
+    {
+      "cardId": "2879",
+      "cardType": "credit",
+      "ranking": 36,
+      "name": "알파벳카드H",
+      "benefitCount": 4,
+      "benefitsSha256": "eb30a676b877fc79f7c6e08630e9c101e9d99a63b0d5c99bb33e3711a85d8902"
+    },
+    {
+      "cardId": "2967",
+      "cardType": "credit",
+      "ranking": 37,
+      "name": "알파벳카드B",
+      "benefitCount": 4,
+      "benefitsSha256": "0868b26ea64222b3e20fff7def123d7685b7b5d2a10b2a4fc36a6955d6eb04be"
+    },
+    {
+      "cardId": "2646",
+      "cardType": "credit",
+      "ranking": 38,
+      "name": "현대카드ZERO Edition3(할인형)",
+      "benefitCount": 2,
+      "benefitsSha256": "6b01089dada4abbf0c2c02d821c818dea8e864dd841fa9b66e57c9402eacd4a0"
+    },
+    {
+      "cardId": "2779",
+      "cardType": "credit",
+      "ranking": 39,
+      "name": "IBK포인트(신용)",
+      "benefitCount": 2,
+      "benefitsSha256": "f72450588de0823d2c67feb904383770eb12dcc2b37e9b5601be542a118df480"
+    },
+    {
+      "cardId": "2846",
+      "cardType": "credit",
+      "ranking": 40,
+      "name": "클래시 트래블카드",
+      "benefitCount": 6,
+      "benefitsSha256": "c405d37ebf53621f7b6f6eeabf05561eba223c99f1cda5ceb1751a415879f851"
+    },
+    {
+      "cardId": "2975",
+      "cardType": "credit",
+      "ranking": 41,
+      "name": "LOCA LIKIT 1.5",
+      "benefitCount": 4,
+      "benefitsSha256": "bfa8c877785ecfa785819d473a220042da92424547bee945a806de57221d777a"
+    },
+    {
+      "cardId": "2553",
+      "cardType": "credit",
+      "ranking": 42,
+      "name": "카드의정석 EVERY MILE SKYPASS",
+      "benefitCount": 4,
+      "benefitsSha256": "4e92f5920cb54ecc76fd325e6d8eeb962abe106bf6a30b6643aa9bc4b2de7494"
+    },
+    {
+      "cardId": "2710",
+      "cardType": "credit",
+      "ranking": 43,
+      "name": "대한항공카드 120",
+      "benefitCount": 6,
+      "benefitsSha256": "80f2d6ec92dae4a8ea53e75dbcf56e1e2353facd7bc6316617dc757cbbfd5cc0"
+    },
+    {
+      "cardId": "2778",
+      "cardType": "credit",
+      "ranking": 44,
+      "name": "IBK포인트3.8(신용)",
+      "benefitCount": 4,
+      "benefitsSha256": "b06ad0afbd902672e4cb49558377b0d0983783c9e2e4f5be417c8f1fe88d8acf"
+    },
+    {
+      "cardId": "2482",
+      "cardType": "credit",
+      "ranking": 45,
+      "name": "I-ALL",
+      "benefitCount": 4,
+      "benefitsSha256": "a227371ddb834727c20c5b1a5883708320a621afbe4090504522522abca41edb"
+    },
+    {
+      "cardId": "1909",
+      "cardType": "credit",
+      "ranking": 46,
+      "name": "THE 1 (스카이패스)",
+      "benefitCount": 7,
+      "benefitsSha256": "07c546dca8cee5318ba3a9d2b6f780446866e0c342c4f9b06b4acd2b621170b4"
+    },
+    {
+      "cardId": "2376",
+      "cardType": "credit",
+      "ranking": 47,
+      "name": "삼성 iD SIMPLE 카드",
+      "benefitCount": 6,
+      "benefitsSha256": "b4586dfe447eaef5046e0eedc84b1bf9d2493a410ddff071977730c0e59ae693"
+    },
+    {
+      "cardId": "2687",
+      "cardType": "credit",
+      "ranking": 48,
+      "name": "카드의정석 SHOPPING+",
+      "benefitCount": 6,
+      "benefitsSha256": "4fa9b51c4f8305e34aee0929e2b9b1e542afe55ebd8baaedbfac4b6154d8c5cc"
+    },
+    {
+      "cardId": "2927",
+      "cardType": "credit",
+      "ranking": 49,
+      "name": "BC 바로 Air Max 카드",
+      "benefitCount": 6,
+      "benefitsSha256": "e234b906c5baf8b2af8249f2c508da1e6a14f4d5b7471fc107bb8349df2f6773"
+    },
+    {
+      "cardId": "2532",
+      "cardType": "credit",
+      "ranking": 50,
+      "name": "신한카드 Globus",
+      "benefitCount": 4,
+      "benefitsSha256": "eedca7dfffb6a8c21258dc781028a6c02aafa791cc9d68f9a708ebeeb5ab52ed"
+    },
+    {
+      "cardId": "2709",
+      "cardType": "credit",
+      "ranking": 51,
+      "name": "대한항공카드 060",
+      "benefitCount": 5,
+      "benefitsSha256": "632779211a289280be572ccc7ef262ad241f2a11d587f0fe91fa220883e3298d"
+    },
+    {
+      "cardId": "2690",
+      "cardType": "credit",
+      "ranking": 52,
+      "name": "K-패스 신한카드",
+      "benefitCount": 4,
+      "benefitsSha256": "778b2fdc6728d9fc5ab588035ee7178f68290e2481e239451ebe86f8866990d8"
+    },
+    {
+      "cardId": "2706",
+      "cardType": "credit",
+      "ranking": 53,
+      "name": "zgm 할인카드",
+      "benefitCount": 4,
+      "benefitsSha256": "adcb7fed41b690d7898a86d107333ac89d1ffc6a1ab099ac79927970e7ea130e"
+    },
+    {
+      "cardId": "2632",
+      "cardType": "credit",
+      "ranking": 54,
+      "name": "디지로카 London",
+      "benefitCount": 4,
+      "benefitsSha256": "24cb1d18215aa690aee9e23453329f0129e1f9962c3141c70ccec64c39d47e0f"
+    },
+    {
+      "cardId": "2662",
+      "cardType": "credit",
+      "ranking": 55,
+      "name": "American Express® Green Card Edition2",
+      "benefitCount": 5,
+      "benefitsSha256": "84ab391b5ceab33f4a699824248e99d2a62afb2f17cb0229cc674cc694189eb8"
+    },
+    {
+      "cardId": "2820",
+      "cardType": "credit",
+      "ranking": 56,
+      "name": "원더카드 2.0 FREE+",
+      "benefitCount": 9,
+      "benefitsSha256": "066a33d7e8b0d557f3af7d8bc76a22bed51c46540e95b909e648316b29af9782"
+    },
+    {
+      "cardId": "716",
+      "cardType": "credit",
+      "ranking": 57,
+      "name": "메리어트 본보이™ 더 베스트 신한카드",
+      "benefitCount": 6,
+      "benefitsSha256": "13911d796fe395692a0e1032e4696002017767fc9a02f146c921dbe74f7b750b"
+    },
+    {
+      "cardId": "2692",
+      "cardType": "credit",
+      "ranking": 58,
+      "name": "현대카드 Summit",
+      "benefitCount": 9,
+      "benefitsSha256": "c10f56a1ca2f8ba9765fffbab148d376aeaa0c9ce514b8e99dd51abeed0e7b27"
+    },
+    {
+      "cardId": "2428",
+      "cardType": "credit",
+      "ranking": 59,
+      "name": "zgm.streaming카드",
+      "benefitCount": 5,
+      "benefitsSha256": "82c2ceaa92808ae98a37e2f8f70eea3546eee22470760336e46af66f9cd0dd82"
+    },
+    {
+      "cardId": "458",
+      "cardType": "credit",
+      "ranking": 60,
+      "name": "네이버페이 taptap",
+      "benefitCount": 7,
+      "benefitsSha256": "5629bd67d99019f34382d31793f9972557248b861d80c04e396a8de8859384c4"
+    },
+    {
+      "cardId": "2613",
+      "cardType": "credit",
+      "ranking": 61,
+      "name": "ALL 우리카드 Infinite",
+      "benefitCount": 12,
+      "benefitsSha256": "6a0b9c1a65b94ce0a16cb1359b15225339d38678ff63683310cb7e7d7583675a"
+    },
+    {
+      "cardId": "2386",
+      "cardType": "credit",
+      "ranking": 62,
+      "name": "티머니 Pay & GO 신한카드",
+      "benefitCount": 9,
+      "benefitsSha256": "d8b395e8e53f13a3f3b4a31ea516fde13119c09f981916a0358b672ca83c7e05"
+    },
+    {
+      "cardId": "2685",
+      "cardType": "credit",
+      "ranking": 63,
+      "name": "WE:SH Travel",
+      "benefitCount": 8,
+      "benefitsSha256": "33bc3cb304352f68050152e96122caf34446af773d18671910117aca72234bf9"
+    },
+    {
+      "cardId": "2451",
+      "cardType": "credit",
+      "ranking": 64,
+      "name": "HERITAGE Smart [대한항공 마일리지형]",
+      "benefitCount": 7,
+      "benefitsSha256": "9154e6e2d76b9860e0fd2c42494a42ca7847267e16c9582a537913bc17c00d92"
+    },
+    {
+      "cardId": "2703",
+      "cardType": "credit",
+      "ranking": 65,
+      "name": "JADE Prime",
+      "benefitCount": 9,
+      "benefitsSha256": "f04c39b49bdfbc383eb3bd58a0fe1566daab75d0b8a13be3e4996328f1b536d1"
+    },
+    {
+      "cardId": "2427",
+      "cardType": "credit",
+      "ranking": 66,
+      "name": "zgm.the pay카드",
+      "benefitCount": 4,
+      "benefitsSha256": "5820c91f19a56b72b3ced93480ecd19b3dd444d8059b9b6c184b0d2255313655"
+    },
+    {
+      "cardId": "2988",
+      "cardType": "credit",
+      "ranking": 67,
+      "name": "트라이플러스 삼성카드",
+      "benefitCount": 10,
+      "benefitsSha256": "0bc884ee8dc67681efcfcf958833863c447ad3523b13e864155f7f85c058d3b2"
+    },
+    {
+      "cardId": "2593",
+      "cardType": "credit",
+      "ranking": 68,
+      "name": "zgm.일본여행중 카드",
+      "benefitCount": 7,
+      "benefitsSha256": "0e7a716f17e925a66049c3ee4c2e32b4749e5cad3f9272e2285cf331aa8596a2"
+    },
+    {
+      "cardId": "2544",
+      "cardType": "credit",
+      "ranking": 69,
+      "name": "zgm.play카드",
+      "benefitCount": 8,
+      "benefitsSha256": "df69a4f31813a394b67ade8fdd90f845c3400e389f63b322bc24c1818f80eff7"
+    },
+    {
+      "cardId": "2844",
+      "cardType": "credit",
+      "ranking": 70,
+      "name": "현대카드 ZERO Up(할인형)",
+      "benefitCount": 5,
+      "benefitsSha256": "1006215d6cd6ce78aed23ee94d5dd60d691ab4cba068b4aae0762fda86ff8a70"
+    },
+    {
+      "cardId": "2674",
+      "cardType": "credit",
+      "ranking": 71,
+      "name": "I-Mileage (대한항공)",
+      "benefitCount": 6,
+      "benefitsSha256": "9adb4ecc82aa2e8fadc4fe759c3eda7c4b6c25f7387533dad0c0c6af702e8fc5"
+    },
+    {
+      "cardId": "2904",
+      "cardType": "credit",
+      "ranking": 72,
+      "name": "토스뱅크 하나카드 Day",
+      "benefitCount": 2,
+      "benefitsSha256": "143fec3f2e3f20c5d9ce58f77bdcff587849981ffb8b8df4a53588ef9ae27e86"
+    },
+    {
+      "cardId": "2942",
+      "cardType": "credit",
+      "ranking": 73,
+      "name": "에너지플러스 현대카드",
+      "benefitCount": 3,
+      "benefitsSha256": "4ac3ff998caddcd8cda9fd11bd4a3856e8b091273fc7fb9fe8bec9d6a6fbd4df"
+    },
+    {
+      "cardId": "2627",
+      "cardType": "credit",
+      "ranking": 74,
+      "name": "TWO CHAIRS",
+      "benefitCount": 7,
+      "benefitsSha256": "15a56b17d4f7b0b10daa8ecbc016a5b31ee71917f0cb85b72ab498a86b13ec95"
+    },
+    {
+      "cardId": "2555",
+      "cardType": "credit",
+      "ranking": 75,
+      "name": "K-패스카드",
+      "benefitCount": 2,
+      "benefitsSha256": "5128b7b6d1f005c0f191af62fe16dc8e27aa057bafd52e714995834275fcc755"
+    },
+    {
+      "cardId": "2938",
+      "cardType": "credit",
+      "ranking": 76,
+      "name": "현대카드MY BUSINESS M F&B",
+      "benefitCount": 4,
+      "benefitsSha256": "89e58c82a0dfe68f3871b1686a7f305bbe361f818e1a4062a10c2eab65fcb90b"
+    },
+    {
+      "cardId": "2237",
+      "cardType": "credit",
+      "ranking": 77,
+      "name": "하나 스카이패스 아멕스 플래티늄 카드",
+      "benefitCount": 3,
+      "benefitsSha256": "5b01263707a6fc385ec5acebe59f8d35ba3a1de9f5d8472b5755abaf561e135d"
+    },
+    {
+      "cardId": "2831",
+      "cardType": "credit",
+      "ranking": 78,
+      "name": "알리익스프레스 신한카드",
+      "benefitCount": 4,
+      "benefitsSha256": "dba1d2bbc169eebfba02811deecae2900cc6acf7870f8b2b40f210d208bf19c1"
+    },
+    {
+      "cardId": "2346",
+      "cardType": "credit",
+      "ranking": 79,
+      "name": "BC 바로 클리어 플러스",
+      "benefitCount": 11,
+      "benefitsSha256": "7e9f926ef01a5a760f6562f9fc19415d45a8e7becbde700726ae09f8154ab1e3"
+    },
+    {
+      "cardId": "133",
+      "cardType": "credit",
+      "ranking": 80,
+      "name": "BeV Ⅲ 카드",
+      "benefitCount": 5,
+      "benefitsSha256": "bed290de6e3cacdc5fbf643da34e2efd9c97df01c6398a082741e8f4188b3f4f"
+    },
+    {
+      "cardId": "2794",
+      "cardType": "credit",
+      "ranking": 81,
+      "name": "네이버 현대카드 Edition2",
+      "benefitCount": 3,
+      "benefitsSha256": "ed1a09fd83fff7dab6150b3aab8b13410512de54adf82a9a05f9709aad78ba3a"
+    },
+    {
+      "cardId": "2707",
+      "cardType": "credit",
+      "ranking": 82,
+      "name": "디지로카 Las Vegas",
+      "benefitCount": 3,
+      "benefitsSha256": "02d4703a7e8fc266ca69d4e273bcd579da3a3c1bfb1faac3fe1ce7e42666f10e"
+    },
+    {
+      "cardId": "2848",
+      "cardType": "credit",
+      "ranking": 83,
+      "name": "카드의정석2",
+      "benefitCount": 3,
+      "benefitsSha256": "2c7ef650e895c7a4dd1634a6405b3861cb03de48f984cb7c90fe34edc023961a"
+    },
+    {
+      "cardId": "2882",
+      "cardType": "credit",
+      "ranking": 84,
+      "name": "알파벳카드T",
+      "benefitCount": 5,
+      "benefitsSha256": "1134ae715bb30475cd25265374147163eac1147cbbb65fd69702d86be42c4a00"
+    },
+    {
+      "cardId": "2446",
+      "cardType": "credit",
+      "ranking": 85,
+      "name": "원더카드 FREE",
+      "benefitCount": 5,
+      "benefitsSha256": "9633b26cd9ef9bac15bd59b1667e811ce59f3cc1620e5ae0a7f2da71429057e4"
+    },
+    {
+      "cardId": "2940",
+      "cardType": "credit",
+      "ranking": 86,
+      "name": "현대카드MY BUSINESS M E-seller",
+      "benefitCount": 4,
+      "benefitsSha256": "6d92e5c0e9ff4bb5a848b40c1d34da7b578f44c53d9162c81744f6625dd4bbe9"
+    },
+    {
+      "cardId": "2460",
+      "cardType": "credit",
+      "ranking": 87,
+      "name": "THE iD. PLATINUM(포인트)",
+      "benefitCount": 8,
+      "benefitsSha256": "aa371d88e908527e12699ee82fad9ceb010d49d6657e6b3cdb584561a552a456"
+    },
+    {
+      "cardId": "16",
+      "cardType": "credit",
+      "ranking": 88,
+      "name": "신한카드 RPM+ Platinum#",
+      "benefitCount": 8,
+      "benefitsSha256": "d39c46bb574a8a0a374123814ae54b17eddee283f7c367c1945c638863843fee"
+    },
+    {
+      "cardId": "2985",
+      "cardType": "credit",
+      "ranking": 89,
+      "name": "현대카드 ZERO Up(포인트형)",
+      "benefitCount": 5,
+      "benefitsSha256": "9941c6e8986bc92258a0f3d864f0209a210975bd264336691c39c5129b5702e7"
+    },
+    {
+      "cardId": "2664",
+      "cardType": "credit",
+      "ranking": 90,
+      "name": "American Express The Platinum Card®Edition2",
+      "benefitCount": 8,
+      "benefitsSha256": "6ccd57659da77cee0ad5178425f056cc51f415a27e692c2cd826a4bb087f9390"
+    },
+    {
+      "cardId": "2786",
+      "cardType": "credit",
+      "ranking": 91,
+      "name": "힐튼 아너스 아멕스 프리미엄",
+      "benefitCount": 5,
+      "benefitsSha256": "02c0d0abed898d58fa1c29e69eb82db2cc7d4544b76f198011c23d126c38fb5b"
+    },
+    {
+      "cardId": "2753",
+      "cardType": "credit",
+      "ranking": 92,
+      "name": "the Green Edition3",
+      "benefitCount": 6,
+      "benefitsSha256": "1414a079e91c93d5b7cde8faa07a5d7306f9feea50e6d75c01f6fc33f15e2387"
+    },
+    {
+      "cardId": "2235",
+      "cardType": "credit",
+      "ranking": 93,
+      "name": "삼성 iD ON 카드",
+      "benefitCount": 5,
+      "benefitsSha256": "6f73d32c5c6c21187c03e0adb2f9f2192dd511b5639083199dde5c48530716fd"
+    },
+    {
+      "cardId": "2878",
+      "cardType": "credit",
+      "ranking": 94,
+      "name": "알파벳카드D",
+      "benefitCount": 4,
+      "benefitsSha256": "f61223959852f5e97950bdb77c96105fcbc9f45eba9f4e7fdc34ea79c294ecfd"
+    },
+    {
+      "cardId": "15",
+      "cardType": "credit",
+      "ranking": 95,
+      "name": "신한카드 The CLASSIC+",
+      "benefitCount": 7,
+      "benefitsSha256": "8cdd4fbf8ac2f2a61f2af91936359144f935b72b5349ea77fe6c5d5e175aa42c"
+    },
+    {
+      "cardId": "2560",
+      "cardType": "credit",
+      "ranking": 96,
+      "name": "K-패스카드(신용)",
+      "benefitCount": 4,
+      "benefitsSha256": "4593b91cdc5900ad88c9fc864df17d5839cc6ea953b3ade8c18b40f4a81f7b49"
+    },
+    {
+      "cardId": "2728",
+      "cardType": "credit",
+      "ranking": 97,
+      "name": "BC 바로 MACAO 카드",
+      "benefitCount": 5,
+      "benefitsSha256": "c8a239b5213c9411963584c6a619b42f70c807d2d3c75cd4d26a94a57b20e72b"
+    },
+    {
+      "cardId": "2654",
+      "cardType": "credit",
+      "ranking": 98,
+      "name": "원더카드 2.0 LIFE",
+      "benefitCount": 7,
+      "benefitsSha256": "f3ee8067182cf1dd008e099d6edfbd129813b8d1761ebd7238bee0a8b881b785"
+    },
+    {
+      "cardId": "718",
+      "cardType": "credit",
+      "ranking": 99,
+      "name": "국민행복 삼성카드 V2",
+      "benefitCount": 8,
+      "benefitsSha256": "4d96c45fdff05a059334ef4ea1ecdeb8ecbed9710727976249dcf59857582b18"
+    },
+    {
+      "cardId": "2928",
+      "cardType": "credit",
+      "ranking": 100,
+      "name": "BC 바로 ZONE 카드",
+      "benefitCount": 8,
+      "benefitsSha256": "5204685761d9df5a679af3a7215d226551594c43002a5e453249982b03f6121e"
+    },
+    {
+      "cardId": "2929",
+      "cardType": "check",
+      "ranking": 1,
+      "name": "KB Youth Club 체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "eee6bfd8b055c96e90f3b705902735b9aa0a0d30994b478fce74ecf492e72dfe"
+    },
+    {
+      "cardId": "2749",
+      "cardType": "check",
+      "ranking": 2,
+      "name": "ONE 체크카드",
+      "benefitCount": 9,
+      "benefitsSha256": "1792e90d5aa6d8ac08dc3c433134af065384e024a19d5ae1f30e1d0d10524285"
+    },
+    {
+      "cardId": "2691",
+      "cardType": "check",
+      "ranking": 3,
+      "name": "트래블러스 체크카드(토심이)",
+      "benefitCount": 10,
+      "benefitsSha256": "dbe07d01309d32327174f5e96059295ed28d111627a17204c8360dab2dd6d743"
+    },
+    {
+      "cardId": "2422",
+      "cardType": "check",
+      "ranking": 4,
+      "name": "노리2 체크카드(KB Pay)",
+      "benefitCount": 13,
+      "benefitsSha256": "e22a399a36abe2bda7c11acc9ea298a0bb3669f4db6fd21351b4b8626722b9dc"
+    },
+    {
+      "cardId": "2667",
+      "cardType": "check",
+      "ranking": 5,
+      "name": "신한카드 SOL트래블 체크",
+      "benefitCount": 7,
+      "benefitsSha256": "00a84ec48a7f9df335f3c74c333cf662ab3843d7988f560785f97d7efb09dc6b"
+    },
+    {
+      "cardId": "2626",
+      "cardType": "check",
+      "ranking": 6,
+      "name": "네이버페이 머니카드",
+      "benefitCount": 5,
+      "benefitsSha256": "6ac6725718ee041a0fabb3e3868af808bb3b80152b5eb0deea7ee1af7e828ad5"
+    },
+    {
+      "cardId": "2934",
+      "cardType": "check",
+      "ranking": 7,
+      "name": "하나 나라사랑카드",
+      "benefitCount": 5,
+      "benefitsSha256": "e246064a2a31a604947f2a709001c71de9bf090bd2e7e3c7dff06a94ac1090bb"
+    },
+    {
+      "cardId": "2519",
+      "cardType": "check",
+      "ranking": 8,
+      "name": "개이득 체크카드",
+      "benefitCount": 5,
+      "benefitsSha256": "ce8f079eabc1c500258b07332c6e468810c1ed8545f7a16a90110a4d061fe14d"
+    },
+    {
+      "cardId": "2269",
+      "cardType": "check",
+      "ranking": 9,
+      "name": "토스뱅크 체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "8274356b8ab5dda99b615a6d20a1c653926f149da78382251f2d54ba4d7d0ea4"
+    },
+    {
+      "cardId": "2693",
+      "cardType": "check",
+      "ranking": 10,
+      "name": "K-패스 신한카드 체크",
+      "benefitCount": 4,
+      "benefitsSha256": "923013ec6aa0d9a0f91b03035efd0b2a34d20878fe5ca23eb2192139ecd6179c"
+    },
+    {
+      "cardId": "2432",
+      "cardType": "check",
+      "ranking": 11,
+      "name": "네이버페이 머니 하나 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "8d6dd23c154b489ad68ccc511c1043a18269420389a2a935bfe3a46ae30bbc34"
+    },
+    {
+      "cardId": "2321",
+      "cardType": "check",
+      "ranking": 12,
+      "name": "모빌카드",
+      "benefitCount": 13,
+      "benefitsSha256": "1c1b1f73e7b73326d4beadbf3474c86033ae527c3a0245744e0225baadd9aa7c"
+    },
+    {
+      "cardId": "2561",
+      "cardType": "check",
+      "ranking": 13,
+      "name": "K-패스카드(체크)",
+      "benefitCount": 3,
+      "benefitsSha256": "a08342ada75862a408a007759967653f7ac50835dbebb52aa4dbdb4554d3890a"
+    },
+    {
+      "cardId": "2570",
+      "cardType": "check",
+      "ranking": 14,
+      "name": "카드의정석 오하CHECK",
+      "benefitCount": 12,
+      "benefitsSha256": "cf1527bca6db8315da39cd651de197d365b8a2d8917a6d44d81d0d51f3ac05fd"
+    },
+    {
+      "cardId": "281",
+      "cardType": "check",
+      "ranking": 15,
+      "name": "신한카드 Deep Dream 체크",
+      "benefitCount": 8,
+      "benefitsSha256": "26c1bd9eb363135bf19a431da3015b7f8eec1d595590dc3432e4f3b534684476"
+    },
+    {
+      "cardId": "435",
+      "cardType": "check",
+      "ranking": 16,
+      "name": "카카오뱅크 프렌즈 체크카드",
+      "benefitCount": 5,
+      "benefitsSha256": "2b8b840d893c3ed51505de82511e65e9146d6ec2c3568b0205770c7d35daed28"
+    },
+    {
+      "cardId": "2394",
+      "cardType": "check",
+      "ranking": 17,
+      "name": "트래블로그 체크카드",
+      "benefitCount": 5,
+      "benefitsSha256": "df114c9cc9d9f4088350b87a1cd85bed61dc445afc2fc4d7a4b95f2083bc8764"
+    },
+    {
+      "cardId": "2604",
+      "cardType": "check",
+      "ranking": 18,
+      "name": "토심이 첵첵 체크카드",
+      "benefitCount": 10,
+      "benefitsSha256": "bc121c3642ba63c8a09e27f724109ef9dcafcb1c1d1854f26393e0995cb482b2"
+    },
+    {
+      "cardId": "2423",
+      "cardType": "check",
+      "ranking": 19,
+      "name": "노리2 체크카드(Global)",
+      "benefitCount": 13,
+      "benefitsSha256": "60117b874ef4b466da9d8544e527c3030814662a7b2e383c5b940ec89b6a6bd3"
+    },
+    {
+      "cardId": "2852",
+      "cardType": "check",
+      "ranking": 20,
+      "name": "KB 틴업 체크카드",
+      "benefitCount": 9,
+      "benefitsSha256": "507f605a893d480b73fc021fecfbc07c9d773887a6af4ecff91204670ccb751a"
+    },
+    {
+      "cardId": "2977",
+      "cardType": "check",
+      "ranking": 21,
+      "name": "신한카드 SOL트립앤J 체크",
+      "benefitCount": 5,
+      "benefitsSha256": "a0f91a086246da3329a85fbf7082e274c76110b8e5b49cd867a090336cf1d11f"
+    },
+    {
+      "cardId": "2871",
+      "cardType": "check",
+      "ranking": 22,
+      "name": "우체국 LUCK-KEY 체크카드",
+      "benefitCount": 8,
+      "benefitsSha256": "b1e708fcc56abdf80e9f4d8eb1c348e2b12df8085cc4ed6740532c0fdb57317f"
+    },
+    {
+      "cardId": "362",
+      "cardType": "check",
+      "ranking": 23,
+      "name": "NH20해봄체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "310e2beb92857b4d7d2a648d5acd44d6fe1c38d5cf0fc2b71b8d95373c366d0e"
+    },
+    {
+      "cardId": "348",
+      "cardType": "check",
+      "ranking": 24,
+      "name": "노리체크카드",
+      "benefitCount": 9,
+      "benefitsSha256": "5ea38e0c281e4a1f614b8af6299443b8d5526012c5f63c7f565bd5316d2733d8"
+    },
+    {
+      "cardId": "2933",
+      "cardType": "check",
+      "ranking": 25,
+      "name": "신한카드 나라사랑카드 체크",
+      "benefitCount": 5,
+      "benefitsSha256": "3e819987c02650d8e87b86d330f484d723f69fcd9fe124e88db3044c4fbffeed"
+    },
+    {
+      "cardId": "360",
+      "cardType": "check",
+      "ranking": 26,
+      "name": "올바른POINT체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "808da4d6a750e7cf7762c118980a9462a38c1b32db1a33f6736be3aadb73054f"
+    },
+    {
+      "cardId": "2941",
+      "cardType": "check",
+      "ranking": 27,
+      "name": "IBK나라사랑카드",
+      "benefitCount": 8,
+      "benefitsSha256": "04e365bf2962dbeac30f0135547e868201400ec59d98379d6c9f6563a83eec21"
+    },
+    {
+      "cardId": "2976",
+      "cardType": "check",
+      "ranking": 28,
+      "name": "우체국 MY-TYPE 체크카드",
+      "benefitCount": 7,
+      "benefitsSha256": "c19b4b86922abd4e489dedd8760ea13e2f0d187abc7595c362caa75dc0f1f9c7"
+    },
+    {
+      "cardId": "2905",
+      "cardType": "check",
+      "ranking": 29,
+      "name": "트래블러스 체크카드",
+      "benefitCount": 10,
+      "benefitsSha256": "e23375427a4eeae233572905b2bd71057cf5f93bbfb9059f9393fe1895b4afce"
+    },
+    {
+      "cardId": "2700",
+      "cardType": "check",
+      "ranking": 30,
+      "name": "위비트래블 체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "67920c89efa03d292e52825ca5b49e4573d58b706be84cf85ccbd26f185d7204"
+    },
+    {
+      "cardId": "2563",
+      "cardType": "check",
+      "ranking": 31,
+      "name": "K-패스 삼성체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "2d108d1043dcabc87c31d7d99a1e61a435316bb672e5fb58809e208e7f9ae9a7"
+    },
+    {
+      "cardId": "2556",
+      "cardType": "check",
+      "ranking": 32,
+      "name": "K-패스체크카드",
+      "benefitCount": 2,
+      "benefitsSha256": "cd4dda37309e8386f85fba54a45c195ad49fbd4e6dc799349cb737050a146d22"
+    },
+    {
+      "cardId": "350",
+      "cardType": "check",
+      "ranking": 33,
+      "name": "직장인보너스체크카드",
+      "benefitCount": 12,
+      "benefitsSha256": "d39cf461e51768411480eec4dcd4a34b90e3264a392bf7cbc695140ee7dd41ef"
+    },
+    {
+      "cardId": "2492",
+      "cardType": "check",
+      "ranking": 34,
+      "name": "신한카드 플리 체크(산리오캐릭터즈)",
+      "benefitCount": 5,
+      "benefitsSha256": "2c7450b613d72eb1e5fc4be14e064a504f9c3e9aa22214b68144639197307f42"
+    },
+    {
+      "cardId": "2758",
+      "cardType": "check",
+      "ranking": 35,
+      "name": "춘식이달달체크카드",
+      "benefitCount": 5,
+      "benefitsSha256": "36926acf82917a979fcaa35dc84f2df15de1a49941d457884e7af29b7ec4ffc7"
+    },
+    {
+      "cardId": "618",
+      "cardType": "check",
+      "ranking": 36,
+      "name": "신한카드 Hey Young 체크",
+      "benefitCount": 14,
+      "benefitsSha256": "60db4e8054844f3f6ebd3c68b4e0c95c029cf731e88b5f808cb5405c3b12bc48"
+    },
+    {
+      "cardId": "407",
+      "cardType": "check",
+      "ranking": 37,
+      "name": "현대카드M CHECK",
+      "benefitCount": 2,
+      "benefitsSha256": "9e05567545f87966e3bdd2d6e75050e6fd665c5b34dd2e243557bd859258b265"
+    },
+    {
+      "cardId": "2552",
+      "cardType": "check",
+      "ranking": 38,
+      "name": "카드의정석 EVERY CHECK",
+      "benefitCount": 5,
+      "benefitsSha256": "8255179cbc15025681530ae11e98ee29b2ec82ddbb4785654bc22c600e009cb7"
+    },
+    {
+      "cardId": "2750",
+      "cardType": "check",
+      "ranking": 39,
+      "name": "달달 하나 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "54f424fdb2f0789872fe5ec39b3069920c29f414b351cc80d2eb2f8482417093"
+    },
+    {
+      "cardId": "408",
+      "cardType": "check",
+      "ranking": 40,
+      "name": "현대카드X CHECK",
+      "benefitCount": 2,
+      "benefitsSha256": "c2f9962e282270af49dffb4c66f26aa351a9eea35fabd0312da64b755ec24936"
+    },
+    {
+      "cardId": "2001",
+      "cardType": "check",
+      "ranking": 41,
+      "name": "꿀카드",
+      "benefitCount": 8,
+      "benefitsSha256": "63bca689d607432d05491ea270c653c22d65d59af2890947a78c5c88294aad6e"
+    },
+    {
+      "cardId": "286",
+      "cardType": "check",
+      "ranking": 42,
+      "name": "카카오페이 신한 체크카드",
+      "benefitCount": 8,
+      "benefitsSha256": "58fb1ad3a3973381e080182fdf7512654eb36ed781b2dbe3bfdd817de3709531"
+    },
+    {
+      "cardId": "2682",
+      "cardType": "check",
+      "ranking": 43,
+      "name": "K-패스 하나 체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "3bd0037a074391206d27718be928bc3de6a8d51895e63911002146e8930238da"
+    },
+    {
+      "cardId": "528",
+      "cardType": "check",
+      "ranking": 44,
+      "name": "라이언 치즈 체크카드",
+      "benefitCount": 12,
+      "benefitsSha256": "59bb7a4a4717b1242c137ddb417ba1d65f8026aafb67d7325267e50b29786658"
+    },
+    {
+      "cardId": "2727",
+      "cardType": "check",
+      "ranking": 45,
+      "name": "NH트래블리체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "feb686f3c8bb62acc9d4312c65860abd3f9b1956f4e245aeaf7471bb9e278012"
+    },
+    {
+      "cardId": "391",
+      "cardType": "check",
+      "ranking": 46,
+      "name": "신한카드 하이패스(전용) 체크",
+      "benefitCount": 2,
+      "benefitsSha256": "0b8d81d92eac2c335c93138893819209af996b1206cf8938c2412f5d065681d1"
+    },
+    {
+      "cardId": "2562",
+      "cardType": "check",
+      "ranking": 47,
+      "name": "K-패스(체크)",
+      "benefitCount": 8,
+      "benefitsSha256": "de84e86614e6d94671c58cb73db31c39ff9a3da24c5609c31bf251bfeaed951f"
+    },
+    {
+      "cardId": "2310",
+      "cardType": "check",
+      "ranking": 48,
+      "name": "PAYCO 포인트 카드",
+      "benefitCount": 5,
+      "benefitsSha256": "191870941a27d018031dc1e29fbd40ef5f4745cf1931285843a069cd0873df3e"
+    },
+    {
+      "cardId": "2847",
+      "cardType": "check",
+      "ranking": 49,
+      "name": "신한카드 SOL트래블 J체크",
+      "benefitCount": 8,
+      "benefitsSha256": "e8b0eed824bd234fc2c1c1a37f15887696ff1cbbfdcb9b49835fddcc7abd4651"
+    },
+    {
+      "cardId": "2742",
+      "cardType": "check",
+      "ranking": 50,
+      "name": "카드의정석 EVERYDAY CHECK",
+      "benefitCount": 4,
+      "benefitsSha256": "4c71d10f790c3aed6245671b76b7906add52ed4668eac3a5669a517304712ab7"
+    },
+    {
+      "cardId": "571",
+      "cardType": "check",
+      "ranking": 51,
+      "name": "어디서나 체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "db1aa058921247493b15a3f34984e06cbc70636d5a0b989a103ebbbfc2bc50a3"
+    },
+    {
+      "cardId": "2588",
+      "cardType": "check",
+      "ranking": 52,
+      "name": "스타플러스 체크카드",
+      "benefitCount": 13,
+      "benefitsSha256": "e55eb515fd406581bcc37219eac811d8bb1e7c9c4363777dba21cc0ae2506e9c"
+    },
+    {
+      "cardId": "690",
+      "cardType": "check",
+      "ranking": 53,
+      "name": "모두의 일상 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "cf219eec32d0baa0003ff1611bdde27485895bdcc90659c4ea3677755cf9512e"
+    },
+    {
+      "cardId": "1765",
+      "cardType": "check",
+      "ranking": 54,
+      "name": "올바른 NEW HAVE체크카드",
+      "benefitCount": 5,
+      "benefitsSha256": "d0bf8d5c28e77ae4445657445d11fd2a6d858f4e0cac030d5c5e741ae9539fd4"
+    },
+    {
+      "cardId": "2890",
+      "cardType": "check",
+      "ranking": 55,
+      "name": "신한카드 Point Plan 체크 캐릭터형(짱구)",
+      "benefitCount": 6,
+      "benefitsSha256": "ecc3756e7138acccac853b56ca3ccf0413216f2eaf7407d6fe89268eb75c4674"
+    },
+    {
+      "cardId": "2910",
+      "cardType": "check",
+      "ranking": 56,
+      "name": "카카오뱅크 스마트 하이패스카드",
+      "benefitCount": 3,
+      "benefitsSha256": "74ba6734ec208c12bc4ff8b6ba60ab161677efdf11140bf0b85acb2bfdfa34ad"
+    },
+    {
+      "cardId": "646",
+      "cardType": "check",
+      "ranking": 57,
+      "name": "신한카드 Deep Dream 체크(미니언즈)",
+      "benefitCount": 7,
+      "benefitsSha256": "d49d31192e042cae2449f6028247bc9e20c24d93a9019214ca365a4e9917d85f"
+    },
+    {
+      "cardId": "2227",
+      "cardType": "check",
+      "ranking": 58,
+      "name": "영리한 PLUS 체크카드",
+      "benefitCount": 7,
+      "benefitsSha256": "06cb0f3e284d6d56b1e2f9d84be5e82b1a058bb7554db2ede655573ebc00adc7"
+    },
+    {
+      "cardId": "382",
+      "cardType": "check",
+      "ranking": 59,
+      "name": "카카오페이 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "c813392539d6aca67b5568cd570b4a81ba9312651bdc7c7666dc8b424841465b"
+    },
+    {
+      "cardId": "2431",
+      "cardType": "check",
+      "ranking": 60,
+      "name": "SC제일은행-현대카드 X CHECK",
+      "benefitCount": 4,
+      "benefitsSha256": "8a3abf9556e1ef7aeeed0dbf574039fb0fe6c528bb38b45e5c6ca5c4fada241d"
+    },
+    {
+      "cardId": "2430",
+      "cardType": "check",
+      "ranking": 61,
+      "name": "SC제일은행-현대카드 M CHECK",
+      "benefitCount": 4,
+      "benefitsSha256": "83e31bb0fbccb2e5ce4b0505b27d4c1916d0a2ca939a9305ff4148a8aa513fef"
+    },
+    {
+      "cardId": "394",
+      "cardType": "check",
+      "ranking": 62,
+      "name": "삼성체크카드 & CASHBACK",
+      "benefitCount": 4,
+      "benefitsSha256": "8e96f29e21ac5cba4644352e29b27a3ed65daed24d3cff721f069de14776b188"
+    },
+    {
+      "cardId": "2620",
+      "cardType": "check",
+      "ranking": 63,
+      "name": "NH 무럭이 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "293881cb1e6476b3fd27a5784b9ce736ce8e5827a3d777246383552fe93401a7"
+    },
+    {
+      "cardId": "669",
+      "cardType": "check",
+      "ranking": 64,
+      "name": "케이뱅크 플러스 체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "1e6352bb484f74cd7717842df7a187c4009185028f41be7bb3b2752045b604ae"
+    },
+    {
+      "cardId": "404",
+      "cardType": "check",
+      "ranking": 65,
+      "name": "롯데 국민행복 체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "526e31a790d7649cbeee420f5fa295aa22726f6acd1595d647f5c6d96ac5c0ad"
+    },
+    {
+      "cardId": "499",
+      "cardType": "check",
+      "ranking": 66,
+      "name": "체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "d5fc4adbfc22d0c84c4891b18c8293079f339f3e493f7e38d52ad563bf506b64"
+    },
+    {
+      "cardId": "454",
+      "cardType": "check",
+      "ranking": 67,
+      "name": "가온 올포인트 체크카드",
+      "benefitCount": 8,
+      "benefitsSha256": "75b6a9bcb6a3cc89040c4be46e5c94cd79a2831da9b473152748af42439a0846"
+    },
+    {
+      "cardId": "2866",
+      "cardType": "check",
+      "ranking": 68,
+      "name": "I-Travel(체크)",
+      "benefitCount": 5,
+      "benefitsSha256": "9659b72a3f82f92c25f7e988598f589e553a9ce30d5150d37fbbc7ab1d04d85e"
+    },
+    {
+      "cardId": "749",
+      "cardType": "check",
+      "ranking": 69,
+      "name": "VIVA X 체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "2fbd383bcfa9c0241e96fdd1165a9e6c6233c4e567adc3d3d247b1941a43e9e4"
+    },
+    {
+      "cardId": "2400",
+      "cardType": "check",
+      "ranking": 70,
+      "name": "밥바라밥 페이북머니 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "a8726251f3bbaa30df456ce51ee112eb0a668c51515d0a30d669c606e428e358"
+    },
+    {
+      "cardId": "2982",
+      "cardType": "check",
+      "ranking": 71,
+      "name": "현대카드 체크(포인트형)",
+      "benefitCount": 3,
+      "benefitsSha256": "a849449c48c958d8a2b9ace83c47ca7a717498d31c1b7a7c7d498cd39dcfaacd"
+    },
+    {
+      "cardId": "368",
+      "cardType": "check",
+      "ranking": 72,
+      "name": "NH올원체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "cbc62062a8a1e46b816def6bcb477c5ffd9ac6c113b1510169d5d2a9a3d91d29"
+    },
+    {
+      "cardId": "2528",
+      "cardType": "check",
+      "ranking": 73,
+      "name": "신한카드 Pick E 체크",
+      "benefitCount": 6,
+      "benefitsSha256": "679720039004d7166913f79d243e7a16d34844393ac1fac1b9218384f3618919"
+    },
+    {
+      "cardId": "2527",
+      "cardType": "check",
+      "ranking": 74,
+      "name": "신한카드 Pick I 체크",
+      "benefitCount": 6,
+      "benefitsSha256": "29a98d64ecfe0adf4458d1d54338ae238c476506957ace111460963c55c16d3d"
+    },
+    {
+      "cardId": "2639",
+      "cardType": "check",
+      "ranking": 75,
+      "name": "카드의정석 DON CHECK",
+      "benefitCount": 4,
+      "benefitsSha256": "76389cc8b87b880d2cba8a91208087fc6e75134d531d32795453a6d9bf70247b"
+    },
+    {
+      "cardId": "676",
+      "cardType": "check",
+      "ranking": 76,
+      "name": "올리 POINT 체크",
+      "benefitCount": 4,
+      "benefitsSha256": "7498fa5436661e00d0bfc46a0ad15a8918870b2d7d88662e6198ccb07ea042eb"
+    },
+    {
+      "cardId": "614",
+      "cardType": "check",
+      "ranking": 77,
+      "name": "위글위글 첵첵 체크카드",
+      "benefitCount": 10,
+      "benefitsSha256": "3cc462b6d044f7e1dab51d3f9c1387b4e8edac45ff4bad2904c6c4821aed6d00"
+    },
+    {
+      "cardId": "2314",
+      "cardType": "check",
+      "ranking": 78,
+      "name": "토스유스카드(USS)",
+      "benefitCount": 2,
+      "benefitsSha256": "cba4c5c0ef731da0350ebdc9e73e6b3aaaf2765b6636a1ea0176d69758b07053"
+    },
+    {
+      "cardId": "403",
+      "cardType": "check",
+      "ranking": 79,
+      "name": "롯데체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "fa54804fa7e09feb0229e6cc2fd628bfd092eaea61ea66c3b20e811c1684e339"
+    },
+    {
+      "cardId": "378",
+      "cardType": "check",
+      "ranking": 80,
+      "name": "VIVA+ 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "94b1fb6c0a375ef1188bb089634f11860ebd3c421d398aafe0064d6586c128e5"
+    },
+    {
+      "cardId": "2745",
+      "cardType": "check",
+      "ranking": 81,
+      "name": "더담은 체크카드",
+      "benefitCount": 7,
+      "benefitsSha256": "3a9c4ae8a7009b85c52fae2b0a7514250f6c0ef584a536756864cc7a44b5d278"
+    },
+    {
+      "cardId": "2094",
+      "cardType": "check",
+      "ranking": 82,
+      "name": "카카오페이 체크카드",
+      "benefitCount": 8,
+      "benefitsSha256": "c7518f94a7bcba8b9717f4851ac9995fe0c4c9f19fc869744be0af019de9705f"
+    },
+    {
+      "cardId": "325",
+      "cardType": "check",
+      "ranking": 83,
+      "name": "그랑블루 체크카드",
+      "benefitCount": 9,
+      "benefitsSha256": "46eabcc0d49e6a4d2c8f27da41a13e19c6f5d42539ba14a5b0ae2b6944ada91c"
+    },
+    {
+      "cardId": "2889",
+      "cardType": "check",
+      "ranking": 84,
+      "name": "신한카드 처음 체크(냐한남자)",
+      "benefitCount": 4,
+      "benefitsSha256": "785ecb594b863afaec5da021888e72cc0b2d782b6c73dcd819e41ce285bbc704"
+    },
+    {
+      "cardId": "2775",
+      "cardType": "check",
+      "ranking": 85,
+      "name": "카카오페이 트래블로그 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "8c555a1baaf41c7b947179f45e61f5c1e745d21ba1dc9738b29e8b67356c4288"
+    },
+    {
+      "cardId": "2900",
+      "cardType": "check",
+      "ranking": 86,
+      "name": "오키카드 H",
+      "benefitCount": 2,
+      "benefitsSha256": "504ee2508dae31cc194e9fd6cb6e2e060f6577b3e1ff5d8635fbf3170b687f73"
+    },
+    {
+      "cardId": "686",
+      "cardType": "check",
+      "ranking": 87,
+      "name": "카카오뱅크 mini카드",
+      "benefitCount": 4,
+      "benefitsSha256": "f1b59728d1c40b76680bb6b23c0fe058608fb517230e8593871e95bdad455711"
+    },
+    {
+      "cardId": "2917",
+      "cardType": "check",
+      "ranking": 88,
+      "name": "IBK BUDDY CHECK",
+      "benefitCount": 7,
+      "benefitsSha256": "d07a1335d79f8f9089cbba86a1101b6899d7c62bcaa61f8349eeb6426f13941f"
+    },
+    {
+      "cardId": "2216",
+      "cardType": "check",
+      "ranking": 89,
+      "name": "미래에셋증권 체크카드(할인 2)",
+      "benefitCount": 4,
+      "benefitsSha256": "8b7ba95ee7c0e8bae88b16ac41a6b862002d68a9ebb853a18a439dd04440ae10"
+    },
+    {
+      "cardId": "346",
+      "cardType": "check",
+      "ranking": 90,
+      "name": "민 체크카드",
+      "benefitCount": 9,
+      "benefitsSha256": "8e0ee376295a177ec21ce01dddfe5ef1a4f42d25e8f4ec99f4a64ced177b23f1"
+    },
+    {
+      "cardId": "2817",
+      "cardType": "check",
+      "ranking": 91,
+      "name": "iM K-패스 체크카드",
+      "benefitCount": 7,
+      "benefitsSha256": "7db4a6df7cf43203a0fe1e6d7586d697f44f58686713ff2f01ddca908e609e5a"
+    },
+    {
+      "cardId": "2197",
+      "cardType": "check",
+      "ranking": 92,
+      "name": "현대카드M CHECK-경차전용카드(유류세 환급)",
+      "benefitCount": 5,
+      "benefitsSha256": "7a42d841d00c6fc4e409af4b823b39506ecfe6024483fd0788531abc2bd3628c"
+    },
+    {
+      "cardId": "303",
+      "cardType": "check",
+      "ranking": 93,
+      "name": "GS칼텍스 신한카드 경차사랑 체크",
+      "benefitCount": 4,
+      "benefitsSha256": "f4eccd6fffa173c4d6e711febdd7b94b195a4975458195f571d8499d6b661e9c"
+    },
+    {
+      "cardId": "2421",
+      "cardType": "check",
+      "ranking": 94,
+      "name": "카카오뱅크 개인사업자 체크카드",
+      "benefitCount": 3,
+      "benefitsSha256": "c3a8cbdd35555861a0cc8391302b42493bab28c399d81b00ed3dcaaa7a0dbaf3"
+    },
+    {
+      "cardId": "436",
+      "cardType": "check",
+      "ranking": 95,
+      "name": "케이뱅크 X KT멤버십더블혜택 체크카드",
+      "benefitCount": 4,
+      "benefitsSha256": "50594a96068dc71bb33546e7dcbd7dc6bc935f4fcbf8db7250e485c36c9eb5a6"
+    },
+    {
+      "cardId": "575",
+      "cardType": "check",
+      "ranking": 96,
+      "name": "라이프+플러스 체크카드",
+      "benefitCount": 9,
+      "benefitsSha256": "1726023f16542c7a574a9bbda6039a20f5a8c4cfd7215c03fd0b226967310d6a"
+    },
+    {
+      "cardId": "332",
+      "cardType": "check",
+      "ranking": 97,
+      "name": "카카오페이 KB국민 체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "90025fefba743b3d006b4cf6b06ef378246b19fee82664e4d11ed583b859e34e"
+    },
+    {
+      "cardId": "572",
+      "cardType": "check",
+      "ranking": 98,
+      "name": "포미 하이브리드 체크카드",
+      "benefitCount": 6,
+      "benefitsSha256": "259e35845ac0e502b187f11700454b2de4fe7378c025bcad977667c048fce114"
+    },
+    {
+      "cardId": "2225",
+      "cardType": "check",
+      "ranking": 99,
+      "name": "able Premier Members 카드",
+      "benefitCount": 3,
+      "benefitsSha256": "bbd678c5390c236ec8ff899de236f68393ecd7359424f4fc198c66df9417dc10"
+    },
+    {
+      "cardId": "284",
+      "cardType": "check",
+      "ranking": 100,
+      "name": "신한카드 주거래 체크",
+      "benefitCount": 4,
+      "benefitsSha256": "7cb4f1498275c5d71274126db2cf7f0739e80c13f73604ac84fd788323e44fc6"
+    }
+  ]
+}
