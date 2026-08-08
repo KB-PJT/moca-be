@@ -19,6 +19,7 @@ import com.moca.mocabe.global.exception.GlobalExceptionHandler;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.merchant.KakaoUnavailableException;
 import com.moca.mocabe.global.exception.merchant.MerchantCategoryNotFoundException;
+import com.moca.mocabe.global.exception.merchant.MerchantNotFoundException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,7 +112,7 @@ class MerchantControllerTest {
     @Test
     @DisplayName("근처 가맹점 API는 쿼리값을 서비스에 전달하고 결과를 반환한다")
     void returnsNearbyMerchants() throws Exception {
-        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500)).thenReturn(List.of(
+        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500, null)).thenReturn(List.of(
                 new NearbyMerchantResponse("m-1", "스타벅스", 37.501, 127.001, 120)));
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -130,7 +131,8 @@ class MerchantControllerTest {
     @Test
     @DisplayName("근처 가맹점 API는 radiusMeters 생략을 허용한다")
     void allowsOmittingRadiusForNearbyMerchants() throws Exception {
-        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, null)).thenReturn(List.of());
+        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, null, null))
+                .thenReturn(List.of());
 
         mockMvc.perform(get("/merchants/nearby")
                         .param("categoryId", "cat-cafe")
@@ -151,7 +153,7 @@ class MerchantControllerTest {
     @Test
     @DisplayName("존재하지 않는 categoryId면 근처 가맹점 API가 404를 반환한다")
     void returnsNotFoundForUnknownCategoryOnNearbyMerchants() throws Exception {
-        when(merchantNearbyQueryService.getNearbyMerchants("cat-unknown", 37.5, 127.0, 500))
+        when(merchantNearbyQueryService.getNearbyMerchants("cat-unknown", 37.5, 127.0, 500, null))
                 .thenThrow(new MerchantCategoryNotFoundException("존재하지 않는 카테고리입니다. categoryId=cat-unknown"));
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -166,9 +168,46 @@ class MerchantControllerTest {
     }
 
     @Test
+    @DisplayName("근처 가맹점 API는 merchantId를 서비스에 전달한다")
+    void passesMerchantIdForNearbyMerchants() throws Exception {
+        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500, "m-starbucks"))
+                .thenReturn(List.of(new NearbyMerchantResponse("m-starbucks", "스타벅스 강남점", 37.501, 127.001, 120)));
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode response = objectMapper.readTree(mockMvc.perform(get("/merchants/nearby")
+                        .param("categoryId", "cat-cafe")
+                        .param("latitude", "37.5")
+                        .param("longitude", "127.0")
+                        .param("radiusMeters", "500")
+                        .param("merchantId", "m-starbucks"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("스타벅스 강남점", response.path("data").get(0).path("name").asText());
+    }
+
+    @Test
+    @DisplayName("merchantId가 그 카테고리에 없으면 404를 반환한다")
+    void returnsNotFoundForUnknownMerchantId() throws Exception {
+        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500, "m-unknown"))
+                .thenThrow(new MerchantNotFoundException(
+                        "해당 카테고리에 존재하지 않는 가맹점입니다. categoryId=cat-cafe merchantId=m-unknown"));
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode response = objectMapper.readTree(mockMvc.perform(get("/merchants/nearby")
+                        .param("categoryId", "cat-cafe")
+                        .param("latitude", "37.5")
+                        .param("longitude", "127.0")
+                        .param("radiusMeters", "500")
+                        .param("merchantId", "m-unknown"))
+                .andExpect(status().isNotFound()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("MERCHANT_NOT_FOUND", response.path("error").path("code").asText());
+    }
+
+    @Test
     @DisplayName("카카오맵 상류 장애면 503을 반환한다")
     void returnsServiceUnavailableWhenKakaoFails() throws Exception {
-        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500))
+        when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500, null))
                 .thenThrow(new KakaoUnavailableException("카카오맵 응답 오류(HTTP 500)"));
 
         ObjectMapper objectMapper = new ObjectMapper();

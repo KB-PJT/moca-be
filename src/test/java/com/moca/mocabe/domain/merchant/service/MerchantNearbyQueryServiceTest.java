@@ -21,6 +21,7 @@ import com.moca.mocabe.domain.merchant.model.MerchantListRow;
 import com.moca.mocabe.domain.merchant.model.MerchantNameCandidate;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.merchant.MerchantCategoryNotFoundException;
+import com.moca.mocabe.global.exception.merchant.MerchantNotFoundException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class MerchantNearbyQueryServiceTest {
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
-        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500);
+        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
         assertEquals(1, results.size());
         assertEquals("m-starbucks", results.get(0).merchantId());
@@ -70,7 +71,7 @@ class MerchantNearbyQueryServiceTest {
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-olive", "올리브영")), List.of()));
 
-        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500);
+        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
         assertEquals(1, results.size());
         assertEquals("m-olive", results.get(0).merchantId());
@@ -90,7 +91,7 @@ class MerchantNearbyQueryServiceTest {
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
-        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500);
+        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
         assertEquals(1, results.size());
         assertEquals(100, results.get(0).distanceMeters());
@@ -109,7 +110,7 @@ class MerchantNearbyQueryServiceTest {
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
-        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500);
+        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
         assertEquals(1, results.size());
         assertEquals(150, results.get(0).distanceMeters());
@@ -128,7 +129,7 @@ class MerchantNearbyQueryServiceTest {
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
-        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500);
+        List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
         assertEquals(1, results.size());
         assertEquals(37.501, results.get(0).latitude());
@@ -140,7 +141,7 @@ class MerchantNearbyQueryServiceTest {
         when(merchantCategoryMapper.existsMapVisibleCategory(CATEGORY_ID)).thenReturn(true);
         when(merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID)).thenReturn(List.of());
 
-        assertTrue(service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500).isEmpty());
+        assertTrue(service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null).isEmpty());
         verify(merchantCategoryMapper, never()).findEnabledKakaoGroupCodes(anyString());
     }
 
@@ -148,29 +149,29 @@ class MerchantNearbyQueryServiceTest {
     @DisplayName("categoryId가 비어 있으면 예외를 던진다")
     void rejectsBlankCategoryId() {
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(" ", 37.5, 127.0, 500));
+                () -> service.getNearbyMerchants(" ", 37.5, 127.0, 500, null));
     }
 
     @Test
     @DisplayName("latitude, longitude가 없으면 예외를 던진다")
     void rejectsMissingCoordinates() {
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, null, 127.0, 500));
+                () -> service.getNearbyMerchants(CATEGORY_ID, null, 127.0, 500, null));
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, null, 500));
+                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, null, 500, null));
     }
 
     @Test
     @DisplayName("latitude, longitude가 범위를 벗어나면 예외를 던진다")
     void rejectsCoordinatesOutOfRange() {
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, 90.1, 127.0, 500));
+                () -> service.getNearbyMerchants(CATEGORY_ID, 90.1, 127.0, 500, null));
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, -90.1, 127.0, 500));
+                () -> service.getNearbyMerchants(CATEGORY_ID, -90.1, 127.0, 500, null));
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, 180.1, 500));
+                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, 180.1, 500, null));
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, -180.1, 500));
+                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, -180.1, 500, null));
         verifyNoInteractions(merchantCategoryMapper, merchantMapper, kakaoLocalClient);
     }
 
@@ -178,9 +179,9 @@ class MerchantNearbyQueryServiceTest {
     @DisplayName("radiusMeters가 범위를 벗어나면 예외를 던진다")
     void rejectsRadiusOutOfRange() {
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 99));
+                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 99, null));
         assertThrows(InvalidMerchantQueryException.class,
-                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 3001));
+                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 3001, null));
         verifyNoInteractions(merchantCategoryMapper);
     }
 
@@ -190,7 +191,7 @@ class MerchantNearbyQueryServiceTest {
         when(merchantCategoryMapper.existsMapVisibleCategory("cat-unknown")).thenReturn(false);
 
         assertThrows(MerchantCategoryNotFoundException.class,
-                () -> service.getNearbyMerchants("cat-unknown", 37.5, 127.0, 500));
+                () -> service.getNearbyMerchants("cat-unknown", 37.5, 127.0, 500, null));
 
         verify(merchantMapper, never()).findActiveMerchantsByCategoryId(anyString());
     }
@@ -205,9 +206,46 @@ class MerchantNearbyQueryServiceTest {
         when(kakaoLocalClient.searchByCategory("CE7", 37.5, 127.0, 150)).thenReturn(List.of());
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(List.of(), List.of()));
 
-        service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, null);
+        service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, null, null);
 
         verify(kakaoLocalClient).searchByCategory("CE7", 37.5, 127.0, 150);
+    }
+
+    @Test
+    @DisplayName("merchantId를 주면 그 가맹점만 검색해서 다른 가맹점 키워드 검색은 호출하지 않는다")
+    void filtersToSingleMerchantWhenMerchantIdGiven() {
+        when(merchantCategoryMapper.existsMapVisibleCategory(CATEGORY_ID)).thenReturn(true);
+        when(merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID)).thenReturn(List.of(
+                new MerchantListRow("m-starbucks", "스타벅스"),
+                new MerchantListRow("m-olive", "올리브영")));
+        when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of());
+        when(kakaoLocalClient.searchByKeyword("스타벅스", 37.5, 127.0, 500)).thenReturn(List.of(
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 120)));
+        when(merchantLookup.loadCandidates()).thenReturn(snapshot(
+                List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
+
+        List<NearbyMerchantResponse> results = service.getNearbyMerchants(
+                CATEGORY_ID, 37.5, 127.0, 500, "m-starbucks");
+
+        assertEquals(1, results.size());
+        assertEquals("m-starbucks", results.get(0).merchantId());
+        verify(kakaoLocalClient).searchByKeyword("스타벅스", 37.5, 127.0, 500);
+        verify(kakaoLocalClient, never()).searchByKeyword(org.mockito.ArgumentMatchers.eq("올리브영"),
+                anyDouble(), anyDouble(), anyInt());
+    }
+
+    @Test
+    @DisplayName("merchantId가 그 카테고리에 없으면 예외를 던진다")
+    void rejectsMerchantIdNotInCategory() {
+        when(merchantCategoryMapper.existsMapVisibleCategory(CATEGORY_ID)).thenReturn(true);
+        when(merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID)).thenReturn(List.of(
+                new MerchantListRow("m-starbucks", "스타벅스")));
+
+        assertThrows(MerchantNotFoundException.class,
+                () -> service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, "m-unknown"));
+
+        verify(kakaoLocalClient, never()).searchByKeyword(anyString(), anyDouble(), anyDouble(), anyInt());
+        verify(kakaoLocalClient, never()).searchByCategory(anyString(), anyDouble(), anyDouble(), anyInt());
     }
 
     private MerchantCandidateSnapshot snapshot(List<MerchantNameCandidate> nameCandidates,

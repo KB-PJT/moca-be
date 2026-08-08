@@ -41,8 +41,9 @@ public class MerchantController {
             @RequestParam(name = "categoryId") String categoryId,
             @RequestParam(name = "latitude") Double latitude,
             @RequestParam(name = "longitude") Double longitude,
-            @RequestParam(name = "radiusMeters", required = false) Integer radiusMeters) {
-        return ResponseEntity.ok(ApiResponse.success(
-                merchantNearbyQueryService.getNearbyMerchants(categoryId, latitude, longitude, radiusMeters)));
+            @RequestParam(name = "radiusMeters", required = false) Integer radiusMeters,
+            @RequestParam(name = "merchantId", required = false) String merchantId) {
+        return ResponseEntity.ok(ApiResponse.success(merchantNearbyQueryService.getNearbyMerchants(
+                categoryId, latitude, longitude, radiusMeters, merchantId)));
     }
 }

@@ -8,6 +8,7 @@ import com.moca.mocabe.domain.merchant.model.KakaoPlace;
 import com.moca.mocabe.domain.merchant.model.MerchantListRow;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.merchant.MerchantCategoryNotFoundException;
+import com.moca.mocabe.global.exception.merchant.MerchantNotFoundException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 카테고리가 카카오 카테고리 그룹코드에 매핑돼 있으면(1안) 그룹코드 반경 검색을 그룹코드 개수만큼
  * 호출하고, 매핑이 없으면(2안) 그 카테고리의 활성 가맹점명 각각으로 키워드 반경 검색을 호출해 합친다.
  * 카카오 검색 결과는 접두사 매칭({@link MerchantLookup})으로 우리 DB 가맹점과 대조해, 요청한 카테고리에
- * 속한 가맹점만 남긴다.
+ * 속한 가맹점만 남긴다. merchantId를 함께 주면 그 카테고리 안에서 해당 가맹점(브랜드)만 조회한다.
  */
 public class MerchantNearbyQueryService {
 
@@ -52,7 +53,7 @@ public class MerchantNearbyQueryService {
 
     @Transactional(readOnly = true)
     public List<NearbyMerchantResponse> getNearbyMerchants(String categoryId, Double latitude, Double longitude,
-                                                            Integer requestedRadiusMeters) {
+                                                            Integer requestedRadiusMeters, String merchantId) {
         if (categoryId == null || categoryId.isBlank()) {
             throw new InvalidMerchantQueryException("categoryId는 필수입니다.");
         }
@@ -76,6 +77,9 @@ public class MerchantNearbyQueryService {
         if (categoryMerchants.isEmpty()) {
             return List.of();
         }
+        if (merchantId != null && !merchantId.isBlank()) {
+            categoryMerchants = filterToMerchant(categoryMerchants, categoryId, merchantId);
+        }
 
         List<String> groupCodes = merchantCategoryMapper.findEnabledKakaoGroupCodes(categoryId);
         List<KakaoPlace> places = searchPlaces(groupCodes, categoryMerchants, latitude, longitude, radiusMeters);
@@ -85,6 +89,16 @@ public class MerchantNearbyQueryService {
         LOGGER.info(() -> "근처 가맹점 조회 categoryId=" + categoryId + " 전략=" + (groupCodes.isEmpty() ? "2안" : "1안")
                 + " 카카오결과=" + placesFound + "건 매칭=" + matched + "건");
         return results;
+    }
+
+    private List<MerchantListRow> filterToMerchant(List<MerchantListRow> categoryMerchants, String categoryId,
+                                                    String merchantId) {
+        return categoryMerchants.stream()
+                .filter(merchant -> merchant.merchantId().equals(merchantId))
+                .findFirst()
+                .map(List::of)
+                .orElseThrow(() -> new MerchantNotFoundException(
+                        "해당 카테고리에 존재하지 않는 가맹점입니다. categoryId=" + categoryId + " merchantId=" + merchantId));
     }
 
     private List<KakaoPlace> searchPlaces(List<String> groupCodes, List<MerchantListRow> categoryMerchants,
