@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.home.mapper.HomeMapper">
+
+    <resultMap id="homeCardRowMap" type="com.moca.mocabe.domain.home.model.HomeCardRow">
+        <id property="userCardId" column="user_card_id"/>
+        <result property="cardName" column="card_name"/>
+        <result property="alias" column="alias"/>
+        <result property="cardImageUrl" column="card_image_url"/>
+        <result property="highlightBenefitTitle" column="highlight_benefit_title"/>
+        <result property="maximumMonthlyBenefitAmount" column="maximum_monthly_benefit_amount"/>
+        <result property="receivedBenefitAmount" column="received_benefit_amount"/>
+        <result property="performanceCurrentAmount" column="performance_current_amount"/>
+        <result property="performanceTargetAmount" column="performance_target_amount"/>
+        <result property="displayOrder" column="display_order"/>
+    </resultMap>
+
+    <!-- 최신 카드 콘텐츠 하나만 사용하고, 월 한도는 정책별 최고 구간을 합산한다. -->
+    <select id="findHomeCards" resultMap="homeCardRowMap">
+        SELECT uc.user_card_id,
+               COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
+               uc.memo AS alias,
+               NULLIF(cv.image_url, '') AS card_image_url,
+               (
+                   SELECT cb.title
+                   FROM card_benefits cb
+                   WHERE cb.content_version_id = cv.content_version_id
+                     AND cb.record_type = 'benefit'
+                   ORDER BY cb.position ASC
+                   LIMIT 1
+               ) AS highlight_benefit_title,
+               COALESCE((
+                   SELECT SUM(policy_limit.maximum_reward)
+                   FROM (
+                       SELECT cb2.content_version_id, blp.limit_policy_id,
+                              MAX(blt.limit_value) AS maximum_reward
+                       FROM card_benefits cb2
+                       INNER JOIN benefit_offers bo ON bo.benefit_id = cb2.benefit_id
+                       INNER JOIN benefit_limit_policies blp ON blp.offer_id = bo.offer_id
+                       INNER JOIN benefit_limit_tiers blt ON blt.limit_policy_id = blp.limit_policy_id
+                       WHERE blp.limit_period = 'monthly'
+                         AND blp.limit_type = 'reward_amount'
+                         AND blp.limit_unit = 'KRW'
+                       GROUP BY cb2.content_version_id, blp.limit_policy_id
+                   ) policy_limit
+                   WHERE policy_limit.content_version_id = cv.content_version_id
+               ), 0) AS maximum_monthly_benefit_amount,
+               COALESCE(benefit_usage.received_benefit_amount, 0) AS received_benefit_amount,
+               COALESCE(performance.current_spend_amount, 0) AS performance_current_amount,
+               <!-- 실적 구간 원문이 없는 카드는 기존 대표 실적을 목표로 사용한다. -->
+               COALESCE(
+                   (SELECT next_tier.minimum_spend_krw
+                    FROM card_performance_tiers next_tier
+                    WHERE next_tier.content_version_id = cv.content_version_id
+                      AND next_tier.minimum_spend_krw &gt; COALESCE(performance.current_spend_amount, 0)
+                    ORDER BY next_tier.minimum_spend_krw ASC
+                    LIMIT 1),
+                   (SELECT MAX(last_tier.minimum_spend_krw)
+                    FROM card_performance_tiers last_tier
+                    WHERE last_tier.content_version_id = cv.content_version_id),
+                   cv.representative_spend, 0) AS performance_target_amount,
+               uc.display_order
+        FROM user_cards uc
+        INNER JOIN cards c ON c.card_id = uc.card_id
+        LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
+            AND NOT EXISTS (
+                SELECT 1
+                FROM card_content_versions cv2
+                WHERE cv2.card_id = cv.card_id
+                  AND (cv2.last_seen_at &gt; cv.last_seen_at
+                       OR (cv2.last_seen_at = cv.last_seen_at
+                           AND cv2.content_version_id &gt; cv.content_version_id))
+            )
+        LEFT JOIN (
+            SELECT user_card_id, SUM(reward_amount_krw) AS received_benefit_amount
+            FROM user_benefit_usages
+            WHERE usage_status = 'confirmed'
+              AND usage_date &gt;= CONCAT(#{yearMonth}, '-01')
+              AND usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+            GROUP BY user_card_id
+        ) benefit_usage ON benefit_usage.user_card_id = uc.user_card_id
+        LEFT JOIN user_card_performance_snapshots performance
+            ON performance.user_card_id = uc.user_card_id
+           AND performance.performance_month = #{yearMonth}
+        WHERE uc.user_id = #{userId}
+          AND uc.is_active = TRUE
+        ORDER BY uc.display_order ASC, uc.user_card_id ASC
+    </select>
+
+    <select id="sumMissedBenefitAmount" resultType="long">
+        SELECT COALESCE(SUM(outcome.missed_reward_value), 0)
+        FROM user_benefit_calculation_outcomes outcome
+        INNER JOIN user_cards uc ON uc.user_card_id = outcome.user_card_id
+        WHERE uc.user_id = #{userId}
+          AND uc.is_active = TRUE
+          AND outcome.reward_unit = 'KRW'
+          AND outcome.usage_date &gt;= CONCAT(#{yearMonth}, '-01')
+          AND outcome.usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+    </select>
+
+    <resultMap id="recentBenefitRowMap" type="com.moca.mocabe.domain.home.model.RecentBenefitRow">
+        <id property="benefitHistoryId" column="benefit_history_id"/>
+        <result property="merchantName" column="merchant_name"/>
+        <result property="benefitType" column="benefit_type"/>
+        <result property="benefitTitle" column="benefit_title"/>
+        <result property="cardName" column="card_name"/>
+        <result property="paymentAmount" column="payment_amount"/>
+        <result property="benefitAmount" column="benefit_amount"/>
+        <result property="occurredAt" column="occurred_at"/>
+    </resultMap>
+
+    <select id="findRecentBenefits" resultMap="recentBenefitRowMap">
+        SELECT ubu.usage_id AS benefit_history_id,
+               approval.merchant_name,
+               CASE bo.reward_type
+                   WHEN 'discount' THEN 'DISCOUNT'
+                   WHEN 'cashback' THEN 'CASHBACK'
+                   WHEN 'points' THEN 'POINT'
+               END AS benefit_type,
+               COALESCE(bo.offer_name, cb.title) AS benefit_title,
+               COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
+               approval.amount AS payment_amount,
+               ubu.reward_amount_krw AS benefit_amount,
+               COALESCE(ubu.approved_at, approval.approved_at) AS occurred_at
+        FROM user_benefit_usages ubu
+        INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
+        INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
+        INNER JOIN cards c ON c.card_id = uc.card_id
+        LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
+            AND NOT EXISTS (
+                SELECT 1
+                FROM card_content_versions cv2
+                WHERE cv2.card_id = cv.card_id
+                  AND (cv2.last_seen_at &gt; cv.last_seen_at
+                       OR (cv2.last_seen_at = cv.last_seen_at
+                           AND cv2.content_version_id &gt; cv.content_version_id))
+            )
+        INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
+        INNER JOIN card_benefits cb ON cb.benefit_id = bo.benefit_id
+        WHERE uc.user_id = #{userId}
+          AND ubu.usage_status = 'confirmed'
+          AND bo.reward_type IN ('discount', 'cashback', 'points')
+          AND COALESCE(ubu.approved_at, approval.approved_at) &gt;= #{fromUtc}
+          AND COALESCE(ubu.approved_at, approval.approved_at) &lt; #{toUtc}
+        ORDER BY COALESCE(ubu.approved_at, approval.approved_at) DESC, ubu.usage_id DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

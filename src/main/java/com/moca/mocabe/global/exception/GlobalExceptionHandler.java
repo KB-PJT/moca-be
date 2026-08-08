@@ -20,6 +20,8 @@ import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
+import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
+import com.moca.mocabe.global.exception.benefit.InvalidBenefitHistoryQueryException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
@@ -27,6 +29,7 @@ import com.moca.mocabe.global.exception.home.HomeDataNotFoundException;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.merchant.KakaoUnavailableException;
 import com.moca.mocabe.global.exception.merchant.MerchantCategoryNotFoundException;
+import com.moca.mocabe.global.exception.report.InvalidReportQueryException;
 import com.moca.mocabe.global.exception.merchant.MerchantNotFoundException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.sql.SQLException;
@@ -111,6 +114,18 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "INVALID_HOME_QUERY", exception.getMessage());
     }
 
+    @ExceptionHandler(InvalidBenefitHistoryQueryException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidBenefitHistoryQuery(
+            InvalidBenefitHistoryQueryException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_BENEFIT_HISTORY_QUERY", exception.getMessage());
+    }
+
+    @ExceptionHandler(BenefitHistoryNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleBenefitHistoryNotFound(
+            BenefitHistoryNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "BENEFIT_HISTORY_NOT_FOUND", exception.getMessage());
+    }
+
     @ExceptionHandler(HomeDataNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleHomeDataNotFound(HomeDataNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, "HOME_DATA_NOT_FOUND", exception.getMessage());
@@ -119,6 +134,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidMerchantQueryException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidMerchantQuery(InvalidMerchantQueryException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_MERCHANT_QUERY", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidReportQueryException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidReportQuery(
+            InvalidReportQueryException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_REPORT_QUERY", exception.getMessage());
     }
 
     @ExceptionHandler(MerchantCategoryNotFoundException.class)

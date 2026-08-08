@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.report.mapper.ReportMapper">
+
+    <resultMap id="benefitTypeAmountRowMap" type="com.moca.mocabe.domain.report.model.BenefitTypeAmountRow">
+        <constructor>
+            <arg column="benefit_type" javaType="java.lang.String"/>
+            <arg column="amount" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 원화 가치가 없는 마일리지는 reward_type/금액 집계에서 의도적으로 제외한다. -->
+    <select id="findBenefitAmountsByType" resultMap="benefitTypeAmountRowMap">
+        SELECT CASE bo.reward_type
+                   WHEN 'discount' THEN 'DISCOUNT'
+                   WHEN 'cashback' THEN 'CASHBACK'
+                   WHEN 'points' THEN 'POINT'
+               END AS benefit_type,
+               CAST(SUM(ubu.reward_amount_krw) AS SIGNED) AS amount
+        FROM user_benefit_usages ubu
+        INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
+        INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
+        WHERE uc.user_id = #{userId}
+          AND ubu.usage_status = 'confirmed'
+          AND bo.reward_type IN ('discount', 'cashback', 'points')
+          AND COALESCE(ubu.approved_at, ubu.confirmed_at) &gt;= #{fromUtc}
+          AND COALESCE(ubu.approved_at, ubu.confirmed_at) &lt; #{toUtc}
+        GROUP BY bo.reward_type
+        ORDER BY amount DESC, benefit_type ASC
+    </select>
+
+    <resultMap id="categoryBenefitRowMap" type="com.moca.mocabe.domain.report.model.CategoryBenefitRow">
+        <constructor>
+            <arg column="category_code" javaType="java.lang.String"/>
+            <arg column="category_name" javaType="java.lang.String"/>
+            <arg column="benefit_amount" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <!-- merchant_id가 매핑된 승인내역만 카테고리 리포트에 포함한다. -->
+    <select id="findBenefitAmountsByCategory" resultMap="categoryBenefitRowMap">
+        SELECT mc.category_code,
+               mc.category_name,
+               CAST(SUM(ubu.reward_amount_krw) AS SIGNED) AS benefit_amount
+        FROM user_benefit_usages ubu
+        INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
+        INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
+        INNER JOIN merchants merchant ON merchant.merchant_id = approval.merchant_id
+        INNER JOIN merchant_categories mc ON mc.merchant_category_id = merchant.merchant_category_id
+        INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
+        WHERE uc.user_id = #{userId}
+          AND ubu.usage_status = 'confirmed'
+          AND bo.reward_type IN ('discount', 'cashback', 'points')
+          AND COALESCE(ubu.approved_at, approval.approved_at) &gt;= #{fromUtc}
+          AND COALESCE(ubu.approved_at, approval.approved_at) &lt; #{toUtc}
+        GROUP BY mc.merchant_category_id, mc.category_code, mc.category_name
+        ORDER BY benefit_amount DESC, mc.category_code ASC
+        LIMIT #{limit}
+    </select>
+
+    <resultMap id="missedBenefitRowMap" type="com.moca.mocabe.domain.report.model.MissedBenefitRow">
+        <constructor>
+            <arg column="benefit_rule_id" javaType="java.lang.String"/>
+            <arg column="title" javaType="java.lang.String"/>
+            <arg column="benefit_type" javaType="java.lang.String"/>
+            <arg column="used_amount" javaType="_long"/>
+            <arg column="limit_amount" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <!--
+        계산 시점에 확정한 expected - applied 값만 집계한다. 단순히 월 한도의 잔여분을 놓친 혜택으로
+        보지 않으므로, 해당 월에 실제로 계산됐지만 한도 때문에 미적용된 거래가 없으면 반환하지 않는다.
+    -->
+    <select id="findMonthlyRemainingBenefits" resultMap="missedBenefitRowMap">
+        SELECT outcome.rule_id AS benefit_rule_id,
+               COALESCE(NULLIF(MIN(br.rule_name), ''), MIN(bo.offer_name)) AS title,
+               CASE MIN(bo.reward_type)
+                   WHEN 'discount' THEN 'DISCOUNT'
+                   WHEN 'cashback' THEN 'CASHBACK'
+                   WHEN 'points' THEN 'POINT'
+               END AS benefit_type,
+               CAST(SUM(outcome.applied_reward_value) AS SIGNED) AS used_amount,
+               CAST(SUM(outcome.expected_reward_value) AS SIGNED) AS limit_amount
+        FROM user_benefit_calculation_outcomes outcome
+        INNER JOIN user_cards uc ON uc.user_card_id = outcome.user_card_id
+        INNER JOIN benefit_rules br ON br.rule_id = outcome.rule_id
+        INNER JOIN benefit_offers bo ON bo.offer_id = outcome.offer_id
+        WHERE uc.user_id = #{userId}
+          AND uc.user_card_id = #{userCardId}
+          AND uc.is_active = TRUE
+          AND outcome.reward_unit = 'KRW'
+          AND outcome.usage_date &gt;= CONCAT(#{yearMonth}, '-01')
+          AND outcome.usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+          AND outcome.missed_reward_value &gt; 0
+        GROUP BY outcome.rule_id
+        ORDER BY SUM(outcome.missed_reward_value) DESC, title ASC
+    </select>
+
+    <resultMap id="performanceCardRowMap" type="com.moca.mocabe.domain.report.model.PerformanceCardRow">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="card_name" javaType="java.lang.String"/>
+            <arg column="card_image_url" javaType="java.lang.String"/>
+            <arg column="current_performance_amount" javaType="_long"/>
+            <arg column="current_tier_target_amount" javaType="_long"/>
+            <arg column="current_tier" javaType="_int"/>
+            <arg column="next_tier" javaType="java.lang.Integer"/>
+            <arg column="display_order" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="performanceCardSelect">
+        SELECT uc.user_card_id,
+               COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
+               NULLIF(cv.image_url, '') AS card_image_url,
+               CAST(COALESCE(snapshot.current_spend_amount, 0) AS SIGNED) AS current_performance_amount,
+               <!-- 실적 구간 원문이 없는 카드는 기존 대표 실적을 목표로 사용한다. -->
+               CAST(COALESCE(
+                   (SELECT next_tier.minimum_spend_krw
+                    FROM card_performance_tiers next_tier
+                    WHERE next_tier.content_version_id = cv.content_version_id
+                      AND next_tier.minimum_spend_krw &gt; COALESCE(snapshot.current_spend_amount, 0)
+                    ORDER BY next_tier.minimum_spend_krw ASC
+                    LIMIT 1),
+                   (SELECT MAX(last_tier.minimum_spend_krw)
+                    FROM card_performance_tiers last_tier
+                    WHERE last_tier.content_version_id = cv.content_version_id),
+                   cv.representative_spend, 0) AS SIGNED) AS current_tier_target_amount,
+               COALESCE((
+                   SELECT current_tier.tier_number
+                   FROM card_performance_tiers current_tier
+                   WHERE current_tier.content_version_id = cv.content_version_id
+                     AND current_tier.minimum_spend_krw &lt;= COALESCE(snapshot.current_spend_amount, 0)
+                     AND (current_tier.maximum_spend_krw IS NULL
+                          OR COALESCE(snapshot.current_spend_amount, 0) &lt;= current_tier.maximum_spend_krw)
+                   ORDER BY current_tier.tier_number DESC
+                   LIMIT 1), 0) AS current_tier,
+               (
+                   SELECT next_tier.tier_number
+                   FROM card_performance_tiers next_tier
+                   WHERE next_tier.content_version_id = cv.content_version_id
+                     AND next_tier.minimum_spend_krw &gt; COALESCE(snapshot.current_spend_amount, 0)
+                   ORDER BY next_tier.minimum_spend_krw ASC
+                   LIMIT 1
+               ) AS next_tier,
+               uc.display_order
+        FROM user_cards uc
+        INNER JOIN cards c ON c.card_id = uc.card_id
+        LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
+            AND NOT EXISTS (
+                SELECT 1 FROM card_content_versions newer
+                WHERE newer.card_id = cv.card_id
+                  AND (newer.last_seen_at &gt; cv.last_seen_at
+                       OR (newer.last_seen_at = cv.last_seen_at
+                           AND newer.content_version_id &gt; cv.content_version_id))
+            )
+        LEFT JOIN user_card_performance_snapshots snapshot
+            ON snapshot.user_card_id = uc.user_card_id
+           AND snapshot.performance_month = #{yearMonth}
+    </sql>
+
+    <select id="findPerformanceCard" resultMap="performanceCardRowMap">
+        <include refid="performanceCardSelect"/>
+        WHERE uc.user_id = #{userId}
+          AND uc.user_card_id = #{userCardId}
+          AND uc.is_active = TRUE
+    </select>
+
+    <select id="findPerformanceCards" resultMap="performanceCardRowMap">
+        <include refid="performanceCardSelect"/>
+        WHERE uc.user_id = #{userId}
+          AND uc.is_active = TRUE
+        ORDER BY uc.display_order ASC, uc.user_card_id ASC
+    </select>
+</mapper>

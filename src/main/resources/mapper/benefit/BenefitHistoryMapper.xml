@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper">
+    <sql id="historyColumns">
+        ubu.usage_id AS benefit_history_id, approval.merchant_name,
+        COALESCE(ubu.approved_at, approval.approved_at) AS approved_at, approval.amount AS payment_amount,
+        ubu.reward_amount_krw AS benefit_amount,
+        CASE bo.reward_type WHEN 'discount' THEN 'DISCOUNT' WHEN 'cashback' THEN 'CASHBACK' WHEN 'points' THEN 'POINT' END AS benefit_type,
+        COALESCE(bo.offer_name, cb.title) AS benefit_title, ubu.user_card_id,
+        COALESCE(cv.name, uc.card_name_from_codef) AS card_name, 'APPLIED' AS calculation_status
+    </sql>
+    <sql id="historyJoins">
+        FROM user_benefit_usages ubu
+        INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
+        INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
+        INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
+        INNER JOIN card_benefits cb ON cb.benefit_id = bo.benefit_id
+        LEFT JOIN cards c ON c.card_id = uc.card_id
+        LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
+          AND NOT EXISTS (SELECT 1 FROM card_content_versions newer WHERE newer.card_id = cv.card_id
+              AND (newer.last_seen_at &gt; cv.last_seen_at OR (newer.last_seen_at = cv.last_seen_at AND newer.content_version_id &gt; cv.content_version_id)))
+        WHERE uc.user_id = #{userId} AND ubu.usage_status = 'confirmed'
+          AND COALESCE(ubu.approved_at, approval.approved_at) &gt;= #{fromUtc}
+          AND COALESCE(ubu.approved_at, approval.approved_at) &lt; #{toUtc}
+          AND bo.reward_type IN ('discount', 'cashback', 'points')
+          <if test="userCardId != null">AND ubu.user_card_id = #{userCardId}</if>
+          <if test="benefitType != null">AND CASE bo.reward_type WHEN 'discount' THEN 'DISCOUNT' WHEN 'cashback' THEN 'CASHBACK' WHEN 'points' THEN 'POINT' END = #{benefitType}</if>
+    </sql>
+    <resultMap id="historyRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryRow">
+        <id property="benefitHistoryId" column="benefit_history_id"/><result property="merchantName" column="merchant_name"/><result property="approvedAt" column="approved_at"/><result property="paymentAmount" column="payment_amount"/><result property="benefitAmount" column="benefit_amount"/><result property="benefitType" column="benefit_type"/><result property="benefitTitle" column="benefit_title"/><result property="userCardId" column="user_card_id"/><result property="cardName" column="card_name"/><result property="calculationStatus" column="calculation_status"/>
+    </resultMap>
+    <select id="findHistory" resultMap="historyRow">
+        SELECT <include refid="historyColumns"/><include refid="historyJoins"/>
+        <choose><when test="sort == 'BENEFIT_DESC'">ORDER BY ubu.reward_amount_krw DESC, COALESCE(ubu.approved_at, approval.approved_at) DESC, ubu.usage_id DESC</when><otherwise>ORDER BY COALESCE(ubu.approved_at, approval.approved_at) DESC, ubu.usage_id DESC</otherwise></choose>
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+    <select id="countHistory" resultType="long">SELECT COUNT(*) <include refid="historyJoins"/></select>
+    <resultMap id="detailRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryDetailRow" extends="historyRow">
+        <result property="monthlyUsedAmount" column="monthly_used_amount"/><result property="monthlyLimitAmount" column="monthly_limit_amount"/><result property="earnedMileage" column="earned_mileage"/>
+    </resultMap>
+    <select id="findDetail" resultMap="detailRow">
+        SELECT <include refid="historyColumns"/>,
+            CASE WHEN ubu.limit_policy_id IS NULL THEN 0 ELSE COALESCE((SELECT SUM(u2.reward_amount_krw) FROM user_benefit_usages u2 WHERE u2.user_card_id = ubu.user_card_id AND u2.limit_policy_id = ubu.limit_policy_id AND u2.usage_status = 'confirmed' AND DATE_FORMAT(u2.usage_date, '%Y-%m') = DATE_FORMAT(ubu.usage_date, '%Y-%m')), 0) END AS monthly_used_amount,
+            COALESCE((SELECT MAX(t.limit_value) FROM benefit_limit_tiers t WHERE t.limit_policy_id = ubu.limit_policy_id), 0) AS monthly_limit_amount,
+            CASE WHEN ubu.reward_original_unit = 'mile' THEN CAST(ubu.reward_original_value AS SIGNED) ELSE NULL END AS earned_mileage
+        FROM user_benefit_usages ubu
+        INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
+        INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
+        INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
+        INNER JOIN card_benefits cb ON cb.benefit_id = bo.benefit_id
+        LEFT JOIN cards c ON c.card_id = uc.card_id
+        LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
+          AND NOT EXISTS (SELECT 1 FROM card_content_versions newer WHERE newer.card_id = cv.card_id
+              AND (newer.last_seen_at &gt; cv.last_seen_at OR (newer.last_seen_at = cv.last_seen_at AND newer.content_version_id &gt; cv.content_version_id)))
+        WHERE uc.user_id = #{userId}
+          AND ubu.usage_status = 'confirmed'
+          AND bo.reward_type IN ('discount', 'cashback', 'points')
+          AND ubu.usage_id = #{usageId}
+    </select>
+</mapper>

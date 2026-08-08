@@ -1,5 +1,9 @@
 package com.moca.mocabe.global.config;
 
+import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
+import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
+import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
+import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
@@ -36,6 +40,9 @@ import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
+import com.moca.mocabe.domain.home.mapper.HomeMapper;
+import com.moca.mocabe.domain.report.mapper.ReportMapper;
+import com.moca.mocabe.domain.report.service.ReportQueryService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
@@ -80,8 +87,24 @@ public class AppConfig {
     }
 
     @Bean
-    public HomeQueryService homeQueryService(UserMapper userMapper, UserCardMapper userCardMapper) {
-        return new HomeQueryService(userMapper, userCardMapper);
+    public HomeQueryService homeQueryService(UserMapper userMapper, HomeMapper homeMapper) {
+        return new HomeQueryService(userMapper, homeMapper);
+    }
+
+    @Bean
+    public ReportQueryService reportQueryService(UserMapper userMapper, ReportMapper reportMapper) {
+        return new ReportQueryService(userMapper, reportMapper);
+    }
+
+    @Bean
+    public BenefitHistoryQueryService benefitHistoryQueryService(BenefitHistoryMapper benefitHistoryMapper) {
+        return new BenefitHistoryQueryService(benefitHistoryMapper);
+    }
+
+    @Bean
+    public BenefitUsageCalculationService benefitUsageCalculationService(
+            BenefitCalculationMapper benefitCalculationMapper) {
+        return new BenefitUsageCalculationService(benefitCalculationMapper);
     }
 
     @Bean
@@ -91,8 +114,9 @@ public class AppConfig {
 
     @Bean
     public UserApplicationService userApplicationService(UserDomainService userDomainService,
-                                                         OpaqueTokenService opaqueTokenService) {
-        return new UserApplicationService(userDomainService, opaqueTokenService);
+                                                         OpaqueTokenService opaqueTokenService,
+                                                         CardQueryService cardQueryService) {
+        return new UserApplicationService(userDomainService, opaqueTokenService, cardQueryService);
     }
 
     @Bean
@@ -240,9 +264,11 @@ public class AppConfig {
                                            MerchantLookup merchantLookup,
                                            ApprovalIngestStore approvalIngestStore,
                                            PerformanceSnapshotStore performanceSnapshotStore,
-                                           Encryptor codefEncryptor) {
+                                           Encryptor codefEncryptor,
+                                           BenefitUsageCalculationService benefitUsageCalculationService) {
         return new CardSyncService(codefClient, codefCredentialMapper, cardApprovalMapper,
-                approvalCardMatcher, merchantLookup, approvalIngestStore, performanceSnapshotStore, codefEncryptor);
+                approvalCardMatcher, merchantLookup, approvalIngestStore, performanceSnapshotStore,
+                codefEncryptor, benefitUsageCalculationService);
     }
 
     @Bean

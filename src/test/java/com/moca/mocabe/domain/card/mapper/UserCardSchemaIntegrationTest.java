@@ -1,8 +1,10 @@
 package com.moca.mocabe.domain.card.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
@@ -102,6 +104,20 @@ class UserCardSchemaIntegrationTest {
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '4' AND success = TRUE",
                 Integer.class));
+    }
+
+    @Test
+    @DisplayName("비활성 카드만 있어도 보유 카드가 존재하는 것으로 판단한다")
+    void existsByUserIdIsTrueEvenWhenOnlyInactiveCardExists() {
+        insertUserCard(USER_CARD_ID, CARD_KEY_HASH, false, 1);
+
+        assertTrue(userCardMapper.existsByUserId(USER_ID));
+    }
+
+    @Test
+    @DisplayName("보유 카드가 없으면 존재하지 않는 것으로 판단한다")
+    void existsByUserIdIsFalseWhenNoCardExists() {
+        assertFalse(userCardMapper.existsByUserId(USER_ID));
     }
 
     @Test
