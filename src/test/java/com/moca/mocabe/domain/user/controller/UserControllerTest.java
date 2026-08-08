@@ -14,6 +14,7 @@ import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.domain.user.dto.UserProfileResponse;
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.LocationSettingsResponse;
+import com.moca.mocabe.domain.user.dto.NewUserCheckResponse;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsResponse;
 import com.moca.mocabe.domain.user.dto.UpdateNicknameRequest;
@@ -119,6 +120,22 @@ class UserControllerTest {
 
         assertTrue(response.contains("\"success\":false"));
         assertTrue(response.contains("cardSortMode"));
+    }
+
+    @Test
+    @DisplayName("보유 카드가 없는 사용자는 신규 사용자로 응답받는다")
+    void getsNewUserStatus() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(userApplicationService.isNewUser(USER_ID)).thenReturn(new NewUserCheckResponse(true));
+
+        String response = mockMvc.perform(get("/me/onboarding-status"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertTrue(response.contains("\"success\":true"));
+        assertTrue(response.contains("\"newUser\":true"));
     }
 
     @Test

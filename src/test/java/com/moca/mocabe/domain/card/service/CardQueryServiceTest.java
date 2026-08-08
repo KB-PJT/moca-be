@@ -68,6 +68,15 @@ class CardQueryServiceTest {
     }
 
     @Test
+    @DisplayName("활성·비활성 상관없이 보유 카드가 있으면 true를 반환한다")
+    void hasAnyCardReturnsMapperResult() {
+        when(userCardMapper.existsByUserId(USER_ID)).thenReturn(true);
+
+        org.junit.jupiter.api.Assertions.assertTrue(cardQueryService.hasAnyCard(USER_ID));
+        verify(userCardMapper).existsByUserId(USER_ID);
+    }
+
+    @Test
     @DisplayName("보유 카드가 없으면 빈 활성·비활성 목록을 반환한다")
     void returnsEmptyCardLists() {
         when(userCardMapper.findActiveByUserId(USER_ID)).thenReturn(List.of());

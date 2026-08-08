@@ -308,6 +308,60 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/AuthenticationError'
+        '404':
+          $ref: '#/components/responses/MerchantCategoryNotFound'
+  /merchants/nearby:
+    get:
+      tags: [Merchant]
+      summary: 카테고리별 근처 가맹점 조회
+      description: >-
+        카카오맵 로컬 API로 반경 내 가맹점을 검색해 우리 DB에 있는 가맹점만 반환합니다.
+        bestRecommendation(혜택 요약)은 아직 계산하지 않아 이 응답에는 포함하지 않습니다.
+      operationId: getNearbyMerchants
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: categoryId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: radiusMeters
+          in: query
+          required: false
+          description: 100~3000, 기본값 150
+          schema:
+            type: integer
+            minimum: 100
+            maximum: 3000
+            default: 150
+      responses:
+        '200':
+          description: 근처 가맹점 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NearbyMerchantsApiResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          $ref: '#/components/responses/MerchantCategoryNotFound'
+        '503':
+          $ref: '#/components/responses/KakaoUnavailableError'
   /card-links:
     post:
       tags: [CardLink]
@@ -430,8 +484,9 @@ paths:
           description: >-
             요청값 검증 실패(code=VALIDATION_FAILED), 연동에 속하지 않은 카드·옵션 오류
             (code=INVALID_CARD_SELECTION), 또는 카드사가 요구하는 카드번호/비밀번호가 이 카드에
-            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — PATCH /card-links/cards/{userCardId}/credentials로
-            먼저 채워야 합니다)
+            저장돼 있지 않음(code=CARD_CREDENTIAL_REQUIRED — error.fields.userCardId에 문제 있는
+            카드의 user_card_id를 콤마로 구분해 담습니다(카드 한 장이면 한 개만). PATCH
+            /card-links/cards/{userCardId}/credentials로 채운 뒤 다시 시도해야 합니다)
           content:
             application/json:
               schema:
@@ -842,6 +897,25 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
+  /me/onboarding-status:
+    get:
+      tags: [User]
+      summary: 신규 사용자 여부 조회
+      description: 보유 카드가(활성·비활성 무관) 하나도 없으면 신규 사용자로 판단합니다.
+      operationId: getMyOnboardingStatus
+      security:
+        - MocaBearerAuth: []
+      responses:
+        '200':
+          description: 신규 사용자 여부 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingStatusApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
   /me/location-settings:
     get:
       tags: [User]
@@ -932,6 +1006,19 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    KakaoUnavailableError:
+      description: >-
+        카카오맵 상류 타임아웃·연결 실패·비2xx 응답으로 처리하지 못함(재시도 가능, code=KAKAO_UNAVAILABLE).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    MerchantCategoryNotFound:
+      description: 존재하지 않거나 지도 대상이 아닌 categoryId(code=MERCHANT_CATEGORY_NOT_FOUND).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     CardSyncFailedError:
       description: >-
         승인내역 또는 실적조회 CODEF 호출 자체가 실패해 전체 동기화를 중단함(재시도 가능). code로
@@ -985,6 +1072,35 @@ components:
         name:
           type: string
           example: 스타벅스
+    NearbyMerchantsApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/NearbyMerchantResponse'
+    NearbyMerchantResponse:
+      type: object
+      required: [merchantId, name, latitude, longitude]
+      properties:
+        merchantId:
+          type: string
+        name:
+          type: string
+          description: '카카오맵이 내려준 지점명 그대로입니다(예: "강남점" 포함). 브랜드명만 필요하면 merchantId로 조회하세요.'
+          example: 스타벅스 강남점
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        distanceMeters:
+          type: integer
+          nullable: true
     HomeGreetingApiResponse:
       type: object
       properties:
@@ -1745,6 +1861,20 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/NotificationSettingsResponse'
+    OnboardingStatusResponse:
+      type: object
+      required: [newUser]
+      properties:
+        newUser:
+          type: boolean
+    OnboardingStatusApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/OnboardingStatusResponse'
     LocationSettingsRequest:
       type: object
       properties:
@@ -1810,6 +1940,8 @@ components:
               type: object
               additionalProperties:
                 type: string
+              description: >-
+                필드명(또는 CARD_CREDENTIAL_REQUIRED의 경우 userCardId)과 검증 메시지의 매핑이다.
     HealthResponse:
       type: object
       required: [status]

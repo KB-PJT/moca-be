@@ -52,12 +52,14 @@
         WHERE c.card_id = #{cardId}
     </select>
 
-    <select id="findOptionsByCardId" resultMap="cardOptionRowMap">
+    <select id="findVerifiedOptionsByCardId" resultMap="cardOptionRowMap">
         SELECT g.option_group_id, g.group_key, g.group_name,
                c.option_choice_id, c.choice_key, c.choice_name
         FROM card_option_groups g
         INNER JOIN card_option_choices c ON c.option_group_id = g.option_group_id
         WHERE g.card_id = #{cardId}
+          AND g.parse_status = 'verified'
+          AND c.parse_status = 'verified'
         ORDER BY g.option_group_id ASC, c.option_choice_id ASC
     </select>
 </mapper>

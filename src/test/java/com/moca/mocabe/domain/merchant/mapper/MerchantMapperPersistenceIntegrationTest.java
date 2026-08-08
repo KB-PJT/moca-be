@@ -134,6 +134,18 @@ class MerchantMapperPersistenceIntegrationTest {
         assertEquals(0, merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID).size());
     }
 
+    @Test
+    @DisplayName("실제 매장이 없는(has_physical_location=FALSE) 가맹점은 제외한다")
+    void excludesMerchantsWithoutPhysicalLocation() {
+        insertMerchant(MEGA_COFFEE_ID, "메가커피", "메가커피", "active");
+        insertMerchantWithoutPhysicalLocation(MEGA_ID, "인터파크", "인터파크", "active");
+
+        List<MerchantListRow> rows = merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID);
+
+        assertEquals(1, rows.size());
+        assertEquals(MEGA_COFFEE_ID, rows.get(0).merchantId());
+    }
+
     private void insertMerchant(String merchantId, String name, String normalizedName, String status) {
         insertMerchant(merchantId, CATEGORY_ID, name, normalizedName, status);
     }
@@ -145,6 +157,15 @@ class MerchantMapperPersistenceIntegrationTest {
                         + "created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
                 merchantId, categoryId, name, normalizedName, status);
+    }
+
+    private void insertMerchantWithoutPhysicalLocation(String merchantId, String name, String normalizedName,
+                                                        String status) {
+        jdbcTemplate.update("INSERT INTO merchants "
+                        + "(merchant_id, merchant_category_id, name, normalized_name, status, "
+                        + "has_physical_location, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, FALSE, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                merchantId, CATEGORY_ID, name, normalizedName, status);
     }
 
     private void insertAlias(String aliasId, String merchantId, String normalizedAlias) {

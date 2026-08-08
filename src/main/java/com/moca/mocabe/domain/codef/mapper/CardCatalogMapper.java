@@ -6,7 +6,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-/** 카드 마스터 이름과 관리자가 등록한 선택 옵션 조회를 담당한다. */
+/** 카드 마스터 이름과 검증 완료된 선택 옵션 조회를 담당한다. */
 @Mapper
 public interface CardCatalogMapper {
 
@@ -14,5 +14,5 @@ public interface CardCatalogMapper {
 
   CardCatalogEntry findCardById(@Param("cardId") String cardId);
 
-  List<CardOptionRow> findOptionsByCardId(@Param("cardId") String cardId);
+  List<CardOptionRow> findVerifiedOptionsByCardId(@Param("cardId") String cardId);
 }

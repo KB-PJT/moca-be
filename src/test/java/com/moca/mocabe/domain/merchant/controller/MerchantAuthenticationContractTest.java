@@ -16,6 +16,7 @@ import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
+import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.report.service.ReportQueryService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
@@ -50,195 +51,179 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * 실제 {@link AuthConfig}의 SecurityFilterChain을 붙여 /merchants 경로의 인증 계약을 검증한다. {@link
- * MerchantControllerTest}는 standaloneSetup이라 Security 필터를 타지 않아 401을 검증하지 못한다.
+ * 실제 {@link AuthConfig}의 SecurityFilterChain을 붙여 /merchants 경로의 인증 계약을 검증한다.
+ * {@link MerchantControllerTest}는 standaloneSetup이라 Security 필터를 타지 않아 401을 검증하지 못한다.
  */
 class MerchantAuthenticationContractTest {
 
-  private AnnotationConfigWebApplicationContext context;
-  private MockMvc mockMvc;
-  private OpaqueTokenService opaqueTokenService;
+    private AnnotationConfigWebApplicationContext context;
+    private MockMvc mockMvc;
+    private OpaqueTokenService opaqueTokenService;
 
-  @BeforeEach
-  void setUp() {
-    context = new AnnotationConfigWebApplicationContext();
-    context.setServletContext(new MockServletContext());
-    context.register(WebMvcConfig.class, SecurityTestConfig.class);
-    context.refresh();
-    opaqueTokenService = context.getBean(OpaqueTokenService.class);
-    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-  }
-
-  @AfterEach
-  void tearDown() {
-    context.close();
-  }
-
-  @Test
-  @DisplayName("Authorization 헤더 없이 카테고리 목록을 조회하면 401을 반환한다")
-  void rejectsUnauthenticatedCategoriesRequest() throws Exception {
-    JsonNode response =
-        new ObjectMapper()
-            .readTree(
-                mockMvc
-                    .perform(get("/api/v1/merchants/categories"))
-                    .andExpect(status().isUnauthorized())
-                    .andReturn()
-                    .getResponse()
-                    .getContentAsString());
-
-    assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
-  }
-
-  @Test
-  @DisplayName("Authorization 헤더 없이 카테고리별 가맹점 목록을 조회하면 401을 반환한다")
-  void rejectsUnauthenticatedMerchantsRequest() throws Exception {
-    JsonNode response =
-        new ObjectMapper()
-            .readTree(
-                mockMvc
-                    .perform(get("/api/v1/merchants").param("categoryId", "cat-cafe"))
-                    .andExpect(status().isUnauthorized())
-                    .andReturn()
-                    .getResponse()
-                    .getContentAsString());
-
-    assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
-  }
-
-  @Test
-  @DisplayName("유효한 Bearer 토큰이면 카테고리 목록 요청이 Security 필터를 통과한다")
-  void allowsAuthenticatedCategoriesRequest() throws Exception {
-    when(opaqueTokenService.authenticate("valid-token"))
-        .thenReturn(new AuthenticatedUser("01980d6a-5c0c-7aaf-9b85-010203040506", "USER"));
-
-    mockMvc
-        .perform(get("/api/v1/merchants/categories").header("Authorization", "Bearer valid-token"))
-        .andExpect(status().isOk());
-  }
-
-  /** MerchantController를 포함한 모든 RestController 의존성 + 실제 AuthConfig SecurityFilterChain 구성이다. */
-  @Configuration
-  @EnableWebSecurity
-  static class SecurityTestConfig {
-
-    @Bean
-    public AuthApplicationService authApplicationService() {
-      return mock(AuthApplicationService.class);
+    @BeforeEach
+    void setUp() {
+        context = new AnnotationConfigWebApplicationContext();
+        context.setServletContext(new MockServletContext());
+        context.register(WebMvcConfig.class, SecurityTestConfig.class);
+        context.refresh();
+        opaqueTokenService = context.getBean(OpaqueTokenService.class);
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
     }
 
-    @Bean
-    public UserApplicationService userApplicationService() {
-      return mock(UserApplicationService.class);
+    @AfterEach
+    void tearDown() {
+        context.close();
     }
 
-    @Bean
-    public CardQueryService cardQueryService() {
-      return mock(CardQueryService.class);
+    @Test
+    @DisplayName("Authorization 헤더 없이 카테고리 목록을 조회하면 401을 반환한다")
+    void rejectsUnauthenticatedCategoriesRequest() throws Exception {
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(get("/api/v1/merchants/categories"))
+                .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
     }
 
-    @Bean
-    public CardLinkService cardLinkService() {
-      return mock(CardLinkService.class);
+    @Test
+    @DisplayName("Authorization 헤더 없이 카테고리별 가맹점 목록을 조회하면 401을 반환한다")
+    void rejectsUnauthenticatedMerchantsRequest() throws Exception {
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(get("/api/v1/merchants")
+                        .param("categoryId", "cat-cafe"))
+                .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
     }
 
-    @Bean
-    public HomeQueryService homeQueryService() {
-      return mock(HomeQueryService.class);
+    @Test
+    @DisplayName("유효한 Bearer 토큰이면 카테고리 목록 요청이 Security 필터를 통과한다")
+    void allowsAuthenticatedCategoriesRequest() throws Exception {
+        when(opaqueTokenService.authenticate("valid-token"))
+                .thenReturn(new AuthenticatedUser("01980d6a-5c0c-7aaf-9b85-010203040506", "USER"));
+
+        mockMvc.perform(get("/api/v1/merchants/categories").header("Authorization", "Bearer valid-token"))
+                .andExpect(status().isOk());
     }
 
-    @Bean
-    public BenefitHistoryQueryService benefitHistoryQueryService() {
-      return mock(BenefitHistoryQueryService.class);
-    }
+    /** MerchantController를 포함한 모든 RestController 의존성 + 실제 AuthConfig SecurityFilterChain 구성이다. */
+    @Configuration
+    @EnableWebSecurity
+    static class SecurityTestConfig {
 
-    @Bean
-    public ReportQueryService reportQueryService() {
-      return mock(ReportQueryService.class);
-    }
+        @Bean
+        public AuthApplicationService authApplicationService() {
+            return mock(AuthApplicationService.class);
+        }
 
-    @Bean
-    public CardSyncService cardSyncService() {
-      return mock(CardSyncService.class);
-    }
+        @Bean
+        public UserApplicationService userApplicationService() {
+            return mock(UserApplicationService.class);
+        }
 
-    @Bean
-    public MerchantCategoryQueryService merchantCategoryQueryService() {
-      return mock(MerchantCategoryQueryService.class);
-    }
+        @Bean
+        public CardQueryService cardQueryService() {
+            return mock(CardQueryService.class);
+        }
 
-    @Bean
-    public MerchantQueryService merchantQueryService() {
-      return mock(MerchantQueryService.class);
-    }
+        @Bean
+        public CardLinkService cardLinkService() {
+            return mock(CardLinkService.class);
+        }
 
-    @Bean
-    public CurrentUserProvider currentUserProvider() {
-      return new SecurityContextCurrentUserProvider();
-    }
+        @Bean
+        public HomeQueryService homeQueryService() {
+            return mock(HomeQueryService.class);
+        }
 
-    @Bean
-    public OpaqueTokenPolicy opaqueTokenPolicy() {
-      return new OpaqueTokenPolicy(1_800, 1_209_600);
-    }
+        @Bean
+        public BenefitHistoryQueryService benefitHistoryQueryService() {
+            return mock(BenefitHistoryQueryService.class);
+        }
 
-    @Bean
-    public RefreshCookiePolicy refreshCookiePolicy() {
-      return new RefreshCookiePolicy(false);
-    }
+        @Bean
+        public ReportQueryService reportQueryService() {
+            return mock(ReportQueryService.class);
+        }
 
-    @Bean
-    public OpaqueTokenService opaqueTokenService() {
-      return mock(OpaqueTokenService.class);
-    }
+        @Bean
+        public CardSyncService cardSyncService() {
+            return mock(CardSyncService.class);
+        }
 
-    @Bean
-    public ApiErrorResponseWriter apiErrorResponseWriter() {
-      return new ApiErrorResponseWriter(new ObjectMapper());
-    }
+        @Bean
+        public MerchantCategoryQueryService merchantCategoryQueryService() {
+            return mock(MerchantCategoryQueryService.class);
+        }
 
-    @Bean
-    public JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint(
-        ApiErrorResponseWriter errorResponseWriter) {
-      return new JsonAuthenticationEntryPoint(errorResponseWriter);
-    }
+        @Bean
+        public MerchantQueryService merchantQueryService() {
+            return mock(MerchantQueryService.class);
+        }
 
-    @Bean
-    public JsonAccessDeniedHandler jsonAccessDeniedHandler(
-        ApiErrorResponseWriter errorResponseWriter) {
-      return new JsonAccessDeniedHandler(errorResponseWriter);
-    }
+        @Bean
+        public MerchantNearbyQueryService merchantNearbyQueryService() {
+            return mock(MerchantNearbyQueryService.class);
+        }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-      CorsConfiguration configuration = new CorsConfiguration();
-      configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-      configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
-      configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
-      configuration.setAllowCredentials(true);
-      UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-      source.registerCorsConfiguration("/api/**", configuration);
-      return source;
-    }
+        @Bean
+        public CurrentUserProvider currentUserProvider() {
+            return new SecurityContextCurrentUserProvider();
+        }
 
-    /** AuthConfig의 실제 규칙(공개 경로 제외 전부 인증 필요)을 그대로 재사용한다. */
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-        HttpSecurity http,
-        OpaqueTokenService opaqueTokenService,
-        JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint,
-        JsonAccessDeniedHandler jsonAccessDeniedHandler,
-        ApiErrorResponseWriter errorResponseWriter,
-        CorsConfigurationSource corsConfigurationSource)
-        throws Exception {
-      return new AuthConfig()
-          .securityFilterChain(
-              http,
-              opaqueTokenService,
-              jsonAuthenticationEntryPoint,
-              jsonAccessDeniedHandler,
-              errorResponseWriter,
-              corsConfigurationSource);
+        @Bean
+        public OpaqueTokenPolicy opaqueTokenPolicy() {
+            return new OpaqueTokenPolicy(1_800, 1_209_600);
+        }
+
+        @Bean
+        public RefreshCookiePolicy refreshCookiePolicy() {
+            return new RefreshCookiePolicy(false);
+        }
+
+        @Bean
+        public OpaqueTokenService opaqueTokenService() {
+            return mock(OpaqueTokenService.class);
+        }
+
+        @Bean
+        public ApiErrorResponseWriter apiErrorResponseWriter() {
+            return new ApiErrorResponseWriter(new ObjectMapper());
+        }
+
+        @Bean
+        public JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint(ApiErrorResponseWriter errorResponseWriter) {
+            return new JsonAuthenticationEntryPoint(errorResponseWriter);
+        }
+
+        @Bean
+        public JsonAccessDeniedHandler jsonAccessDeniedHandler(ApiErrorResponseWriter errorResponseWriter) {
+            return new JsonAccessDeniedHandler(errorResponseWriter);
+        }
+
+        @Bean
+        public CorsConfigurationSource corsConfigurationSource() {
+            CorsConfiguration configuration = new CorsConfiguration();
+            configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+            configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
+            configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+            configuration.setAllowCredentials(true);
+            UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+            source.registerCorsConfiguration("/api/**", configuration);
+            return source;
+        }
+
+        /** AuthConfig의 실제 규칙(공개 경로 제외 전부 인증 필요)을 그대로 재사용한다. */
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                        OpaqueTokenService opaqueTokenService,
+                                                        JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint,
+                                                        JsonAccessDeniedHandler jsonAccessDeniedHandler,
+                                                        ApiErrorResponseWriter errorResponseWriter,
+                                                        CorsConfigurationSource corsConfigurationSource)
+                throws Exception {
+            return new AuthConfig().securityFilterChain(http, opaqueTokenService, jsonAuthenticationEntryPoint,
+                    jsonAccessDeniedHandler, errorResponseWriter, corsConfigurationSource);
+        }
     }
-  }
 }

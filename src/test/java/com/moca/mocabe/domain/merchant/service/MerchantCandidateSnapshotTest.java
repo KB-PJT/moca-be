@@ -89,6 +89,15 @@ class MerchantCandidateSnapshotTest {
     }
 
     @Test
+    @DisplayName("DB에 저장된 후보명이 정규화 규칙과 어긋나도(소문자·특수문자) 재정규화해서 매칭한다")
+    void reNormalizesStoredCandidateNameBeforeMatching() {
+        MerchantCandidateSnapshot snapshot = snapshot(
+                List.of(new MerchantNameCandidate("m-1", "gs25")), List.of());
+
+        assertEquals("m-1", snapshot.resolveMerchantId("GS25 화양세종점"));
+    }
+
+    @Test
     @DisplayName("merchants·aliases 모두 일치하지 않으면 null을 반환한다")
     void returnsNullWhenNoMatch() {
         MerchantCandidateSnapshot snapshot = snapshot(
