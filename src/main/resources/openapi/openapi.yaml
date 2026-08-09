@@ -917,6 +917,52 @@ paths:
           $ref: '#/components/responses/AuthorizationError'
         '503':
           $ref: '#/components/responses/CardSyncFailedError'
+  /me/cards/{userCardId}/memo:
+    patch:
+      tags: [Card]
+      summary: 보유 카드 메모 수정
+      description: |
+        인증 사용자가 소유한 보유 카드의 메모를 수정합니다. memo를 생략하거나 null로 보내면 메모를 비웁니다.
+        본인 소유가 아니거나 존재하지 않는 카드면 404를 반환합니다.
+      operationId: updateMyCardMemo
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: userCardId
+          in: path
+          required: true
+          description: 메모를 수정할 보유카드(user_cards)의 식별자
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: 카드에 저장할 새 메모입니다.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemoRequest'
+      responses:
+        '200':
+          description: 메모 수정 성공(갱신된 카드 정보 반환)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeCardItemApiResponse'
+        '400':
+          description: 요청값 검증 실패(code=VALIDATION_FAILED) — 메모가 500자를 초과함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '404':
+          description: 본인 소유의 카드를 찾을 수 없음(code=USER_CARD_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /me/card-sort-mode:
     patch:
       tags: [User]
@@ -2104,6 +2150,27 @@ components:
           description: '사용자가 카드에 작성한 메모입니다. 작성하지 않으면 null입니다.'
           type: string
           nullable: true
+          example: 카페 전용 카드
+    MeCardItemApiResponse:
+      description: 'MeCardItem API의 공통 성공 응답입니다.'
+      type: object
+      properties:
+        success:
+          description: '요청 처리 성공 여부입니다.'
+          type: boolean
+          example: true
+        data:
+          description: 'API의 실제 처리 결과입니다.'
+          $ref: '#/components/schemas/MeCardItemResponse'
+    UpdateMemoRequest:
+      description: '보유 카드에 저장할 새 메모입니다.'
+      type: object
+      properties:
+        memo:
+          description: '카드에 표시할 메모입니다. 생략하거나 null이면 메모를 비웁니다.'
+          type: string
+          nullable: true
+          maxLength: 500
           example: 카페 전용 카드
     UpdateNicknameRequest:
       description: '인증 사용자의 새 닉네임 입력입니다.'
