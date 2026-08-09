@@ -30,9 +30,23 @@ const gorillaCategoryCodes = new Map([
     [141, "AIRLINE"], [145, "AIRLINE"]
 ]);
 const issuers = [...new Set(cards.map((card) => card.issuer))].sort();
+// 카드고릴라의 발급사 표기는 카드 카탈로그와의 연결 키로 유지한다.
+// CODEF 기관코드만 별도로 매핑해, cards INSERT의 issuer_id 조회가 이름 변경으로 깨지지 않게 한다.
+const codefInstitutionCodesByIssuerName = new Map([
+    ["BC 바로카드", "0305"],
+    ["KB국민카드", "0301"],
+    ["NH농협카드", "0304"],
+    ["롯데카드", "0311"],
+    ["삼성카드", "0303"],
+    ["신한카드", "0306"],
+    ["우리카드", "0309"],
+    ["하나카드", "0313"],
+    ["현대카드", "0302"],
+]);
 const issuerRows = issuers.map((issuer, index) => [
     uuidV5(`issuer:${issuer}`),
-    `CG${String(index + 1).padStart(8, "0")}`,
+    codefInstitutionCodesByIssuerName.get(issuer)
+        ?? `CG${String(index + 1).padStart(8, "0")}`,
     issuer,
     seedDate(cards),
     seedDate(cards),
@@ -182,7 +196,11 @@ output.push(insertSql(
     "issuers",
     ["issuer_id", "institution_code", "issuer_name", "created_at", "updated_at"],
     issuerRows,
-    ["issuer_name = VALUES(issuer_name)", "updated_at = VALUES(updated_at)"],
+    [
+        "institution_code = VALUES(institution_code)",
+        "issuer_name = VALUES(issuer_name)",
+        "updated_at = VALUES(updated_at)",
+    ],
 ));
 output.push("UPDATE cards c\n"
     + "INNER JOIN card_content_versions cv ON cv.card_id = c.card_id\n"
