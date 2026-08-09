@@ -49,11 +49,12 @@ MOCA Backend 초기 개발을 위한 기본 협업 규칙이다.
 
 1. 작업 전에 현재 브랜치와 `git status`를 확인한다.
 2. 모든 새 작업은 현재 브랜치와 무관하게 반드시 최신 `main`에서 시작한다. 먼저 `git pull --ff-only origin main`으로 동기화한 뒤 `main` 기반 작업 브랜치를 만든다.
-3. 새 기능은 `feature/<feature-name>`, 수정 작업은 `fix/<fix-name>` 또는 `hotfix/<hotfix-name>` 브랜치를 최신 `main`에서 만든 후 작업한다.
+3. 작업 목적에 따라 `feature/<feature-name>`, `fix/<fix-name>`, `hotfix/<hotfix-name>`, `docs/<topic>`, `chore/<topic>` 브랜치를 최신 `main`에서 만든 후 작업한다.
 4. `main`에 기능을 직접 커밋하지 않는다.
-5. 하나의 부모 이슈와 이에 연결된 하위 이슈 묶음은 하나의 기능 브랜치와 하나의 Pull Request로 진행한다.
-6. Pull Request 본문에는 완료한 모든 하위 이슈를 `Closes #번호`로 연결하고, 부모 이슈는 모든 하위 이슈와 Pull Request가 완료된 뒤 직접 종료한다.
-7. 기존 변경 사항과 관련 없는 IDE·개인 설정 파일은 수정하거나 커밋하지 않는다.
+5. 현재 브랜치의 목적과 다른 새 작업은 같은 브랜치에서 이어서 진행하지 않는다. 변경 사항을 정리한 뒤 최신 `main`에서 작업 목적에 맞는 새 브랜치를 만든다.
+6. 하나의 부모 이슈와 이에 연결된 하위 이슈 묶음은 하나의 기능 브랜치와 하나의 Pull Request로 진행한다.
+7. Pull Request 본문에는 완료한 모든 하위 이슈를 `Closes #번호`로 연결하고, 부모 이슈는 모든 하위 이슈와 Pull Request가 완료된 뒤 직접 종료한다.
+8. 기존 변경 사항과 관련 없는 IDE·개인 설정 파일은 수정하거나 커밋하지 않는다.
 
 ## Commit rules
 
@@ -79,6 +80,17 @@ docs(github-flow): 이슈 템플릿 보완
 - `git push` 전에는 `./gradlew check`를 통과해야 한다. pre-push 훅의 JaCoCo 100% 기준을
   `--no-verify`로 우회해 push하지 않는다.
 
+## Push handoff
+
+사용자가 커밋과 push를 요청하면 push 성공으로 작업을 끝내지 않고 이슈와 Pull Request 초안까지 함께 작성한다.
+
+1. 현재 브랜치의 `main` 대비 커밋과 diff를 확인해 실제 반영된 변경만 기준으로 작성한다.
+2. `.agents/skills/github-issue-writing/SKILL.md`와 저장소 이슈 템플릿을 사용해 작업 이슈 제목과 본문을 작성한다.
+3. `.github/pull_request_template.md`를 사용해 Pull Request 제목과 본문을 작성하고 변경 내용, 리뷰 포인트, 실행한 검증을 구체적으로 적는다.
+4. 작업 이슈 번호를 알면 Pull Request에 `Closes #번호`를 넣고, 번호가 없으면 `Closes #작업-이슈-번호` 자리표시자를 사용한다. 부모 이슈는 Pull Request에서 직접 종료하지 않는다.
+5. 사용자가 GitHub 이슈나 Pull Request의 실제 생성을 명시하지 않았다면 외부 상태를 변경하지 않고 복사 가능한 초안만 제공한다.
+6. 최종 인계에는 push한 브랜치와 커밋, 검증 결과, 작업 이슈 초안, Pull Request 초안을 함께 포함한다.
+
 ## Basic verification
 
 - Java 변경은 컴파일과 핵심 정상 경로만 확인한다.
@@ -95,4 +107,4 @@ docs(github-flow): 이슈 템플릿 보완
 - `spring-api`: Spring MVC API 작업
 - `mybatis-feature`: MyBatis Mapper와 SQL 작업
 - `benefit-calculation-test`: 카드 혜택 계산 규칙과 CODEF 역산 테스트 작업
-- `github-issue-writing`: GitHub 부모·작업 이슈 작성 전 템플릿을 읽고 형식에 맞춰 작성
+- `github-issue-writing`: GitHub 부모·작업 이슈와 Pull Request 초안을 템플릿에 맞춰 작성하고 push 후 인계 자료를 구성
