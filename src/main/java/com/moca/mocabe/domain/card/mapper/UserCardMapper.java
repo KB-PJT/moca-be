@@ -17,4 +17,11 @@ public interface UserCardMapper {
                                                 @Param("orderMode") String orderMode);
 
     boolean existsByUserId(@Param("userId") String userId);
+
+    UserCardListRow findByUserCardId(@Param("userCardId") String userCardId,
+                                     @Param("userId") String userId);
+
+    int updateMemo(@Param("userCardId") String userCardId,
+                   @Param("userId") String userId,
+                   @Param("memo") String memo);
 }
