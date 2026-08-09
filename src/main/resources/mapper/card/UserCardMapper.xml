@@ -88,4 +88,21 @@
             WHERE <include refid="userCardCondition"/>
         )
     </select>
+
+    <select id="findByUserCardId" resultMap="userCardListRowResultMap">
+        SELECT
+            <include refid="userCardColumns"/>
+        FROM user_cards uc
+        <include refid="userCardJoins"/>
+        WHERE uc.user_card_id = #{userCardId}
+            AND <include refid="userCardCondition"/>
+    </select>
+
+    <update id="updateMemo">
+        UPDATE user_cards
+        SET memo = #{memo},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_card_id = #{userCardId}
+            AND user_id = #{userId}
+    </update>
 </mapper>

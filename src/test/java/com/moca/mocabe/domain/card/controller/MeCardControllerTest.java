@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,16 +21,18 @@ import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
-import java.time.LocalDate;
 import com.moca.mocabe.global.exception.GlobalExceptionHandler;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -184,6 +187,83 @@ class MeCardControllerTest {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(cardSyncService);
+    }
+
+    @Test
+    @DisplayName("메모 수정 요청을 현재 사용자·userCardId 기준으로 서비스에 전달한다")
+    void updatesMemo() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, "새 메모"))
+                .thenReturn(card(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, "새 메모"));
+
+        String response = mockMvc.perform(patch("/me/cards/" + ACTIVE_USER_CARD_ID + "/memo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memo\":\"새 메모\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode root = new ObjectMapper().readTree(response);
+        assertEquals(ACTIVE_USER_CARD_ID, root.path("data").path("userCardId").asText());
+        assertEquals("새 메모", root.path("data").path("memo").asText());
+        verify(cardQueryService).updateMemo(USER_ID, ACTIVE_USER_CARD_ID, "새 메모");
+    }
+
+    @Test
+    @DisplayName("메모를 생략하면 null로 서비스에 전달한다")
+    void updatesMemoWithNullWhenOmitted() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.updateMemo(eq(USER_ID), eq(ACTIVE_USER_CARD_ID), isNull()))
+                .thenReturn(card(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null));
+
+        mockMvc.perform(patch("/me/cards/" + ACTIVE_USER_CARD_ID + "/memo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        verify(cardQueryService).updateMemo(eq(USER_ID), eq(ACTIVE_USER_CARD_ID), isNull());
+    }
+
+    @Test
+    @DisplayName("메모가 500자를 초과하면 400 검증 오류를 반환하고 서비스를 호출하지 않는다")
+    void rejectsTooLongMemo() throws Exception {
+        String tooLong = "a".repeat(501);
+
+        mockMvc.perform(patch("/me/cards/" + ACTIVE_USER_CARD_ID + "/memo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memo\":\"" + tooLong + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(cardQueryService);
+    }
+
+    @Test
+    @DisplayName("인증 정보가 없으면 메모 수정 서비스를 호출하지 않고 401을 반환한다")
+    void rejectsUnauthenticatedMemoUpdate() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
+
+        mockMvc.perform(patch("/me/cards/" + ACTIVE_USER_CARD_ID + "/memo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memo\":\"새 메모\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(cardQueryService);
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드가 아니면 404를 반환한다")
+    void rejectsUnknownCardForMemoUpdate() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, "새 메모"))
+                .thenThrow(new UserCardNotFoundException());
+
+        String response = mockMvc.perform(patch("/me/cards/" + ACTIVE_USER_CARD_ID + "/memo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memo\":\"새 메모\"}"))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("USER_CARD_NOT_FOUND",
+                new ObjectMapper().readTree(response).path("error").path("code").asText());
     }
 
     private MeCardItemResponse card(String userCardId, String cardName, String cardImageUrl, String memo) {
