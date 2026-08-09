@@ -2,6 +2,7 @@ package com.moca.mocabe.domain.card.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,7 @@ import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +88,42 @@ class CardQueryServiceTest {
 
         assertEquals(List.of(), response.getActiveCards());
         assertEquals(List.of(), response.getInactiveCards());
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드면 메모를 수정하고 갱신된 카드 정보를 반환한다")
+    void updatesMemoForOwnedCard() {
+        when(userCardMapper.updateMemo(ACTIVE_USER_CARD_ID, USER_ID, "새 메모")).thenReturn(1);
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID))
+                .thenReturn(userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, "새 메모"));
+
+        MeCardItemResponse response = cardQueryService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, "새 메모");
+
+        assertEquals(ACTIVE_USER_CARD_ID, response.getUserCardId());
+        assertEquals("새 메모", response.getMemo());
+    }
+
+    @Test
+    @DisplayName("메모를 null로 보내면 그대로 반영한다")
+    void clearsMemoWhenNull() {
+        when(userCardMapper.updateMemo(ACTIVE_USER_CARD_ID, USER_ID, null)).thenReturn(1);
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID))
+                .thenReturn(userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null));
+
+        MeCardItemResponse response = cardQueryService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, null);
+
+        assertNull(response.getMemo());
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드가 아니면 예외를 던지고 갱신된 정보를 다시 조회하지 않는다")
+    void rejectsMemoUpdateForUnknownCard() {
+        when(userCardMapper.updateMemo(ACTIVE_USER_CARD_ID, USER_ID, "메모")).thenReturn(0);
+
+        assertThrows(UserCardNotFoundException.class,
+                () -> cardQueryService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, "메모"));
+
+        verify(userCardMapper, never()).findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID);
     }
 
     private UserCardListRow userCard(

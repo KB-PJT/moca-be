@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
+import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,14 @@ public class CardQueryService {
 
         // CODEF 동기화 시각의 제공 계약이 확정될 때까지 null을 반환한다.
         return new MeCardsResponse(null, activeCards, inactiveCards);
+    }
+
+    @Transactional
+    public MeCardItemResponse updateMemo(String userId, String userCardId, String memo) {
+        if (userCardMapper.updateMemo(userCardId, userId, memo) == 0) {
+            throw new UserCardNotFoundException();
+        }
+        return new MeCardItemResponse(userCardMapper.findByUserCardId(userCardId, userId));
     }
 
     private List<MeCardItemResponse> mapCards(List<UserCardListRow> cardRows) {
