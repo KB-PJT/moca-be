@@ -34,7 +34,9 @@ paths:
     get:
       tags: [Health]
       summary: 서버 상태 조회
-      description: 인증 없이 사용할 수 있는 상태 확인 API입니다.
+      description: |
+        인증 없이 서버 프로세스의 응답 가능 여부를 확인합니다.
+        정상 응답의 `status`는 `UP`이며, 애플리케이션의 세부 의존성이나 외부 서비스 상태는 진단하지 않습니다.
       operationId: getHealth
       security: []
       responses:
@@ -48,7 +50,12 @@ paths:
     get:
       tags: [Home]
       summary: 홈 인사와 놓친 혜택 조회
-      description: yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용합니다.
+      description: |
+        인증 사용자의 홈 상단 인사말과 기준 월의 실제 미적용 혜택 합계를 반환합니다.
+        `data.nickname`은 인사말에 표시할 사용자 닉네임이고, `data.yearMonth`는 집계 기준 월입니다.
+        `data.missedBenefitAmount`는 승인별 예상 혜택과 실제 적용 혜택의 차이를 합산한 금액이며,
+        단순히 남아 있는 월 혜택 한도는 포함하지 않습니다. `data.message`는 이 합계를 바탕으로 만든 홈 노출 문구입니다.
+        yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하며, 미적용 혜택이 없으면 금액은 0입니다.
       operationId: getHomeGreeting
       security:
         - MocaBearerAuth: []
@@ -56,7 +63,7 @@ paths:
         - $ref: '#/components/parameters/YearMonth'
       responses:
         '200':
-          description: 홈 상단 요약
+          description: 사용자 닉네임, 집계 기준 월, 실제 미적용 혜택 합계와 홈 노출 문구
           content:
             application/json:
               schema:
@@ -69,7 +76,11 @@ paths:
     get:
       tags: [Home]
       summary: 홈 보유 카드 캐러셀 조회
-      description: yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용합니다. 보유 카드가 없으면 빈 cards 배열을 반환합니다.
+      description: |
+        인증 사용자의 홈 카드 캐러셀을 반환합니다. `data.yearMonth`는 집계 기준 월이고,
+        `data.cards`의 각 항목에는 카드 식별·표시 정보, 대표 혜택, 해당 월 혜택·실적 요약이 담깁니다.
+        `selectedUserCardId`는 현재 선택된 카드이며 없으면 null입니다. 보유 카드가 없으면 `cards`는 빈 배열입니다.
+        yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용합니다.
       operationId: getHomeCards
       security:
         - MocaBearerAuth: []
@@ -78,7 +89,7 @@ paths:
         - name: orderMode
           in: query
           required: false
-          description: 미전달 시 사용자가 저장한 정렬 방식을 사용합니다.
+          description: 캐러셀 정렬 방식을 이번 조회에만 지정합니다. AUTO는 서버 추천 순서, MANUAL은 사용자가 저장한 순서입니다. 생략하면 사용자의 저장된 정렬 방식을 사용합니다.
           schema:
             type: string
             enum: [AUTO, MANUAL]
@@ -97,7 +108,11 @@ paths:
     get:
       tags: [Home]
       summary: 홈 최근 혜택 내역 조회
-      description: yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용합니다. 내역이 없으면 빈 benefits 배열을 반환합니다.
+      description: |
+        인증 사용자의 기준 월 확정 혜택 중 최근 내역을 승인 시각 내림차순으로 반환합니다.
+        `data.benefits`의 각 항목에는 혜택 이력 식별자, 가맹점·카드명, 결제금액, 혜택 유형·금액과 발생 시각이 담깁니다.
+        yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하고, limit을 생략하면 최대 5건을 반환합니다.
+        확정 혜택이 없으면 `benefits`는 빈 배열입니다.
       operationId: getHomeRecentBenefits
       security:
         - MocaBearerAuth: []
@@ -127,7 +142,11 @@ paths:
     get:
       tags: [Benefit]
       summary: 혜택 내역 목록 조회
-      description: yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용합니다. 확정된 할인·캐시백·포인트 혜택만 반환합니다.
+      description: |
+        인증 사용자의 확정 할인·캐시백·포인트 이력을 페이지 단위로 반환합니다.
+        보유카드와 혜택 유형으로 필터링할 수 있고, 최신 승인순 또는 혜택 금액순으로 정렬할 수 있습니다.
+        `data.data`에는 승인·가맹점·카드·혜택 정보가, `data.meta`에는 페이지 번호·크기·전체 건수·다음 페이지 여부가 담깁니다.
+        yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하며, 조회 결과가 없으면 목록은 빈 배열입니다.
       operationId: getBenefitHistory
       security:
         - MocaBearerAuth: []
@@ -135,18 +154,23 @@ paths:
         - $ref: '#/components/parameters/YearMonth'
         - name: userCardId
           in: query
+          description: 특정 보유카드로 혜택 이력을 제한합니다. 생략하면 모든 보유카드를 조회합니다.
           schema: { type: string, format: uuid }
         - name: type
           in: query
+          description: 조회할 혜택 유형입니다. 생략하면 모든 유형을 반환합니다.
           schema: { type: string, enum: [DISCOUNT, CASHBACK, POINT] }
         - name: sort
           in: query
+          description: 정렬 기준입니다. LATEST는 최신 승인순, BENEFIT_DESC는 혜택 금액 내림차순입니다.
           schema: { type: string, enum: [LATEST, BENEFIT_DESC], default: LATEST }
         - name: page
           in: query
+          description: 1부터 시작하는 페이지 번호입니다.
           schema: { type: integer, minimum: 1, default: 1 }
         - name: size
           in: query
+          description: 페이지당 반환 건수입니다. 1~100 사이여야 합니다.
           schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
       responses:
         '200':
@@ -160,6 +184,10 @@ paths:
     get:
       tags: [Benefit]
       summary: 혜택 내역 상세 조회
+      description: |
+        로그인 사용자의 확정 혜택 한 건을 조회합니다. 승인 시각·가맹점·카드·결제금액·혜택 유형과 금액을 반환하고,
+        `monthlyLimit`에는 해당 혜택의 월 한도 사용액·전체 한도·잔여 한도가 담깁니다.
+        마일리지 적립 건만 `earnedMileage`가 값으로 제공되고 그 외에는 null이며, 다른 사용자의 이력은 조회할 수 없습니다.
       operationId: getBenefitHistoryDetail
       security:
         - MocaBearerAuth: []
@@ -167,6 +195,7 @@ paths:
         - name: benefitHistoryId
           in: path
           required: true
+          description: 조회할 혜택 이력의 식별자입니다.
           schema: { type: string, format: uuid }
       responses:
         '200':
@@ -181,6 +210,7 @@ paths:
     get:
       tags: [Report]
       summary: 월별 혜택 합계와 전월 비교 조회
+      description: 선택한 월의 확정 혜택 합계와 직전 달 대비 증감액을 혜택 유형별로 반환합니다. yearMonth를 생략하면 Asia/Seoul 현재 월을 사용합니다.
       operationId: getBenefitReportSummary
       security: [{ MocaBearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/YearMonth' }]
@@ -196,13 +226,17 @@ paths:
     get:
       tags: [Report]
       summary: 월별 혜택 상위 가맹점 카테고리 조회
-      description: merchant가 매핑된 승인내역의 확정 혜택만 집계합니다.
+      description: |
+        기준 월의 확정 혜택을 가맹점 카테고리별로 합산해 혜택 금액이 큰 순서로 반환합니다.
+        `data.categories`의 각 항목에는 순위, 카테고리 코드·이름과 혜택 합계가 담기며, limit으로 최대 3개까지 지정할 수 있습니다.
+        merchant가 매핑된 승인내역만 집계하고, 집계 결과가 없으면 `categories`는 빈 배열입니다.
       operationId: getBenefitReportCategories
       security: [{ MocaBearerAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/YearMonth'
         - name: limit
           in: query
+          description: 반환할 상위 카테고리 수입니다. 1~3 사이이며 기본값은 3입니다.
           schema: { type: integer, minimum: 1, maximum: 3, default: 3 }
       responses:
         '200':
@@ -216,7 +250,11 @@ paths:
     get:
       tags: [Report]
       summary: 카드별 실제 미적용 혜택 조회
-      description: 승인별 계산 결과의 예상 혜택과 실제 적용 혜택 차이만 반환합니다. 단순 월 한도 잔여분은 포함하지 않습니다.
+      description: |
+        지정한 활성 보유카드에서 기준 월에 실제로 적용되지 않은 혜택을 반환합니다.
+        `data.userCard`에는 대상 카드가, `data.totalMissedBenefitAmount`에는 미적용 혜택 합계가,
+        `data.benefits`에는 규칙별 사용액·한도·잔여액이 담깁니다.
+        승인별 예상 혜택과 실제 적용 혜택의 차이만 집계하며, 사용하지 않고 남은 단순 월 한도는 포함하지 않습니다.
       operationId: getBenefitReportMissed
       security: [{ MocaBearerAuth: [] }]
       parameters:
@@ -224,6 +262,7 @@ paths:
         - name: userCardId
           in: query
           required: true
+          description: 실제 미적용 혜택을 조회할 활성 보유카드의 식별자입니다.
           schema: { type: string, format: uuid }
       responses:
         '200':
@@ -238,6 +277,11 @@ paths:
     get:
       tags: [Report]
       summary: 월 실적 도넛과 대표 카드 조회
+      description: |
+        선택한 월의 카드 실적을 홈·리포트 요약용으로 반환합니다.
+        `data.cardCount`와 `achievedCardCount`는 전체 카드 수와 실적 달성 카드 수이고,
+        `data.cards`에는 최대 3개 카드의 상품명·달성률·현재 구간 달성 여부가 담깁니다.
+        yearMonth를 생략하면 Asia/Seoul 현재 월을 사용하고, 대상 카드가 없으면 `cards`는 빈 배열입니다.
       operationId: getPerformanceReportSummary
       security: [{ MocaBearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/YearMonth' }]
@@ -253,7 +297,11 @@ paths:
     get:
       tags: [Report]
       summary: 월별 전체 카드 실적 조회
-      description: 현재 카드 원천 데이터에는 실적 tier가 없어 currentTier=0, nextTier=null로 반환합니다.
+      description: |
+        인증 사용자의 모든 활성 카드에 대해 기준 월 인정 실적과 구간 달성 현황을 반환합니다.
+        각 카드에는 현재 인정 실적, 목표 금액, 달성률, 현재 구간과 다음 구간까지 남은 금액이 담깁니다.
+        현재 카드 원천 데이터에 실적 tier가 없으면 `currentTier=0`, `nextTier=null`로 반환하며,
+        대상 카드가 없으면 `data.cards`는 빈 배열입니다.
       operationId: getPerformanceReportCards
       security: [{ MocaBearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/YearMonth' }]
@@ -270,7 +318,9 @@ paths:
       tags: [Merchant]
       summary: 가맹점 카테고리 목록 조회
       description: >-
-        간편결제·OTT처럼 물리적 위치가 없어 지도에서 검색할 수 없는 카테고리는 포함하지 않습니다.
+        지도 기반 주변 혜택 검색에서 선택할 수 있는 활성 가맹점 카테고리의 식별자·코드·표시명을 반환합니다.
+        간편결제·OTT처럼 물리적 위치가 없어 지도에서 검색할 수 없는 카테고리는 포함하지 않으며,
+        제공할 카테고리가 없으면 data는 빈 배열입니다.
       operationId: getMerchantCategories
       security:
         - MocaBearerAuth: []
@@ -287,7 +337,10 @@ paths:
     get:
       tags: [Merchant]
       summary: 카테고리별 가맹점 목록 조회
-      description: 지정한 카테고리에 속한 활성 가맹점(브랜드) 목록을 반환합니다.
+      description: |
+        지정한 카테고리에 속한 활성 가맹점 또는 브랜드의 식별자와 표시명을 반환합니다.
+        카테고리는 `/merchants/categories`에서 받은 categoryId를 사용해야 하며,
+        등록된 가맹점이 없으면 data는 빈 배열, 카테고리가 없거나 지도 검색 대상이 아니면 404를 반환합니다.
       operationId: getMerchantsByCategory
       security:
         - MocaBearerAuth: []
@@ -295,6 +348,7 @@ paths:
         - name: categoryId
           in: query
           required: true
+          description: 조회할 가맹점 카테고리의 식별자입니다.
           schema:
             type: string
       responses:
@@ -324,17 +378,20 @@ paths:
         - name: categoryId
           in: query
           required: true
+          description: 근처 가맹점을 검색할 가맹점 카테고리의 식별자입니다.
           schema:
             type: string
         - name: latitude
           in: query
           required: true
+          description: 검색 중심점의 위도(WGS84)입니다.
           schema:
             type: number
             format: double
         - name: longitude
           in: query
           required: true
+          description: 검색 중심점의 경도(WGS84)입니다.
           schema:
             type: number
             format: double
@@ -390,6 +447,7 @@ paths:
       security:
         - MocaBearerAuth: []
       requestBody:
+        description: CODEF 계정 연동에 필요한 카드사 기관코드와 자격정보입니다.
         required: true
         content:
           application/json:
@@ -480,6 +538,7 @@ paths:
             type: string
             format: uuid
       requestBody:
+        description: 활성화할 보유카드와 선택형 카드의 옵션입니다.
         required: true
         content:
           application/json:
@@ -571,6 +630,7 @@ paths:
             type: string
             format: uuid
       requestBody:
+        description: 카드사 검증에 필요한 카드번호와 비밀번호 추가 입력값입니다.
         required: true
         content:
           application/json:
@@ -617,6 +677,7 @@ paths:
       operationId: loginWithGoogle
       security: []
       requestBody:
+        description: PWA가 PKCE 절차로 발급받은 Google authorization code입니다.
         required: true
         content:
           application/json:
@@ -646,7 +707,10 @@ paths:
     post:
       tags: [Auth]
       summary: MOCA access token 갱신
-      description: HttpOnly refresh cookie를 사용해 새 access/refresh token을 발급합니다.
+      description: |
+        브라우저가 전송한 HttpOnly refresh token cookie를 검증하고 기존 세션을 회전합니다.
+        응답 본문에는 새 opaque access token과 초 단위 만료시간이 담기며, 새 refresh token은 JSON이 아니라 HttpOnly cookie로만 설정됩니다.
+        refresh token이 없거나 만료·폐기되었으면 401을 반환합니다.
       operationId: refreshToken
       security: []
       responses:
@@ -671,7 +735,9 @@ paths:
     post:
       tags: [Auth]
       summary: MOCA 로그아웃
-      description: access token 또는 refresh cookie에 연결된 Redis 세션을 폐기합니다.
+      description: |
+        access token 또는 refresh cookie에 연결된 Redis 세션을 폐기하고 refresh cookie를 만료시킵니다.
+        유효한 세션이 없어도 클라이언트가 로컬 인증 상태를 정리할 수 있도록 성공 응답을 반환합니다.
       operationId: logout
       security: []
       responses:
@@ -690,7 +756,9 @@ paths:
     get:
       tags: [User]
       summary: 내 프로필 조회
-      description: MOCA opaque access token이 필요한 인증 사용자 API입니다. 사용자 정보와 연관 설정·탈퇴 이력을 물리 삭제합니다.
+      description: |
+        MOCA opaque access token으로 인증한 사용자의 식별자, 닉네임, 이메일, 권한 유형과 홈 카드 정렬 방식을 반환합니다.
+        Google 계정에서 이메일을 제공하지 않았으면 email은 null입니다.
       operationId: getMyProfile
       security:
         - MocaBearerAuth: []
@@ -708,11 +776,15 @@ paths:
     delete:
       tags: [User]
       summary: 회원 탈퇴
-      description: MOCA opaque access token이 필요한 인증 사용자 API입니다.
+      description: |
+        인증 사용자의 탈퇴 의사를 확인한 뒤 사용자 정보와 연관 설정·탈퇴 대상 데이터를 삭제합니다.
+        `confirmed`가 true여야 처리하며, reason과 reasonDetail은 선택적으로 탈퇴 사유를 전달합니다.
+        성공하면 인증 세션도 더 이상 사용할 수 없습니다.
       operationId: withdrawMe
       security:
         - MocaBearerAuth: []
       requestBody:
+        description: 탈퇴 사유와 최종 확인값입니다.
         required: true
         content:
           application/json:
@@ -735,10 +807,14 @@ paths:
     patch:
       tags: [User]
       summary: 내 닉네임 변경
+      description: |
+        인증 사용자의 닉네임을 1~50자 값으로 변경합니다.
+        성공 응답에는 변경된 닉네임을 포함한 사용자 식별자·이메일·권한 유형·카드 정렬 방식의 최신 프로필이 담깁니다.
       operationId: updateMyNickname
       security:
         - MocaBearerAuth: []
       requestBody:
+        description: 변경할 닉네임입니다.
         required: true
         content:
           application/json:
@@ -845,11 +921,15 @@ paths:
     patch:
       tags: [User]
       summary: 홈 보유 카드 정렬 방식 변경
-      description: AUTO는 서버 추천 규칙 순서, MANUAL은 사용자가 지정한 카드 순서를 사용합니다.
+      description: |
+        인증 사용자의 홈 카드 캐러셀 정렬 방식을 저장합니다.
+        AUTO는 서버 추천 규칙 순서, MANUAL은 사용자가 지정한 카드 순서를 사용하며,
+        성공 응답에는 변경된 cardSortMode를 포함한 최신 사용자 프로필이 담깁니다.
       operationId: updateMyCardSortMode
       security:
         - MocaBearerAuth: []
       requestBody:
+        description: 홈 보유 카드에 적용할 정렬 방식입니다.
         required: true
         content:
           application/json:
@@ -872,6 +952,9 @@ paths:
     get:
       tags: [User]
       summary: 내 알림 설정 조회
+      description: |
+        인증 사용자의 알림 설정을 조회합니다.
+        응답에는 실적 마감, 주변 혜택, 혜택 한도와 마케팅 알림의 수신 여부가 각각 boolean 값으로 담깁니다.
       operationId: getMyNotificationSettings
       security:
         - MocaBearerAuth: []
@@ -889,10 +972,14 @@ paths:
     patch:
       tags: [User]
       summary: 내 알림 설정 변경
+      description: |
+        실적 마감, 주변 혜택, 혜택 한도와 마케팅 알림의 수신 여부를 한 번에 저장합니다.
+        모든 설정값을 요청 본문에 포함해야 하며, 성공 응답은 저장된 최신 설정 전체를 반환합니다.
       operationId: updateMyNotificationSettings
       security:
         - MocaBearerAuth: []
       requestBody:
+        description: 알림 유형별 수신 동의 상태입니다.
         required: true
         content:
           application/json:
@@ -913,7 +1000,9 @@ paths:
     get:
       tags: [User]
       summary: 신규 사용자 여부 조회
-      description: 보유 카드가(활성·비활성 무관) 하나도 없으면 신규 사용자로 판단합니다.
+      description: |
+        인증 사용자가 카드 연동 온보딩이 필요한 신규 사용자인지 반환합니다.
+        활성·비활성 여부와 관계없이 보유카드가 하나도 없으면 `data.newUser=true`, 하나 이상이면 false입니다.
       operationId: getMyOnboardingStatus
       security:
         - MocaBearerAuth: []
@@ -932,6 +1021,9 @@ paths:
     get:
       tags: [User]
       summary: 내 위치 추천 설정 조회
+      description: |
+        인증 사용자의 위치 기반 주변 혜택 추천 사용 여부를 조회합니다.
+        `data.locationRecommendationEnabled`가 true이면 위치 기반 추천을 사용하도록 동의한 상태입니다.
       operationId: getMyLocationSettings
       security:
         - MocaBearerAuth: []
@@ -949,10 +1041,14 @@ paths:
     patch:
       tags: [User]
       summary: 내 위치 추천 설정 변경
+      description: |
+        인증 사용자의 위치 기반 주변 혜택 추천 사용 여부를 저장합니다.
+        성공 응답의 `data.locationRecommendationEnabled`에는 실제로 저장된 최신 값이 담깁니다.
       operationId: updateMyLocationSettings
       security:
         - MocaBearerAuth: []
       requestBody:
+        description: 위치 기반 혜택 추천 사용 여부입니다.
         required: true
         content:
           application/json:
@@ -1044,432 +1140,536 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
     MerchantCategoriesApiResponse:
+      description: 'MerchantCategories API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           type: array
           items:
             $ref: '#/components/schemas/MerchantCategoryResponse'
     MerchantCategoryResponse:
+      description: '가맹점 분류에 사용하는 카테고리 정보입니다.'
       type: object
       required: [categoryId, categoryCode, categoryName]
       properties:
         categoryId:
+          description: '가맹점 카테고리 식별자입니다.'
           type: string
         categoryCode:
+          description: '서비스 내부에서 사용하는 가맹점 카테고리 코드입니다.'
           type: string
           example: CAFE
         categoryName:
+          description: '화면에 표시할 가맹점 카테고리명입니다.'
           type: string
           example: 카페
     MerchantsApiResponse:
+      description: 'Merchants API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           type: array
           items:
             $ref: '#/components/schemas/MerchantResponse'
     MerchantResponse:
+      description: '내부에 등록된 가맹점 또는 브랜드 정보입니다.'
       type: object
       required: [merchantId, name]
       properties:
         merchantId:
+          description: '가맹점 또는 브랜드 식별자입니다.'
           type: string
         name:
+          description: '화면에 표시할 이름입니다.'
           type: string
           example: 스타벅스
     NearbyMerchantsApiResponse:
+      description: 'NearbyMerchants API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           type: array
           items:
             $ref: '#/components/schemas/NearbyMerchantResponse'
     NearbyMerchantResponse:
+      description: '검색 반경 안에서 확인된 가맹점 위치 정보입니다.'
       type: object
       required: [merchantId, name, latitude, longitude]
       properties:
         merchantId:
+          description: '가맹점 또는 브랜드 식별자입니다.'
           type: string
         name:
           type: string
           description: '카카오맵이 내려준 지점명 그대로입니다(예: "강남점" 포함). 브랜드명만 필요하면 merchantId로 조회하세요.'
           example: 스타벅스 강남점
         latitude:
+          description: '가맹점 위치의 위도(WGS84)입니다.'
           type: number
           format: double
         longitude:
+          description: '가맹점 위치의 경도(WGS84)입니다.'
           type: number
           format: double
         distanceMeters:
+          description: '검색 중심점에서 가맹점까지의 거리입니다. 단위는 미터이며 계산할 수 없으면 null입니다.'
           type: integer
           nullable: true
     HomeGreetingApiResponse:
+      description: '홈 인사와 실제 미적용 혜택 조회의 공통 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/HomeGreetingResponse'
     HomeGreetingResponse:
+      description: '홈 상단 인사말과 기준 월의 실제 미적용 혜택 요약입니다.'
       type: object
       required: [nickname, yearMonth, missedBenefitAmount, message]
       properties:
         nickname:
+          description: '사용자에게 표시할 닉네임입니다.'
           type: string
         yearMonth:
+          description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'
           type: string
           example: 2026-07
         missedBenefitAmount:
+          description: '승인별 예상 혜택과 실제 적용 혜택 차이의 합계입니다. 단위는 원입니다.'
           type: integer
           format: int64
         message:
+          description: '화면에 표시할 안내 문구입니다.'
           type: string
     HomeCardsApiResponse:
+      description: 홈 보유 카드 캐러셀 조회의 공통 응답 envelope입니다.
       type: object
       properties:
         success:
+          description: 요청 처리 성공 여부입니다.
           type: boolean
           example: true
         data:
+          description: 집계 기준 월과 보유 카드 캐러셀 데이터입니다.
           $ref: '#/components/schemas/HomeCardsResponse'
     HomeCardsResponse:
+      description: 홈 화면에서 카드 캐러셀을 구성하는 데이터입니다.
       type: object
       required: [yearMonth, orderMode, cards]
       properties:
         yearMonth:
+          description: 카드 혜택·실적을 집계한 기준 월(YYYY-MM)입니다.
           type: string
         orderMode:
+          description: 응답 cards 배열에 적용된 정렬 방식입니다. AUTO는 추천 순서, MANUAL은 사용자 지정 순서입니다.
           type: string
           enum: [AUTO, MANUAL]
         selectedUserCardId:
+          description: 홈에서 현재 선택된 보유카드 식별자입니다. 선택된 카드가 없으면 null입니다.
           type: string
           format: uuid
           nullable: true
         cards:
+          description: 정렬된 보유 카드 캐러셀 항목입니다. 보유 카드가 없으면 빈 배열입니다.
           type: array
           items:
             $ref: '#/components/schemas/HomeCardResponse'
     HomeCardResponse:
+      description: 홈 카드 캐러셀의 보유 카드 한 장과 해당 월의 요약 정보입니다.
       type: object
       required: [userCardId, order, cardName, alias, cardImageUrl, highlightBenefit, summary]
       properties:
         userCardId:
+          description: 사용자가 등록한 보유카드의 식별자입니다.
           type: string
           format: uuid
         order:
+          description: cards 배열에서의 표시 순서입니다.
           type: integer
         cardName:
+          description: 카드 상품명입니다.
           type: string
         alias:
+          description: 사용자가 지정한 카드 별칭입니다. 지정하지 않으면 null입니다.
           type: string
           nullable: true
         cardImageUrl:
+          description: 카드 이미지 URL입니다. 이미지가 없으면 null입니다.
           type: string
           nullable: true
         autoOrderReason:
+          description: AUTO 정렬일 때 서버가 계산한 우선순위 사유입니다. MANUAL 정렬이면 null입니다.
           type: string
           nullable: true
         highlightBenefit:
+          description: 홈 카드에 강조 표시할 대표 혜택입니다.
           $ref: '#/components/schemas/HomeBenefitHighlightResponse'
         summary:
+          description: 집계 기준 월의 혜택·실적 요약입니다.
           $ref: '#/components/schemas/HomeCardSummaryResponse'
     HomeBenefitHighlightResponse:
+      description: 카드 캐러셀에 노출할 대표 혜택 문구입니다.
       type: object
       properties:
         title:
+          description: 대표 혜택의 제목입니다. 강조할 혜택이 없으면 null입니다.
           type: string
           nullable: true
         monthlyLimitText:
+          description: 대표 혜택의 월 한도 안내 문구입니다. 한도가 없거나 알 수 없으면 null입니다.
           type: string
           nullable: true
     HomeCardSummaryResponse:
+      description: 보유 카드 한 장의 혜택 수령·잠재 혜택·실적 달성 현황입니다. 금액 단위는 원입니다.
       type: object
       required: [receivedBenefitAmount, availableBenefitAmount, maximumMonthlyBenefitAmount,
                  performanceCurrentAmount, performanceTargetAmount, performanceRate,
                  performanceRemainingAmount]
       properties:
         receivedBenefitAmount:
+          description: 기준 월에 확정된 혜택 수령 금액입니다.
           type: integer
           format: int64
         availableBenefitAmount:
+          description: 기준 월에 추가로 받을 수 있다고 계산된 예상 혜택 금액입니다.
           type: integer
           format: int64
         maximumMonthlyBenefitAmount:
+          description: 기준 월에 해당 카드로 받을 수 있는 최대 혜택 금액입니다.
           type: integer
           format: int64
         performanceCurrentAmount:
+          description: 기준 월의 현재 인정 실적 금액입니다.
           type: integer
           format: int64
         performanceTargetAmount:
+          description: 현재 실적 구간 달성에 필요한 목표 인정 실적 금액입니다.
           type: integer
           format: int64
         performanceRate:
+          description: 목표 실적 대비 현재 인정 실적의 달성률(정수 백분율)입니다.
           type: integer
         performanceRemainingAmount:
+          description: 목표 실적까지 남은 인정 실적 금액입니다. 이미 달성했으면 0입니다.
           type: integer
           format: int64
     RecentBenefitsApiResponse:
+      description: 'RecentBenefits API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/RecentBenefitsResponse'
     RecentBenefitsResponse:
+      description: '홈 화면에 표시할 최근 확정 혜택 목록입니다.'
       type: object
       required: [benefits]
       properties:
         benefits:
+          description: '조건에 해당하는 혜택 목록입니다. 내역이 없으면 빈 배열입니다.'
           type: array
           maxItems: 5
           items:
             $ref: '#/components/schemas/RecentBenefitItemResponse'
     RecentBenefitItemResponse:
+      description: '홈에 표시할 최근 확정 혜택 한 건입니다.'
       type: object
       required: [benefitHistoryId, merchantName, benefitType, benefitTitle, cardName,
                  paymentAmount, benefitAmount, occurredAt]
       properties:
         benefitHistoryId:
+          description: '확정 혜택 이력의 식별자입니다.'
           type: string
         merchantName:
+          description: '승인내역에 연결된 가맹점명입니다.'
           type: string
         benefitType:
+          description: '혜택 유형입니다. DISCOUNT는 할인, CASHBACK은 캐시백, POINT는 포인트입니다.'
           type: string
           enum: [DISCOUNT, CASHBACK, POINT]
         benefitTitle:
+          description: '카드 상품 안내에 정의된 혜택명입니다.'
           type: string
         cardName:
+          description: '카드 상품명입니다.'
           type: string
         paymentAmount:
+          description: '승인 결제금액입니다. 단위는 원입니다.'
           type: integer
           format: int64
         benefitAmount:
+          description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'
           type: integer
           format: int64
         occurredAt:
+          description: '혜택이 발생한 승인 시각입니다.'
           type: string
           format: date-time
     BenefitHistoryApiResponse:
+      description: 'BenefitHistory API의 공통 성공 응답입니다.'
       type: object
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/BenefitHistoryResponse' }
     BenefitHistoryResponse:
+      description: '조회 조건에 맞는 확정 혜택 목록과 페이지 정보입니다.'
       type: object
       required: [data, meta]
       properties:
         data:
+          description: 'API의 실제 처리 결과입니다.'
           type: array
           items: { $ref: '#/components/schemas/BenefitHistoryItemResponse' }
         meta: { $ref: '#/components/schemas/BenefitHistoryMetaResponse' }
     BenefitHistoryItemResponse:
+      description: '혜택 이력 목록에 표시할 확정 혜택 한 건입니다.'
       type: object
       required: [benefitHistoryId, merchantName, approvedAt, paymentAmount, benefitAmount, benefitType, benefitTitle, userCardId, cardName, calculationStatus]
       properties:
-        benefitHistoryId: { type: string, format: uuid }
-        merchantName: { type: string }
-        approvedAt: { type: string, format: date-time }
-        paymentAmount: { type: integer, format: int64 }
-        benefitAmount: { type: integer, format: int64 }
-        benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT] }
-        benefitTitle: { type: string }
-        userCardId: { type: string, format: uuid }
-        cardName: { type: string }
-        calculationStatus: { type: string, enum: [APPLIED] }
+        benefitHistoryId: { type: string, format: uuid , description: '확정 혜택 이력의 식별자입니다.'}
+        merchantName: { type: string , description: '승인내역에 연결된 가맹점명입니다.'}
+        approvedAt: { type: string, format: date-time , description: '카드 승인이 발생한 시각입니다.'}
+        paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
+        benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
+        benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT] , description: '혜택 유형입니다. DISCOUNT는 할인, CASHBACK은 캐시백, POINT는 포인트입니다.'}
+        benefitTitle: { type: string , description: '카드 상품 안내에 정의된 혜택명입니다.'}
+        userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
+        cardName: { type: string , description: '카드 상품명입니다.'}
+        calculationStatus: { type: string, enum: [APPLIED] , description: '혜택 계산 상태입니다.'}
     BenefitHistoryMetaResponse:
+      description: '혜택 이력 목록의 페이지 번호·크기·전체 건수·다음 페이지 여부입니다.'
       type: object
       required: [page, size, totalCount, hasNext]
       properties:
-        page: { type: integer }
-        size: { type: integer }
-        totalCount: { type: integer, format: int64 }
-        hasNext: { type: boolean }
+        page: { type: integer , description: '1부터 시작하는 현재 페이지 번호입니다.'}
+        size: { type: integer , description: '페이지당 반환 건수입니다.'}
+        totalCount: { type: integer, format: int64 , description: '조회 조건에 해당하는 전체 건수입니다.'}
+        hasNext: { type: boolean , description: '다음 페이지 존재 여부입니다.'}
     BenefitHistoryDetailApiResponse:
+      description: 'BenefitHistoryDetail API의 공통 성공 응답입니다.'
       type: object
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/BenefitHistoryDetailResponse' }
     BenefitHistoryDetailResponse:
+      description: '확정 혜택 한 건의 승인·혜택·월 한도 상세 정보입니다.'
       type: object
       required: [benefitHistoryId, calculationStatus, merchantName, approvedAt, cardName, paymentAmount, benefitAmount, benefitType, benefitTitle, monthlyLimit]
       properties:
-        benefitHistoryId: { type: string, format: uuid }
-        calculationStatus: { type: string, enum: [APPLIED] }
-        merchantName: { type: string }
-        approvedAt: { type: string, format: date-time }
-        cardName: { type: string }
-        paymentAmount: { type: integer, format: int64 }
-        benefitAmount: { type: integer, format: int64 }
-        benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT] }
-        benefitTitle: { type: string }
+        benefitHistoryId: { type: string, format: uuid , description: '확정 혜택 이력의 식별자입니다.'}
+        calculationStatus: { type: string, enum: [APPLIED] , description: '혜택 계산 상태입니다.'}
+        merchantName: { type: string , description: '승인내역에 연결된 가맹점명입니다.'}
+        approvedAt: { type: string, format: date-time , description: '카드 승인이 발생한 시각입니다.'}
+        cardName: { type: string , description: '카드 상품명입니다.'}
+        paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
+        benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
+        benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT] , description: '혜택 유형입니다. DISCOUNT는 할인, CASHBACK은 캐시백, POINT는 포인트입니다.'}
+        benefitTitle: { type: string , description: '카드 상품 안내에 정의된 혜택명입니다.'}
         monthlyLimit: { $ref: '#/components/schemas/MonthlyLimitResponse' }
         earnedMileage: { type: integer, format: int64, nullable: true, description: 마일리지 적립 건에서만 반환 }
     MonthlyLimitResponse:
+      description: '혜택의 월 한도 사용 현황입니다.'
       type: object
       required: [usedAmount, limitAmount, remainingAmount]
       properties:
-        usedAmount: { type: integer, format: int64 }
-        limitAmount: { type: integer, format: int64 }
-        remainingAmount: { type: integer, format: int64 }
+        usedAmount: { type: integer, format: int64 , description: '현재까지 사용한 한도 금액입니다. 단위는 원입니다.'}
+        limitAmount: { type: integer, format: int64 , description: '적용 가능한 전체 한도 금액입니다. 단위는 원입니다.'}
+        remainingAmount: { type: integer, format: int64 , description: '아직 사용할 수 있는 잔여 한도 금액입니다. 단위는 원입니다.'}
     BenefitSummaryReportApiResponse:
+      description: 'BenefitSummaryReport API의 공통 성공 응답입니다.'
       type: object
       required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/BenefitSummaryReportResponse' }
     BenefitSummaryReportResponse:
+      description: '기준 월 혜택 합계와 직전 달 비교 결과입니다.'
       type: object
       required: [yearMonth, totalBenefitAmount, previousMonthBenefitAmount, differenceAmount, breakdown]
       properties:
-        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' }
+        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' , description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'}
         totalBenefitAmount: { type: integer, format: int64, description: 원화 가치가 있는 확정 혜택 합계 }
-        previousMonthBenefitAmount: { type: integer, format: int64 }
-        differenceAmount: { type: integer, format: int64 }
+        previousMonthBenefitAmount: { type: integer, format: int64 , description: '직전 달에 확정된 혜택 합계입니다. 단위는 원입니다.'}
+        differenceAmount: { type: integer, format: int64 , description: '기준 월과 직전 달 혜택 합계의 차이입니다. 단위는 원입니다.'}
         breakdown:
+          description: '혜택 유형별 합계 목록입니다.'
           type: array
           items: { $ref: '#/components/schemas/BenefitBreakdownResponse' }
     BenefitBreakdownResponse:
+      description: '할인·캐시백·포인트 중 한 유형의 월 혜택 합계입니다.'
       type: object
       required: [type, label, amount]
       properties:
-        type: { type: string, enum: [DISCOUNT, CASHBACK, POINT] }
-        label: { type: string, example: 할인 }
-        amount: { type: integer, format: int64 }
+        type: { type: string, enum: [DISCOUNT, CASHBACK, POINT] , description: '집계한 혜택 유형입니다.'}
+        label: { type: string, example: 할인 , description: '화면에 표시할 혜택 유형명입니다.'}
+        amount: { type: integer, format: int64 , description: '해당 혜택 유형의 합계입니다. 단위는 원입니다.'}
     BenefitCategoriesReportApiResponse:
+      description: 'BenefitCategoriesReport API의 공통 성공 응답입니다.'
       type: object
       required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/BenefitCategoriesReportResponse' }
     BenefitCategoriesReportResponse:
+      description: '기준 월과 혜택 금액 상위 가맹점 카테고리 목록입니다.'
       type: object
       required: [yearMonth, categories]
       properties:
-        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' }
+        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' , description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'}
         categories:
+          description: 'categories 목록입니다. 해당 항목이 없으면 빈 배열입니다.'
           type: array
           maxItems: 3
           items: { $ref: '#/components/schemas/BenefitCategoryResponse' }
     BenefitCategoryResponse:
+      description: '혜택 금액을 기준으로 정렬된 가맹점 카테고리 한 건입니다.'
       type: object
       required: [rank, categoryCode, categoryName, benefitAmount]
       properties:
-        rank: { type: integer, minimum: 1 }
-        categoryCode: { type: string, example: CAFE }
-        categoryName: { type: string, example: 카페 }
-        benefitAmount: { type: integer, format: int64 }
+        rank: { type: integer, minimum: 1 , description: '혜택 금액을 기준으로 정렬한 순위입니다.'}
+        categoryCode: { type: string, example: CAFE , description: '서비스 내부에서 사용하는 가맹점 카테고리 코드입니다.'}
+        categoryName: { type: string, example: 카페 , description: '화면에 표시할 가맹점 카테고리명입니다.'}
+        benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
     MissedBenefitsReportApiResponse:
+      description: 'MissedBenefitsReport API의 공통 성공 응답입니다.'
       type: object
       required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/MissedBenefitsReportResponse' }
     MissedBenefitsReportResponse:
+      description: '지정한 보유카드의 기준 월 실제 미적용 혜택 요약입니다.'
       type: object
       required: [yearMonth, userCard, totalMissedBenefitAmount, benefits]
       properties:
-        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' }
+        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' , description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'}
         userCard: { $ref: '#/components/schemas/ReportUserCardResponse' }
         totalMissedBenefitAmount:
           type: integer
           format: int64
           description: 승인별 계산 결과에서 확인된 실제 미적용 혜택 합계
         benefits:
+          description: '조건에 해당하는 혜택 목록입니다. 내역이 없으면 빈 배열입니다.'
           type: array
           items: { $ref: '#/components/schemas/MissedBenefitItemResponse' }
     ReportUserCardResponse:
+      description: '리포트 조회 대상 보유카드의 식별·표시 정보입니다.'
       type: object
       required: [userCardId, cardName]
       properties:
-        userCardId: { type: string, format: uuid }
-        cardName: { type: string }
+        userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
+        cardName: { type: string , description: '카드 상품명입니다.'}
         cardColor: { type: string, nullable: true, description: 현재 카드 카탈로그에 색상 원천이 없어 null 가능 }
     MissedBenefitItemResponse:
+      description: '승인 계산 결과에서 확인된 실제 미적용 혜택 규칙 한 건입니다.'
       type: object
       required: [benefitRuleId, title, type, usedAmount, limitAmount, remainingAmount, unit]
       properties:
-        benefitRuleId: { type: string, format: uuid }
-        title: { type: string }
-        type: { type: string, enum: [DISCOUNT, CASHBACK, POINT] }
-        usedAmount: { type: integer, format: int64 }
-        limitAmount: { type: integer, format: int64 }
-        remainingAmount: { type: integer, format: int64 }
-        unit: { type: string, enum: [KRW] }
+        benefitRuleId: { type: string, format: uuid , description: '혜택 계산에 사용한 규칙 식별자입니다.'}
+        title: { type: string , description: '실제로 적용되지 않은 혜택의 제목입니다.'}
+        type: { type: string, enum: [DISCOUNT, CASHBACK, POINT] , description: '미적용 혜택 유형입니다.'}
+        usedAmount: { type: integer, format: int64 , description: '현재까지 사용한 한도 금액입니다. 단위는 원입니다.'}
+        limitAmount: { type: integer, format: int64 , description: '적용 가능한 전체 한도 금액입니다. 단위는 원입니다.'}
+        remainingAmount: { type: integer, format: int64 , description: '아직 사용할 수 있는 잔여 한도 금액입니다. 단위는 원입니다.'}
+        unit: { type: string, enum: [KRW] , description: '금액 또는 보상의 단위입니다.'}
     PerformanceSummaryReportApiResponse:
+      description: 'PerformanceSummaryReport API의 공통 성공 응답입니다.'
       type: object
       required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/PerformanceSummaryReportResponse' }
     PerformanceSummaryReportResponse:
+      description: '기준 월의 전체 카드 수·실적 달성 카드 수와 대표 카드 목록입니다.'
       type: object
       required: [yearMonth, cardCount, achievedCardCount, cards]
       properties:
-        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' }
-        cardCount: { type: integer }
-        achievedCardCount: { type: integer }
+        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' , description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'}
+        cardCount: { type: integer , description: '기준 월의 실적 집계 대상 카드 수입니다.'}
+        achievedCardCount: { type: integer , description: '현재 실적 구간을 달성한 카드 수입니다.'}
         cards:
+          description: '보유카드 목록입니다. 해당 카드가 없으면 빈 배열입니다.'
           type: array
           maxItems: 3
           items: { $ref: '#/components/schemas/PerformanceSummaryCardResponse' }
     PerformanceSummaryCardResponse:
+      description: '실적 요약에 표시할 보유카드 한 장의 달성 현황입니다.'
       type: object
       required: [userCardId, cardName, achievementRate, isCurrentTierAchieved]
       properties:
-        userCardId: { type: string, format: uuid }
-        cardName: { type: string }
-        achievementRate: { type: integer, minimum: 0, maximum: 100 }
-        isCurrentTierAchieved: { type: boolean }
+        userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
+        cardName: { type: string , description: '카드 상품명입니다.'}
+        achievementRate: { type: integer, minimum: 0, maximum: 100 , description: '목표 실적 대비 현재 인정 실적의 달성률입니다. 단위는 정수 백분율입니다.'}
+        isCurrentTierAchieved: { type: boolean , description: '현재 실적 구간 달성 여부입니다.'}
     PerformanceCardsReportApiResponse:
+      description: 'PerformanceCardsReport API의 공통 성공 응답입니다.'
       type: object
       required: [success, data]
       properties:
-        success: { type: boolean, example: true }
+        success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/PerformanceCardsReportResponse' }
     PerformanceCardsReportResponse:
+      description: '기준 월의 모든 활성 보유카드 실적 목록입니다.'
       type: object
       required: [yearMonth, cards]
       properties:
-        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' }
+        yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' , description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'}
         cards:
+          description: '보유카드 목록입니다. 해당 카드가 없으면 빈 배열입니다.'
           type: array
           items: { $ref: '#/components/schemas/PerformanceCardResponse' }
     PerformanceCardResponse:
+      description: '보유카드 한 장의 기준 월 실적 달성 현황입니다.'
       type: object
       required: [userCardId, cardName, currentPerformanceAmount, currentTierTargetAmount,
                  achievementRate, currentTier, isCurrentTierAchieved, remainingAmountToNextTier]
       properties:
-        userCardId: { type: string, format: uuid }
-        cardName: { type: string }
-        cardImageUrl: { type: string, format: uri, nullable: true }
-        currentPerformanceAmount: { type: integer, format: int64 }
+        userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
+        cardName: { type: string , description: '카드 상품명입니다.'}
+        cardImageUrl: { type: string, format: uri, nullable: true , description: '카드 이미지 URL입니다. 이미지가 없으면 null입니다.'}
+        currentPerformanceAmount: { type: integer, format: int64 , description: '기준 월의 현재 인정 실적 금액입니다. 단위는 원입니다.'}
         currentTierTargetAmount: { type: integer, format: int64, description: 다음 실적 구간의 최소 금액이며, 실적 구간이 없으면 카드 대표 실적 기준 금액 }
-        achievementRate: { type: integer, minimum: 0, maximum: 100 }
+        achievementRate: { type: integer, minimum: 0, maximum: 100 , description: '목표 실적 대비 현재 인정 실적의 달성률입니다. 단위는 정수 백분율입니다.'}
         currentTier: { type: integer, minimum: 0, description: 현재 실적이 속한 카드 콘텐츠 실적 구간 번호이며, 구간 데이터가 없거나 첫 구간 미만이면 0 }
         nextTier: { type: integer, nullable: true, description: 다음으로 달성할 카드 콘텐츠 실적 구간 번호이며, 최고 구간이면 null }
-        isCurrentTierAchieved: { type: boolean }
-        remainingAmountToNextTier: { type: integer, format: int64 }
+        isCurrentTierAchieved: { type: boolean , description: '현재 실적 구간 달성 여부입니다.'}
+        remainingAmountToNextTier: { type: integer, format: int64 , description: '다음 실적 구간까지 필요한 금액입니다. 단위는 원입니다.'}
     CardLinkApiResponse:
+      description: 'CardLink API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/CardLinkResponse'
     CardLinkResponse:
+      description: 'CODEF 카드사 계정 연동 결과와 조회된 보유카드 목록입니다.'
       type: object
       required: [linkId, institutionCode, status, cards]
       properties:
@@ -1484,13 +1684,16 @@ components:
           description: 카드사 기관코드(issuers.institution_code)
           example: "0301"
         status:
+          description: '카드 연동 처리 상태입니다. PENDING_CARD_ACTIVATION은 조회된 카드의 활성화 선택이 필요함을 뜻합니다.'
           type: string
           enum: [PENDING_CARD_ACTIVATION]
         cards:
+          description: '보유카드 목록입니다. 해당 카드가 없으면 빈 배열입니다.'
           type: array
           items:
             $ref: '#/components/schemas/CardLinkCardResponse'
     CardLinkCardResponse:
+      description: 'CODEF에서 조회하고 내부 카탈로그와 매칭한 보유카드 정보입니다.'
       type: object
       required: [userCardId, cardName, cardNo, institutionCode, issuerName, cardType, cardImageUrl,
                  matched, supported, optionGroups]
@@ -1501,10 +1704,12 @@ components:
           nullable: true
           description: 매칭 성공 카드만 is_active=false로 적재되어 값이 있고, 미매칭 카드는 null입니다.
         cardId:
+          description: 'card 리소스의 식별자입니다.'
           type: string
           format: uuid
           nullable: true
         cardName:
+          description: '카드 상품명입니다.'
           type: string
         cardNo:
           type: string
@@ -1515,8 +1720,10 @@ components:
           type: string
           description: 카드사 기관코드(issuers.institution_code)
         issuerName:
+          description: '카드 발급사명입니다.'
           type: string
         cardType:
+          description: '카드 유형입니다. CREDIT은 신용카드, CHECK는 체크카드, UNKNOWN은 확인 불가입니다.'
           type: string
           enum: [CREDIT, CHECK, UNKNOWN]
         cardImageUrl:
@@ -1524,41 +1731,53 @@ components:
           nullable: true
           description: 카드고릴라 이미지 → 미매칭 시 CODEF 이미지 순. 둘 다 없으면 null이며 기본 이미지는 프론트가 처리합니다.
         matched:
+          description: 'CODEF 카드가 내부 카드 카탈로그와 매칭되었는지 여부입니다.'
           type: boolean
         supported:
           type: boolean
           description: false이면 추천 계산에서 제외합니다.
         optionGroups:
+          description: '카드 활성화 전에 선택해야 하는 옵션 그룹 목록입니다.'
           type: array
           items:
             $ref: '#/components/schemas/CardOptionGroupResponse'
     CardOptionGroupResponse:
+      description: '카드 활성화 전에 선택해야 하는 옵션 그룹입니다.'
       type: object
       required: [optionGroupId, groupKey, groupName, choices]
       properties:
         optionGroupId:
+          description: 'optionGroup 리소스의 식별자입니다.'
           type: string
           format: uuid
         groupKey:
+          description: '옵션 그룹을 구분하는 내부 키입니다.'
           type: string
         groupName:
+          description: '화면에 표시할 옵션 그룹명입니다.'
           type: string
         choices:
+          description: '옵션 그룹에서 선택할 수 있는 항목 목록입니다.'
           type: array
           items:
             $ref: '#/components/schemas/CardOptionChoiceResponse'
     CardOptionChoiceResponse:
+      description: '카드 옵션 그룹에서 선택할 수 있는 항목입니다.'
       type: object
       required: [optionChoiceId, choiceKey, choiceName]
       properties:
         optionChoiceId:
+          description: 'optionChoice 리소스의 식별자입니다.'
           type: string
           format: uuid
         choiceKey:
+          description: '옵션 선택지를 구분하는 내부 키입니다.'
           type: string
         choiceName:
+          description: '화면에 표시할 옵션 선택지명입니다.'
           type: string
     ActivateCardLinkCardsRequest:
+      description: '활성화할 보유카드 목록과 선택형 카드의 옵션을 전달하는 요청입니다.'
       type: object
       required: [activeUserCardIds]
       properties:
@@ -1577,21 +1796,26 @@ components:
             required: [userCardId]
             properties:
               userCardId:
+                description: 옵션을 선택할 보유카드 식별자입니다.
                 type: string
                 format: uuid
               optionSelections:
+                description: 해당 카드에 적용할 옵션 그룹별 선택 목록입니다.
                 type: array
                 items:
                   type: object
                   required: [optionGroupId, optionChoiceId]
                   properties:
                     optionGroupId:
+                      description: 선택할 옵션 그룹의 식별자입니다.
                       type: string
                       format: uuid
                     optionChoiceId:
+                      description: 옵션 그룹에서 선택한 항목의 식별자입니다.
                       type: string
                       format: uuid
     SubmitCardCredentialsRequest:
+      description: '추가 카드 검증이 필요한 카드의 카드번호와 선택적 비밀번호 입력입니다.'
       type: object
       required: [cardNo]
       properties:
@@ -1602,30 +1826,39 @@ components:
           type: string
           description: 카드사 정책상 카드 비밀번호가 필요한 경우에만 필수입니다.
     CardLinkCardApiResponse:
+      description: 'CardLinkCard API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/CardLinkCardResponse'
     SyncOwnedCardsApiResponse:
+      description: 'SyncOwnedCards API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/SyncOwnedCardsResponse'
     SyncOwnedCardsResponse:
+      description: '활성 카드사 계정 연동별 보유카드 재조회 결과입니다.'
       type: object
       required: [results]
       properties:
         results:
+          description: '카드사 연동별 동기화 결과 목록입니다.'
           type: array
           items:
             $ref: '#/components/schemas/SyncOwnedCardsResult'
     SyncOwnedCardsResult:
+      description: '카드사 계정 연동 한 건의 보유카드 재조회 성공 여부와 카드 목록입니다.'
       type: object
       required: [linkId, institutionCode, success, cards]
       properties:
@@ -1634,35 +1867,44 @@ components:
           format: uuid
           description: 이 결과가 속한 연동(codef_account_credential_id)의 식별자
         institutionCode:
+          description: 'CODEF에서 사용하는 카드사 기관코드입니다.'
           type: string
           example: "0301"
         success:
           type: boolean
           description: false면 CODEF 조회 자체가 실패해 재시도가 필요합니다. cards가 빈 배열인 것과는 다릅니다.
         cards:
+          description: '보유카드 목록입니다. 해당 카드가 없으면 빈 배열입니다.'
           type: array
           items:
             $ref: '#/components/schemas/CardLinkCardResponse'
     ActivateCardLinkCardsApiResponse:
+      description: 'ActivateCardLinkCards API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           type: object
           properties:
             linkId:
+              description: 활성화 처리를 수행한 카드사 계정 연동 식별자입니다.
               type: string
               format: uuid
             activatedUserCardIds:
+              description: 이번 요청에서 활성화된 보유카드 식별자 목록입니다.
               type: array
               items:
                 type: string
                 format: uuid
             activatedCount:
+              description: 이번 요청에서 활성화된 보유카드 수입니다.
               type: integer
     GoogleLoginRequest:
+      description: 'Google PKCE 로그인을 완료하기 위한 authorization code와 검증값입니다.'
       type: object
       required: [code, codeVerifier, redirectUri]
       properties:
@@ -1677,76 +1919,103 @@ components:
           format: uri
           description: Google 로그인 요청에 사용한 callback URI
     GoogleLoginApiResponse:
+      description: 'GoogleLogin API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/GoogleLoginResponse'
     GoogleLoginResponse:
+      description: 'Google 로그인 완료 후 발급한 MOCA 인증 정보입니다.'
       type: object
       properties:
         newMember:
+          description: '이번 로그인에서 신규 회원으로 등록되었는지 여부입니다.'
           type: boolean
         accessToken:
+          description: 'MOCA API 인증에 사용하는 서버 발급 opaque access token입니다.'
           type: string
         accessTokenExpiresIn:
+          description: 'access token 만료까지 남은 시간입니다. 단위는 초입니다.'
           type: integer
           example: 1800
         member:
+          description: '로그인한 사용자의 프로필입니다.'
           $ref: '#/components/schemas/UserProfileResponse'
     RefreshTokenApiResponse:
+      description: 'RefreshToken API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/RefreshTokenResponse'
     RefreshTokenResponse:
+      description: 'refresh token 회전 후 새로 발급한 opaque access token 정보입니다.'
       type: object
       properties:
         accessToken:
+          description: 'MOCA API 인증에 사용하는 서버 발급 opaque access token입니다.'
           type: string
         accessTokenExpiresIn:
+          description: 'access token 만료까지 남은 시간입니다. 단위는 초입니다.'
           type: integer
           example: 1800
     UserProfileApiResponse:
+      description: 'UserProfile API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/UserProfileResponse'
     UserProfileResponse:
+      description: '인증 사용자의 프로필과 카드 정렬 설정입니다.'
       type: object
       properties:
         userId:
+          description: '인증 사용자의 식별자입니다.'
           type: string
           format: uuid
         nickname:
+          description: '사용자에게 표시할 닉네임입니다.'
           type: string
         email:
+          description: 'Google 계정 이메일입니다. 제공되지 않으면 null입니다.'
           type: string
           format: email
           nullable: true
         userType:
+          description: '사용자 권한 유형입니다.'
           type: string
           enum: [user, admin]
         cardSortMode:
+          description: '홈 카드 정렬 방식입니다. AUTO는 서버 추천, MANUAL은 사용자 지정 순서입니다.'
           type: string
           enum: [AUTO, MANUAL]
     MeCardsApiResponse:
+      description: 'MeCards API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/MeCardsResponse'
     MeCardsResponse:
+      description: '인증 사용자의 활성·비활성 보유카드 목록입니다.'
       type: object
       required: [lastSyncedAt, activeCards]
       properties:
@@ -1756,6 +2025,7 @@ components:
           nullable: true
           description: CODEF 동기화 시각 출처가 연결되기 전에는 null입니다.
         activeCards:
+          description: '현재 활성화된 보유카드 목록입니다.'
           type: array
           items:
             $ref: '#/components/schemas/MeCardItemResponse'
@@ -1765,14 +2035,18 @@ components:
           items:
             $ref: '#/components/schemas/MeCardItemResponse'
     SyncMyCardsApiResponse:
+      description: 'SyncMyCards API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/SyncMyCardsResponse'
     SyncMyCardsResponse:
+      description: '승인내역과 카드 실적 동기화 결과입니다.'
       type: object
       required: [syncedCardCount, syncedApprovalCount, syncedPerformanceCount, syncedAt]
       properties:
@@ -1794,14 +2068,17 @@ components:
           description: 동기화 완료 시각(KST 오프셋 포함).
           example: "2026-08-03T10:30:00+09:00"
     MeCardItemResponse:
+      description: '내 카드 목록에 표시할 보유카드 한 장입니다.'
       type: object
       required: [userCardId, cardName, cardNo, issuerId, issuerName, cardImageUrl, memo]
       properties:
         userCardId:
+          description: 'userCard 리소스의 식별자입니다.'
           type: string
           format: uuid
           example: 01980d6a-5c0c-7aaf-9b85-010203040531
         cardName:
+          description: '카드 상품명입니다.'
           type: string
           example: KB My WE:SH
         cardNo:
@@ -1810,6 +2087,7 @@ components:
           description: CODEF resCardNo(마스킹된 카드번호)
           example: "943646******1069"
         issuerId:
+          description: '카드 발급사 식별자입니다.'
           type: string
           format: uuid
           example: 00000000-0000-4000-8000-000000000301
@@ -1823,123 +2101,165 @@ components:
           description: 카드 이미지 URL. 없으면 null이며 기본 이미지는 프론트가 처리합니다.
           example: https://example.com/card.png
         memo:
+          description: '사용자가 카드에 작성한 메모입니다. 작성하지 않으면 null입니다.'
           type: string
           nullable: true
           example: 카페 전용 카드
     UpdateNicknameRequest:
+      description: '인증 사용자의 새 닉네임 입력입니다.'
       type: object
       required: [nickname]
       properties:
         nickname:
+          description: '사용자에게 표시할 닉네임입니다.'
           type: string
           minLength: 1
           maxLength: 50
     UpdateCardSortModeRequest:
+      description: '홈 카드 캐러셀에 저장할 정렬 방식 입력입니다.'
       type: object
       required: [cardSortMode]
       properties:
         cardSortMode:
+          description: '홈 카드 정렬 방식입니다. AUTO는 서버 추천, MANUAL은 사용자 지정 순서입니다.'
           type: string
           enum: [AUTO, MANUAL]
     NotificationSettingsRequest:
+      description: '알림 유형별 수신 동의 상태를 한 번에 변경하는 입력입니다.'
       type: object
       required: [performanceClosingEnabled, nearbyBenefitEnabled, benefitLimitEnabled, marketingEnabled]
       properties:
         performanceClosingEnabled:
+          description: '실적 마감 알림 수신 여부입니다.'
           type: boolean
         nearbyBenefitEnabled:
+          description: '주변 혜택 알림 수신 여부입니다.'
           type: boolean
         benefitLimitEnabled:
+          description: '혜택 한도 알림 수신 여부입니다.'
           type: boolean
         marketingEnabled:
+          description: '마케팅 알림 수신 동의 여부입니다.'
           type: boolean
     NotificationSettingsResponse:
+      description: '인증 사용자에게 저장된 알림 유형별 수신 동의 상태입니다.'
       type: object
       required: [performanceClosingEnabled, nearbyBenefitEnabled, benefitLimitEnabled, marketingEnabled]
       properties:
         performanceClosingEnabled:
+          description: '실적 마감 알림 수신 여부입니다.'
           type: boolean
         nearbyBenefitEnabled:
+          description: '주변 혜택 알림 수신 여부입니다.'
           type: boolean
         benefitLimitEnabled:
+          description: '혜택 한도 알림 수신 여부입니다.'
           type: boolean
         marketingEnabled:
+          description: '마케팅 알림 수신 동의 여부입니다.'
           type: boolean
     NotificationSettingsApiResponse:
+      description: 'NotificationSettings API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/NotificationSettingsResponse'
     OnboardingStatusResponse:
+      description: '보유카드 존재 여부로 판단한 카드 연동 온보딩 상태입니다.'
       type: object
       required: [newUser]
       properties:
         newUser:
+          description: '활성·비활성 보유카드가 하나도 없는 신규 사용자인지 여부입니다.'
           type: boolean
     OnboardingStatusApiResponse:
+      description: 'OnboardingStatus API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/OnboardingStatusResponse'
     LocationSettingsRequest:
+      description: '위치 기반 주변 혜택 추천 사용 여부를 변경하는 입력입니다.'
       type: object
       properties:
         locationRecommendationEnabled:
+          description: '위치 기반 혜택 추천 사용 여부입니다.'
           type: boolean
     LocationSettingsResponse:
+      description: '인증 사용자에게 저장된 위치 기반 혜택 추천 설정입니다.'
       type: object
       required: [locationRecommendationEnabled]
       properties:
         locationRecommendationEnabled:
+          description: '위치 기반 혜택 추천 사용 여부입니다.'
           type: boolean
     LocationSettingsApiResponse:
+      description: 'LocationSettings API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/LocationSettingsResponse'
     WithdrawUserRequest:
+      description: '회원 탈퇴 사유와 최종 탈퇴 확인값입니다.'
       type: object
       required: [confirmed]
       properties:
         reason:
+          description: '회원 탈퇴 사유 코드입니다.'
           type: string
           enum: [inconvenient, not_needed, incorrect_benefit, privacy_concern, low_usage, etc]
         reasonDetail:
+          description: '회원 탈퇴 사유의 추가 설명입니다.'
           type: string
           maxLength: 500
         confirmed:
+          description: '회원 탈퇴 의사를 최종 확인한 값입니다. true여야 탈퇴를 처리합니다.'
           type: boolean
           example: true
     SuccessApiResponse:
+      description: 'Success API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: true
         data:
+          description: 'API의 실제 처리 결과입니다.'
           type: object
           properties:
             success:
+              description: 요청한 작업의 최종 성공 여부입니다.
               type: boolean
               example: true
     ErrorResponse:
+      description: 'MOCA API의 공통 오류 응답입니다.'
       type: object
       properties:
         success:
+          description: '요청 처리 성공 여부입니다.'
           type: boolean
           example: false
         data:
+          description: '오류 응답에서는 항상 null입니다.'
           nullable: true
         error:
+          description: '요청 실패 시 오류 코드, 메시지와 필드별 검증 결과를 담습니다.'
           type: object
           properties:
             code:
@@ -1947,6 +2267,7 @@ components:
               description: 클라이언트 분기용 오류 코드
               example: AUTHENTICATION_REQUIRED
             message:
+              description: 사용자 또는 클라이언트 로그에 표시할 오류 설명입니다.
               type: string
             fields:
               type: object
@@ -1955,9 +2276,11 @@ components:
               description: >-
                 필드명(또는 CARD_CREDENTIAL_REQUIRED의 경우 userCardId)과 검증 메시지의 매핑이다.
     HealthResponse:
+      description: '서버 프로세스의 응답 가능 상태입니다.'
       type: object
       required: [status]
       properties:
         status:
+          description: '서버 상태입니다. 정상 동작 중이면 UP입니다.'
           type: string
           example: UP
