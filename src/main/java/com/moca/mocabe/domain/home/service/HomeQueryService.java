@@ -214,7 +214,7 @@ public class HomeQueryService {
             ? savedOrderMode
             : requestedOrderMode;
     if (orderMode == null || orderMode.isBlank()) {
-      return "AUTO";
+      return "MANUAL";
     }
     String normalized = orderMode.toUpperCase(Locale.ROOT);
     if (!"AUTO".equals(normalized) && !"MANUAL".equals(normalized)) {
