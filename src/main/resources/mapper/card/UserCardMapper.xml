@@ -134,4 +134,12 @@
         WHERE user_card_id = #{userCardId}
             AND user_id = #{userId}
     </delete>
+
+    <update id="deactivateUserCard">
+        UPDATE user_cards
+        SET is_active = FALSE,
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_card_id = #{userCardId}
+            AND user_id = #{userId}
+    </update>
 </mapper>
