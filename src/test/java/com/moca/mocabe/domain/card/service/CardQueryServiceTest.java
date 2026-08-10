@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.card.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -188,12 +190,13 @@ class CardQueryServiceTest {
 
         cardQueryService.disconnectCard(USER_ID, ACTIVE_USER_CARD_ID);
 
-        verify(userCardMapper).deleteBenefitCalculationOutcomesByUserCardId(ACTIVE_USER_CARD_ID);
-        verify(userCardMapper).deleteBenefitUsagesByUserCardId(ACTIVE_USER_CARD_ID);
-        verify(userCardMapper).deleteOptionSelectionsByUserCardId(ACTIVE_USER_CARD_ID);
-        verify(userCardMapper).deletePerformanceSnapshotsByUserCardId(ACTIVE_USER_CARD_ID);
-        verify(userCardMapper).deletePaymentApprovalsByUserCardId(ACTIVE_USER_CARD_ID);
-        verify(userCardMapper).deleteUserCard(ACTIVE_USER_CARD_ID, USER_ID);
+        InOrder inOrder = inOrder(userCardMapper);
+        inOrder.verify(userCardMapper).deleteBenefitCalculationOutcomesByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deleteBenefitUsagesByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deleteOptionSelectionsByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deletePerformanceSnapshotsByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deletePaymentApprovalsByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deleteUserCard(ACTIVE_USER_CARD_ID, USER_ID);
     }
 
     @Test
