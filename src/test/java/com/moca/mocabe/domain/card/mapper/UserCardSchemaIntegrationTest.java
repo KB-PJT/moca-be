@@ -235,6 +235,27 @@ class UserCardSchemaIntegrationTest {
                 () -> cardQueryService.disconnectCard(USER_ID, USER_CARD_ID));
     }
 
+    @Test
+    @DisplayName("보유 카드를 비활성화하면 is_active가 false로 바뀌고 목록 조회에서 비활성 카드로 잡힌다")
+    void deactivatesUserCard() {
+        insertUserCard(USER_CARD_ID, CARD_KEY_HASH, true, 1);
+
+        cardQueryService.deactivateCard(USER_ID, USER_CARD_ID);
+
+        assertFalse(jdbcTemplate.queryForObject(
+                "SELECT is_active FROM user_cards WHERE user_card_id = ?",
+                Boolean.class, USER_CARD_ID));
+        assertTrue(userCardMapper.findActiveByUserId(USER_ID).isEmpty());
+        assertEquals(1, userCardMapper.findInactiveByUserId(USER_ID).size());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 보유 카드를 비활성화하려 하면 예외를 던진다")
+    void deactivatingMissingUserCardThrows() {
+        assertThrows(UserCardNotFoundException.class,
+                () -> cardQueryService.deactivateCard(USER_ID, USER_CARD_ID));
+    }
+
     private void insertUserCard(String userCardId, String cardKeyHash, boolean active, int displayOrder) {
         jdbcTemplate.update("INSERT INTO user_cards "
                         + "(user_card_id, user_id, card_id, codef_account_credential_id, "

@@ -182,6 +182,25 @@ class CardQueryServiceTest {
     }
 
     @Test
+    @DisplayName("본인 소유 카드면 is_active를 false로 변경한다")
+    void deactivatesOwnedCard() {
+        when(userCardMapper.deactivateUserCard(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(1);
+
+        cardQueryService.deactivateCard(USER_ID, ACTIVE_USER_CARD_ID);
+
+        verify(userCardMapper).deactivateUserCard(ACTIVE_USER_CARD_ID, USER_ID);
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드가 아니면 비활성화 시 예외를 던진다")
+    void rejectsDeactivateForUnknownCard() {
+        when(userCardMapper.deactivateUserCard(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(0);
+
+        assertThrows(UserCardNotFoundException.class,
+                () -> cardQueryService.deactivateCard(USER_ID, ACTIVE_USER_CARD_ID));
+    }
+
+    @Test
     @DisplayName("본인 소유 카드면 자식 테이블을 먼저 지우고 user_cards를 삭제한다")
     void disconnectsOwnedCardByDeletingChildRowsFirst() {
         when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID))

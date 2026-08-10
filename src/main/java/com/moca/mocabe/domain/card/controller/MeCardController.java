@@ -66,6 +66,14 @@ public class MeCardController {
     }
 
 
+    @PatchMapping("/{userCardId}/deactivate")
+    public ResponseEntity<ApiResponse<SuccessResponse>> deactivateCard(
+            @PathVariable String userCardId
+    ) {
+        cardQueryService.deactivateCard(currentUserProvider.getCurrentUserId(), userCardId);
+        return ResponseEntity.ok(ApiResponse.success(new SuccessResponse(true)));
+    }
+
     @DeleteMapping("/{userCardId}")
     public ResponseEntity<ApiResponse<SuccessResponse>> disconnectCard(
             @PathVariable String userCardId

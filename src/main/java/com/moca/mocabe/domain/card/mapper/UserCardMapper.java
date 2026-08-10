@@ -36,4 +36,6 @@ public interface UserCardMapper {
     int deletePaymentApprovalsByUserCardId(@Param("userCardId") String userCardId);
 
     int deleteUserCard(@Param("userCardId") String userCardId, @Param("userId") String userId);
+
+    int deactivateUserCard(@Param("userCardId") String userCardId, @Param("userId") String userId);
 }
