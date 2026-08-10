@@ -13,6 +13,7 @@ import com.moca.mocabe.domain.benefit.dto.BenefitHistoryResponse;
 import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryDetailRow;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
+import com.moca.mocabe.domain.benefit.model.BenefitHistorySummaryRow;
 import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
 import com.moca.mocabe.global.exception.benefit.InvalidBenefitHistoryQueryException;
 import java.time.LocalDateTime;
@@ -42,12 +43,16 @@ class BenefitHistoryQueryServiceTest {
             eq(20),
             eq(20)))
         .thenReturn(List.of(row()));
+    when(mapper.summarizeHistory(eq("user-1"), any(), any(), eq("card-1")))
+        .thenReturn(new BenefitHistorySummaryRow(13750, 3200, 7500, 3050, 0));
     BenefitHistoryResponse result =
         new BenefitHistoryQueryService(mapper)
             .getHistory("user-1", "2026-07", "card-1", "discount", "benefit_desc", 2, 20);
     assertEquals(21, result.getMeta().getTotalCount());
     assertEquals(false, result.getMeta().isHasNext());
     assertEquals("2026-07-17T14:30:00+09:00", result.getData().get(0).getApprovedAt());
+    assertEquals(13750, result.getSummary().totalBenefitAmount());
+    assertEquals(3200, result.getSummary().discountAmount());
   }
 
   @Test
@@ -58,7 +63,7 @@ class BenefitHistoryQueryServiceTest {
         () -> service.getHistory("u", "2026-13", null, null, null, 1, 20));
     assertThrows(
         InvalidBenefitHistoryQueryException.class,
-        () -> service.getHistory("u", "2026-07", null, "MILEAGE", null, 1, 20));
+        () -> service.getHistory("u", "2026-07", null, "COUPON", null, 1, 20));
     assertThrows(
         InvalidBenefitHistoryQueryException.class,
         () -> service.getHistory("u", "2026-07", null, null, "OLD", 0, 20));
@@ -100,6 +105,8 @@ class BenefitHistoryQueryServiceTest {
   void defaultsMissingMonthToSeoulCurrentMonth() {
     when(mapper.findHistory(anyString(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
         .thenReturn(List.of());
+    when(mapper.summarizeHistory(anyString(), any(), any(), any()))
+        .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
 
     assertEquals(YearMonth.now(ZoneId.of("Asia/Seoul")).toString(),
         new BenefitHistoryQueryService(mapper).getHistory("user-1", null, null, null, null, 1, 20).getData().isEmpty()
