@@ -5,10 +5,11 @@
 --
 -- 목적
 --  1) Mock 사용자 1명
---  2) 카드고릴라 기반 실제 카드 3장 등록
+--  2) 카드고릴라 기반 실제 카드 4장 등록
 --     - KB국민 My WE:SH
 --     - 신한카드 Mr.Life
 --     - 삼성카드 taptap O
+--     - 삼성 iD SELECT UP 카드
 --  3) 2026-08 홈 화면용 승인내역
 --  4) 카드별 이번 달 사용액 / 실제 혜택 합산
 --  5) 최근 전체 내역
@@ -186,6 +187,7 @@ INSERT INTO codef_account_credentials (
 --   My WE:SH = 2441
 --   Mr.Life   = 13
 --   taptap O  = 51
+--   iD SELECT UP = 2986
 -- ---------------------------------------------------------------------
 INSERT INTO cards (
     card_id, gorilla_card_id, issuer_id, card_type,
@@ -220,9 +222,21 @@ INSERT INTO cards (
     '2026-01-01 00:00:00.000000', @NOW
 WHERE NOT EXISTS (SELECT 1 FROM cards WHERE gorilla_card_id = '51');
 
+INSERT INTO cards (
+    card_id, gorilla_card_id, issuer_id, card_type,
+    first_seen_at, last_seen_at
+) SELECT
+    '13000000-0000-0000-0000-000000000004',
+    '2986',
+    @SS_ISSUER_ID,
+    'credit',
+    '2026-04-21 00:00:00.000000', @NOW
+WHERE NOT EXISTS (SELECT 1 FROM cards WHERE gorilla_card_id = '2986');
+
 SET @KB_CARD_ID := (SELECT card_id FROM cards WHERE gorilla_card_id = '2441');
 SET @SH_CARD_ID := (SELECT card_id FROM cards WHERE gorilla_card_id = '13');
 SET @SS_CARD_ID := (SELECT card_id FROM cards WHERE gorilla_card_id = '51');
+SET @SELECT_UP_CARD_ID := (SELECT card_id FROM cards WHERE gorilla_card_id = '2986');
 
 INSERT INTO card_content_versions (
     content_version_id, card_id, content_sha256,
@@ -290,6 +304,30 @@ INSERT INTO card_content_versions (
     '2026-01-01 00:00:00.000000', @NOW
 WHERE NOT EXISTS (SELECT 1 FROM card_content_versions WHERE card_id = @SS_CARD_ID);
 
+INSERT INTO card_content_versions (
+    content_version_id, card_id, content_sha256,
+    name, annual_fee_summary, annual_fee_detail,
+    representative_spend, discontinued,
+    main_benefits,
+    event_title, event_detail_text, event_detail_html,
+    image_url, source_url,
+    first_seen_at, last_seen_at
+) SELECT
+    '14000000-0000-0000-0000-000000000004',
+    @SELECT_UP_CARD_ID,
+    REPEAT('4', 64),
+    '삼성 iD SELECT UP 카드',
+    NULL, NULL,
+    500000, FALSE,
+    '의료 20% 또는 생활 영역 10% 중 매월 택 1',
+    NULL, NULL, NULL,
+    NULL,
+    'https://www.card-gorilla.com/card/detail/2986',
+    '2026-04-21 00:00:00.000000', @NOW
+WHERE NOT EXISTS (
+    SELECT 1 FROM card_content_versions WHERE card_id = @SELECT_UP_CARD_ID
+);
+
 SET @KB_CONTENT_VERSION_ID := (
     SELECT content_version_id FROM card_content_versions
     WHERE card_id = @KB_CARD_ID ORDER BY last_seen_at DESC, content_version_id DESC LIMIT 1
@@ -301,6 +339,11 @@ SET @SH_CONTENT_VERSION_ID := (
 SET @SS_CONTENT_VERSION_ID := (
     SELECT content_version_id FROM card_content_versions
     WHERE card_id = @SS_CARD_ID ORDER BY last_seen_at DESC, content_version_id DESC LIMIT 1
+);
+SET @SELECT_UP_CONTENT_VERSION_ID := (
+    SELECT content_version_id FROM card_content_versions
+    WHERE card_id = @SELECT_UP_CARD_ID
+    ORDER BY last_seen_at DESC, content_version_id DESC LIMIT 1
 );
 
 -- ---------------------------------------------------------------------
@@ -339,8 +382,44 @@ WHERE NOT EXISTS (
     SELECT 1 FROM card_performance_tiers WHERE content_version_id = @SS_CONTENT_VERSION_ID
 );
 
+INSERT INTO card_performance_tiers (
+    performance_tier_id, content_version_id, tier_number,
+    minimum_spend_krw, maximum_spend_krw
+) SELECT
+    '15000000-0000-0000-0000-000000000004',
+    @SELECT_UP_CONTENT_VERSION_ID,
+    1, 500000, 999999
+WHERE NOT EXISTS (
+    SELECT 1 FROM card_performance_tiers
+    WHERE content_version_id = @SELECT_UP_CONTENT_VERSION_ID
+);
+
+INSERT INTO card_performance_tiers (
+    performance_tier_id, content_version_id, tier_number,
+    minimum_spend_krw, maximum_spend_krw
+) SELECT
+    '15000000-0000-0000-0000-000000000005',
+    @SELECT_UP_CONTENT_VERSION_ID,
+    2, 1000000, 1499999
+WHERE NOT EXISTS (
+    SELECT 1 FROM card_performance_tiers
+    WHERE content_version_id = @SELECT_UP_CONTENT_VERSION_ID AND tier_number = 2
+);
+
+INSERT INTO card_performance_tiers (
+    performance_tier_id, content_version_id, tier_number,
+    minimum_spend_krw, maximum_spend_krw
+) SELECT
+    '15000000-0000-0000-0000-000000000006',
+    @SELECT_UP_CONTENT_VERSION_ID,
+    3, 1500000, NULL
+WHERE NOT EXISTS (
+    SELECT 1 FROM card_performance_tiers
+    WHERE content_version_id = @SELECT_UP_CONTENT_VERSION_ID AND tier_number = 3
+);
+
 -- ---------------------------------------------------------------------
--- 6. 사용자 보유 카드 3장
+-- 6. 사용자 보유 카드 4장
 -- ---------------------------------------------------------------------
 INSERT INTO user_cards (
     user_card_id, user_id, card_id,
@@ -394,6 +473,90 @@ INSERT INTO user_cards (
     REPEAT('f', 64),
     '영화/카페/교통',
     @NOW, @NOW
+),
+(
+    '20000000-0000-0000-0000-000000000004',
+    @SIMULATION_USER_ID,
+    @SELECT_UP_CARD_ID,
+    '12000000-0000-0000-0000-000000000003',
+    '삼성 iD SELECT UP 카드',
+    '456789******4004',
+    NULL, NULL,
+    @SS_ISSUER_ID,
+    4, TRUE,
+    REPEAT('9', 64),
+    '의료 선택형 혜택',
+    @NOW, @NOW
+);
+
+-- ---------------------------------------------------------------------
+-- 6-1. taptap O 라이프스타일 패키지 선택
+-- 원문은 패키지 1~6 중 하나를 매월 선택하며, fixture 사용자는 패키지 1을 선택한다.
+-- ---------------------------------------------------------------------
+INSERT INTO card_option_groups (
+    option_group_id, card_id, group_key, group_name,
+    selection_required, created_at, updated_at
+) VALUES (
+    '46000000-0000-0000-0000-000000000001',
+    @SS_CARD_ID,
+    'TAPTAP_O_LIFESTYLE_PACKAGE',
+    '라이프스타일 패키지',
+    TRUE, @NOW, @NOW
+);
+
+INSERT INTO card_option_choices (
+    option_choice_id, option_group_id, choice_key, choice_name,
+    created_at, updated_at
+) VALUES
+('46100000-0000-0000-0000-000000000001','46000000-0000-0000-0000-000000000001','PACKAGE_1','패키지 1',@NOW,@NOW),
+('46100000-0000-0000-0000-000000000002','46000000-0000-0000-0000-000000000001','PACKAGE_2','패키지 2',@NOW,@NOW),
+('46100000-0000-0000-0000-000000000003','46000000-0000-0000-0000-000000000001','PACKAGE_3','패키지 3',@NOW,@NOW),
+('46100000-0000-0000-0000-000000000004','46000000-0000-0000-0000-000000000001','PACKAGE_4','패키지 4',@NOW,@NOW),
+('46100000-0000-0000-0000-000000000005','46000000-0000-0000-0000-000000000001','PACKAGE_5','패키지 5',@NOW,@NOW),
+('46100000-0000-0000-0000-000000000006','46000000-0000-0000-0000-000000000001','PACKAGE_6','패키지 6',@NOW,@NOW);
+
+INSERT INTO user_card_option_selections (
+    user_card_id, option_group_id, card_id, option_choice_id,
+    selected_at, created_at, updated_at
+) VALUES (
+    '20000000-0000-0000-0000-000000000003',
+    '46000000-0000-0000-0000-000000000001',
+    @SS_CARD_ID,
+    '46100000-0000-0000-0000-000000000001',
+    @NOW, @NOW, @NOW
+);
+
+-- ---------------------------------------------------------------------
+-- 6-2. 삼성 iD SELECT UP SELECT 서비스 선택
+-- 의료 20%와 생활 영역 10% 중 하나를 매월 선택하며, fixture 사용자는 의료를 선택한다.
+-- ---------------------------------------------------------------------
+INSERT INTO card_option_groups (
+    option_group_id, card_id, group_key, group_name,
+    selection_required, created_at, updated_at
+) VALUES (
+    '46000000-0000-0000-0000-000000000002',
+    @SELECT_UP_CARD_ID,
+    'ID_SELECT_UP_SELECT_SERVICE',
+    'SELECT 서비스',
+    TRUE, @NOW, @NOW
+);
+
+INSERT INTO card_option_choices (
+    option_choice_id, option_group_id, choice_key, choice_name,
+    created_at, updated_at
+) VALUES
+('46100000-0000-0000-0000-000000000007','46000000-0000-0000-0000-000000000002','MEDICAL_20','의료 20% 할인',@NOW,@NOW),
+('46100000-0000-0000-0000-000000000008','46000000-0000-0000-0000-000000000002','LIVING_10','생활 영역 10% 할인',@NOW,@NOW);
+
+INSERT INTO user_card_option_selections (
+    user_card_id, option_group_id, card_id, option_choice_id,
+    selected_at, created_at, updated_at
+) VALUES (
+    '20000000-0000-0000-0000-000000000004',
+    '46000000-0000-0000-0000-000000000002',
+    @SELECT_UP_CARD_ID,
+    '46100000-0000-0000-0000-000000000007',
+    @NOW, @NOW, @NOW
 );
 
 -- ---------------------------------------------------------------------
@@ -438,6 +601,17 @@ INSERT INTO user_card_performance_snapshots (
     '21000000-0000-0000-0000-000000000006',
     '20000000-0000-0000-0000-000000000003',
     '2026-08', 269900, @NOW, @NOW
+),
+-- 삼성 iD SELECT UP: 전월 100만원 경계로 월 10,000원 한도 구간
+(
+    '21000000-0000-0000-0000-000000000007',
+    '20000000-0000-0000-0000-000000000004',
+    '2026-07', 1000000, @NOW, @NOW
+),
+(
+    '21000000-0000-0000-0000-000000000008',
+    '20000000-0000-0000-0000-000000000004',
+    '2026-08', 0, @NOW, @NOW
 );
 
 -- ---------------------------------------------------------------------
@@ -458,7 +632,8 @@ INSERT INTO merchant_categories (
 ('30000000-0000-0000-0000-000000000006', NULL, 'SIM_LAUNDRY',     '세탁소',   6, @NOW, @NOW, TRUE),
 ('30000000-0000-0000-0000-000000000007', NULL, 'SIM_CINEMA',      '영화관',   7, @NOW, @NOW, TRUE),
 ('30000000-0000-0000-0000-000000000008', NULL, 'SIM_TRANSPORT',   '대중교통', 8, @NOW, @NOW, FALSE),
-('30000000-0000-0000-0000-000000000009', NULL, 'SIM_MART',    '대형마트',  9, @NOW, @NOW, TRUE);
+('30000000-0000-0000-0000-000000000009', NULL, 'SIM_MART',        '대형마트',  9, @NOW, @NOW, TRUE),
+('30000000-0000-0000-0000-000000000010', NULL, 'SIM_OPEN_MARKET', '오픈마켓', 10, @NOW, @NOW, FALSE);
 
 -- ---------------------------------------------------------------------
 -- 9. 가맹점
@@ -724,6 +899,390 @@ INSERT INTO benefit_limit_tiers (
 ('45000000-0000-0000-0000-000000000001','44000000-0000-0000-0000-000000000001',1,1,300000,NULL),
 ('45000000-0000-0000-0000-000000000002','44000000-0000-0000-0000-000000000002',1,2,300000,NULL),
 ('45000000-0000-0000-0000-000000000003','44000000-0000-0000-0000-000000000003',1,12,300000,NULL);
+
+-- 10-4. taptap O 패키지 1 - 스타벅스 50% 할인(월 10,000원)
+INSERT INTO card_benefits (
+    benefit_id, content_version_id, position, record_type,
+    title, summary, detail_text, detail_html
+) VALUES (
+    '40000000-0000-0000-0000-000000000004',
+    @SS_CONTENT_VERSION_ID,
+    30002, 'benefit',
+    '패키지 1 스타벅스 할인',
+    '라이프스타일 패키지 1 선택 시 스타벅스 50% 할인',
+    '전월 30만원 이상 / 커피 할인 월 한도 10,000원', NULL
+);
+
+INSERT INTO benefit_offers (
+    offer_id, benefit_id, reward_program_id,
+    offer_name, position, priority, exclusive_group_key,
+    reward_type, value_type, value_unit,
+    calculation_mode, calculation_basis, stacking_mode,
+    reward_timing, valuation_scope, valuation_method,
+    reference_value_krw, reference_value_unit,
+    valid_from, valid_to
+) VALUES (
+    '41000000-0000-0000-0000-000000000004',
+    '40000000-0000-0000-0000-000000000004',
+    NULL,
+    '패키지 1 스타벅스 50% 할인',
+    1, 100, 'TAPTAP_O_PACKAGE_1_COFFEE',
+    'discount', 'percentage', 'percent',
+    'flat', 'transaction_amount', 'not_stackable',
+    'statement', 'transaction', 'direct',
+    NULL, NULL,
+    '2026-01-01', NULL
+);
+
+INSERT INTO benefit_rules (
+    rule_id, offer_id, position, priority,
+    rule_name, rule_effect, stacking_mode,
+    reward_value, reward_unit,
+    reward_basis_amount, reward_basis_unit,
+    previous_spend_min_krw, current_spend_min_krw,
+    transaction_min_krw, transaction_max_krw,
+    rounding_type, rounding_unit,
+    valid_from, valid_to
+) VALUES (
+    '42000000-0000-0000-0000-000000000004',
+    '41000000-0000-0000-0000-000000000004',
+    1, 100,
+    '패키지 1 전월 30만원 이상 스타벅스 50%',
+    'grant', 'not_stackable',
+    50, 'percent',
+    NULL, NULL,
+    300000, NULL,
+    NULL, NULL,
+    'floor', 1,
+    '2026-01-01', NULL
+);
+
+INSERT INTO benefit_rule_targets (
+    target_id, rule_id, condition_group, match_mode,
+    target_type, target_code, target_name
+) VALUES (
+    '43000000-0000-0000-0000-000000000031',
+    '42000000-0000-0000-0000-000000000004',
+    1, 'include', 'merchant', 'STARBUCKS', '스타벅스'
+);
+
+INSERT INTO benefit_limit_policies (
+    limit_policy_id, offer_id, policy_name,
+    limit_period, limit_type, limit_unit,
+    shared_group_key, valid_from, valid_to
+) VALUES (
+    '44000000-0000-0000-0000-000000000004',
+    '41000000-0000-0000-0000-000000000004',
+    '패키지 1 커피 할인 월 한도',
+    'monthly', 'reward_amount', 'KRW',
+    'TAPTAP_O_PACKAGE_1_COFFEE', '2026-01-01', NULL
+);
+
+INSERT INTO benefit_limit_tiers (
+    limit_tier_id, limit_policy_id, position,
+    limit_value, previous_spend_min_krw, current_spend_min_krw
+) VALUES (
+    '45000000-0000-0000-0000-000000000004',
+    '44000000-0000-0000-0000-000000000004',
+    1, 10000, 300000, NULL
+);
+
+-- 10-5. taptap O 패키지 1 - 오픈마켓 7% 할인(월 5,000원)
+INSERT INTO card_benefits (
+    benefit_id, content_version_id, position, record_type,
+    title, summary, detail_text, detail_html
+) VALUES (
+    '40000000-0000-0000-0000-000000000005',
+    @SS_CONTENT_VERSION_ID,
+    30003, 'benefit',
+    '패키지 1 오픈마켓 할인',
+    '라이프스타일 패키지 1 선택 시 G마켓·옥션·11번가 7% 할인',
+    '전월 30만원 이상 / 쇼핑 할인 월 한도 5,000원', NULL
+);
+
+INSERT INTO benefit_offers (
+    offer_id, benefit_id, reward_program_id,
+    offer_name, position, priority, exclusive_group_key,
+    reward_type, value_type, value_unit,
+    calculation_mode, calculation_basis, stacking_mode,
+    reward_timing, valuation_scope, valuation_method,
+    reference_value_krw, reference_value_unit,
+    valid_from, valid_to
+) VALUES (
+    '41000000-0000-0000-0000-000000000005',
+    '40000000-0000-0000-0000-000000000005',
+    NULL,
+    '패키지 1 오픈마켓 7% 할인',
+    1, 100, 'TAPTAP_O_PACKAGE_1_SHOPPING',
+    'discount', 'percentage', 'percent',
+    'flat', 'transaction_amount', 'not_stackable',
+    'statement', 'transaction', 'direct',
+    NULL, NULL,
+    '2026-01-01', NULL
+);
+
+INSERT INTO benefit_rules (
+    rule_id, offer_id, position, priority,
+    rule_name, rule_effect, stacking_mode,
+    reward_value, reward_unit,
+    reward_basis_amount, reward_basis_unit,
+    previous_spend_min_krw, current_spend_min_krw,
+    transaction_min_krw, transaction_max_krw,
+    rounding_type, rounding_unit,
+    valid_from, valid_to
+) VALUES (
+    '42000000-0000-0000-0000-000000000005',
+    '41000000-0000-0000-0000-000000000005',
+    1, 100,
+    '패키지 1 전월 30만원 이상 오픈마켓 7%',
+    'grant', 'not_stackable',
+    7, 'percent',
+    NULL, NULL,
+    300000, NULL,
+    NULL, NULL,
+    'floor', 1,
+    '2026-01-01', NULL
+);
+
+INSERT INTO benefit_rule_targets (
+    target_id, rule_id, condition_group, match_mode,
+    target_type, target_code, target_name
+) VALUES (
+    '43000000-0000-0000-0000-000000000032',
+    '42000000-0000-0000-0000-000000000005',
+    1, 'include', 'merchant_category', 'SIM_OPEN_MARKET', '오픈마켓'
+);
+
+INSERT INTO benefit_limit_policies (
+    limit_policy_id, offer_id, policy_name,
+    limit_period, limit_type, limit_unit,
+    shared_group_key, valid_from, valid_to
+) VALUES (
+    '44000000-0000-0000-0000-000000000005',
+    '41000000-0000-0000-0000-000000000005',
+    '패키지 1 쇼핑 할인 월 한도',
+    'monthly', 'reward_amount', 'KRW',
+    'TAPTAP_O_PACKAGE_1_SHOPPING', '2026-01-01', NULL
+);
+
+INSERT INTO benefit_limit_tiers (
+    limit_tier_id, limit_policy_id, position,
+    limit_value, previous_spend_min_krw, current_spend_min_krw
+) VALUES (
+    '45000000-0000-0000-0000-000000000005',
+    '44000000-0000-0000-0000-000000000005',
+    1, 5000, 300000, NULL
+);
+
+INSERT INTO benefit_offer_option_requirements (
+    requirement_id, offer_id, option_group_id, option_choice_id,
+    created_at, updated_at
+) VALUES
+(
+    '46200000-0000-0000-0000-000000000001',
+    '41000000-0000-0000-0000-000000000004',
+    '46000000-0000-0000-0000-000000000001',
+    '46100000-0000-0000-0000-000000000001',
+    @NOW, @NOW
+),
+(
+    '46200000-0000-0000-0000-000000000002',
+    '41000000-0000-0000-0000-000000000005',
+    '46000000-0000-0000-0000-000000000001',
+    '46100000-0000-0000-0000-000000000001',
+    @NOW, @NOW
+);
+
+-- 10-6. 삼성 iD SELECT UP - 의료 20% 또는 생활 영역 10% 중 택 1
+INSERT INTO card_benefits (
+    benefit_id, content_version_id, position, record_type,
+    title, summary, detail_text, detail_html
+) VALUES
+(
+    '40000000-0000-0000-0000-000000000006',
+    @SELECT_UP_CONTENT_VERSION_ID,
+    30001, 'benefit',
+    'SELECT 의료 할인',
+    'SELECT 서비스에서 의료 선택 시 병원·약국 20% 할인',
+    '전월 50만원/100만원/150만원 이상 시 통합 월 7천원/1만원/1만5천원', NULL
+),
+(
+    '40000000-0000-0000-0000-000000000007',
+    @SELECT_UP_CONTENT_VERSION_ID,
+    30002, 'benefit',
+    'SELECT 생활 영역 할인',
+    'SELECT 서비스에서 생활 선택 시 보험·주유·이동통신 10% 할인',
+    '전월 50만원/100만원/150만원 이상 시 통합 월 7천원/1만원/1만5천원', NULL
+);
+
+INSERT INTO benefit_offers (
+    offer_id, benefit_id, reward_program_id,
+    offer_name, position, priority, exclusive_group_key,
+    reward_type, value_type, value_unit,
+    calculation_mode, calculation_basis, stacking_mode,
+    reward_timing, valuation_scope, valuation_method,
+    reference_value_krw, reference_value_unit,
+    valid_from, valid_to
+) VALUES
+(
+    '41000000-0000-0000-0000-000000000006',
+    '40000000-0000-0000-0000-000000000006', NULL,
+    'SELECT 의료 20% 할인',
+    1, 100, 'ID_SELECT_UP_SELECT_SERVICE',
+    'discount', 'percentage', 'percent',
+    'flat', 'transaction_amount', 'not_stackable',
+    'statement', 'transaction', 'direct',
+    NULL, NULL, '2026-04-21', NULL
+),
+(
+    '41000000-0000-0000-0000-000000000007',
+    '40000000-0000-0000-0000-000000000007', NULL,
+    'SELECT 생활 영역 10% 할인',
+    1, 100, 'ID_SELECT_UP_SELECT_SERVICE',
+    'discount', 'percentage', 'percent',
+    'flat', 'transaction_amount', 'not_stackable',
+    'statement', 'transaction', 'direct',
+    NULL, NULL, '2026-04-21', NULL
+);
+
+INSERT INTO benefit_rules (
+    rule_id, offer_id, position, priority,
+    rule_name, rule_effect, stacking_mode,
+    reward_value, reward_unit,
+    reward_basis_amount, reward_basis_unit,
+    previous_spend_min_krw, current_spend_min_krw,
+    transaction_min_krw, transaction_max_krw,
+    rounding_type, rounding_unit,
+    valid_from, valid_to
+) VALUES
+(
+    '42000000-0000-0000-0000-000000000006',
+    '41000000-0000-0000-0000-000000000006',
+    1, 100, 'SELECT 의료 20%', 'grant', 'not_stackable',
+    20, 'percent', NULL, NULL, 500000, NULL, NULL, NULL,
+    'floor', 1, '2026-04-21', NULL
+),
+(
+    '42000000-0000-0000-0000-000000000007',
+    '41000000-0000-0000-0000-000000000007',
+    1, 100, 'SELECT 생활 영역 10%', 'grant', 'not_stackable',
+    10, 'percent', NULL, NULL, 500000, NULL, NULL, NULL,
+    'floor', 1, '2026-04-21', NULL
+);
+
+INSERT INTO benefit_rule_targets (
+    target_id, rule_id, condition_group, match_mode,
+    target_type, target_code, target_name
+) VALUES
+('43000000-0000-0000-0000-000000000041','42000000-0000-0000-0000-000000000006',1,'include','merchant_category','SIM_HOSPITAL','병원'),
+('43000000-0000-0000-0000-000000000042','42000000-0000-0000-0000-000000000006',1,'include','merchant_category','SIM_PHARMACY','약국'),
+('43000000-0000-0000-0000-000000000043','42000000-0000-0000-0000-000000000007',1,'include','merchant_category','SIM_LIVING','보험·주유·이동통신');
+
+INSERT INTO benefit_limit_policies (
+    limit_policy_id, offer_id, policy_name,
+    limit_period, limit_type, limit_unit,
+    shared_group_key, valid_from, valid_to
+) VALUES
+('44000000-0000-0000-0000-000000000006','41000000-0000-0000-0000-000000000006','SELECT 의료 통합 월 할인한도','monthly','reward_amount','KRW','ID_SELECT_UP_SELECT_SERVICE','2026-04-21',NULL),
+('44000000-0000-0000-0000-000000000007','41000000-0000-0000-0000-000000000007','SELECT 생활 통합 월 할인한도','monthly','reward_amount','KRW','ID_SELECT_UP_SELECT_SERVICE','2026-04-21',NULL);
+
+INSERT INTO benefit_limit_tiers (
+    limit_tier_id, limit_policy_id, position,
+    limit_value, previous_spend_min_krw, current_spend_min_krw
+) VALUES
+('45000000-0000-0000-0000-000000000006','44000000-0000-0000-0000-000000000006',1,7000,500000,NULL),
+('45000000-0000-0000-0000-000000000007','44000000-0000-0000-0000-000000000006',2,10000,1000000,NULL),
+('45000000-0000-0000-0000-000000000008','44000000-0000-0000-0000-000000000006',3,15000,1500000,NULL),
+('45000000-0000-0000-0000-000000000009','44000000-0000-0000-0000-000000000007',1,7000,500000,NULL),
+('45000000-0000-0000-0000-000000000010','44000000-0000-0000-0000-000000000007',2,10000,1000000,NULL),
+('45000000-0000-0000-0000-000000000011','44000000-0000-0000-0000-000000000007',3,15000,1500000,NULL);
+
+INSERT INTO benefit_offer_option_requirements (
+    requirement_id, offer_id, option_group_id, option_choice_id,
+    created_at, updated_at
+) VALUES
+('46200000-0000-0000-0000-000000000003','41000000-0000-0000-0000-000000000006','46000000-0000-0000-0000-000000000002','46100000-0000-0000-0000-000000000007',@NOW,@NOW),
+('46200000-0000-0000-0000-000000000004','41000000-0000-0000-0000-000000000007','46000000-0000-0000-0000-000000000002','46100000-0000-0000-0000-000000000008',@NOW,@NOW);
+
+-- 10-7. 삼성 iD SELECT UP 기본 서비스 - 여가 2% 할인(통합 월 500,000원)
+INSERT INTO card_benefits (
+    benefit_id, content_version_id, position, record_type,
+    title, summary, detail_text, detail_html
+) VALUES (
+    '40000000-0000-0000-0000-000000000008',
+    @SELECT_UP_CONTENT_VERSION_ID,
+    30003, 'benefit',
+    '기본 여가 할인',
+    '골프·항공·면세점·철도·공연 2% 할인',
+    '전월 이용금액 조건 없음 / 여가 영역 통합 월 할인한도 500,000원', NULL
+);
+
+INSERT INTO benefit_offers (
+    offer_id, benefit_id, reward_program_id,
+    offer_name, position, priority, exclusive_group_key,
+    reward_type, value_type, value_unit,
+    calculation_mode, calculation_basis, stacking_mode,
+    reward_timing, valuation_scope, valuation_method,
+    reference_value_krw, reference_value_unit,
+    valid_from, valid_to
+) VALUES (
+    '41000000-0000-0000-0000-000000000008',
+    '40000000-0000-0000-0000-000000000008', NULL,
+    '기본 여가 2% 할인',
+    1, 50, 'ID_SELECT_UP_LEISURE',
+    'discount', 'percentage', 'percent',
+    'flat', 'transaction_amount', 'not_stackable',
+    'statement', 'transaction', 'direct',
+    NULL, NULL, '2026-04-21', NULL
+);
+
+INSERT INTO benefit_rules (
+    rule_id, offer_id, position, priority,
+    rule_name, rule_effect, stacking_mode,
+    reward_value, reward_unit,
+    reward_basis_amount, reward_basis_unit,
+    previous_spend_min_krw, current_spend_min_krw,
+    transaction_min_krw, transaction_max_krw,
+    rounding_type, rounding_unit,
+    valid_from, valid_to
+) VALUES (
+    '42000000-0000-0000-0000-000000000008',
+    '41000000-0000-0000-0000-000000000008',
+    1, 50, '기본 여가 2%', 'grant', 'not_stackable',
+    2, 'percent', NULL, NULL, NULL, NULL, NULL, NULL,
+    'floor', 1, '2026-04-21', NULL
+);
+
+INSERT INTO benefit_rule_targets (
+    target_id, rule_id, condition_group, match_mode,
+    target_type, target_code, target_name
+) VALUES
+('43000000-0000-0000-0000-000000000044','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_GOLF','골프'),
+('43000000-0000-0000-0000-000000000045','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_AIRLINE','항공'),
+('43000000-0000-0000-0000-000000000046','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_DUTY_FREE','면세점'),
+('43000000-0000-0000-0000-000000000047','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_RAIL','철도'),
+('43000000-0000-0000-0000-000000000048','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_PERFORMANCE','공연');
+
+INSERT INTO benefit_limit_policies (
+    limit_policy_id, offer_id, policy_name,
+    limit_period, limit_type, limit_unit,
+    shared_group_key, valid_from, valid_to
+) VALUES (
+    '44000000-0000-0000-0000-000000000008',
+    '41000000-0000-0000-0000-000000000008',
+    '기본 여가 통합 월 할인한도',
+    'monthly', 'reward_amount', 'KRW',
+    'ID_SELECT_UP_LEISURE', '2026-04-21', NULL
+);
+
+INSERT INTO benefit_limit_tiers (
+    limit_tier_id, limit_policy_id, position,
+    limit_value, previous_spend_min_krw, current_spend_min_krw
+) VALUES (
+    '45000000-0000-0000-0000-000000000012',
+    '44000000-0000-0000-0000-000000000008',
+    1, 500000, NULL, NULL
+);
 
 -- ---------------------------------------------------------------------
 -- 11. 카드 승인내역

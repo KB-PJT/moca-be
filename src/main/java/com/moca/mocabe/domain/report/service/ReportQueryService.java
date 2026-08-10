@@ -91,7 +91,7 @@ public class ReportQueryService {
     return new BenefitCategoriesReportResponse(format(yearMonth), categories);
   }
 
-  /** 계산 결과 원장에 남은 실제 예상액과 적용액의 차이만 '놓친 혜택'으로 반환한다. */
+  /** 선택 옵션과 실적에 따라 제공된 월 한도 중 사용하지 않은 금액을 '놓친 혜택'으로 반환한다. */
   @Transactional(readOnly = true)
   public MissedBenefitsReportResponse getMissedBenefits(
       String userId, String requestedYearMonth, String userCardId) {
