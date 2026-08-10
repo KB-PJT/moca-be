@@ -54,12 +54,13 @@ class HomeSimulationWithCardGorillaSeedIntegrationTest {
 
             JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
             assertEquals(
-                    3,
+                    4,
                     jdbcTemplate.queryForObject(
-                            "SELECT COUNT(*) FROM cards WHERE gorilla_card_id IN ('13', '51', '2441')",
+                            "SELECT COUNT(*) FROM cards "
+                                    + "WHERE gorilla_card_id IN ('13', '51', '2441', '2986')",
                             Integer.class));
             assertEquals(
-                    3,
+                    4,
                     jdbcTemplate.queryForObject(
                             "SELECT COUNT(*) FROM user_cards "
                                     + "WHERE user_id = '10000000-0000-0000-0000-000000000001'",

@@ -71,6 +71,8 @@
                        DATE_SUB(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH),
                        '%Y-%m')
             WHERE limit_policy.limit_period = 'monthly'
+              AND limit_card.user_id = #{userId}
+              AND limit_card.is_active = TRUE
               AND (limit_policy.valid_from IS NULL
                    OR limit_policy.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
               AND (limit_policy.valid_to IS NULL
@@ -79,6 +81,35 @@
               AND (limit_tier.previous_spend_min_krw IS NULL
                    OR limit_tier.previous_spend_min_krw &lt;=
                       COALESCE(previous_performance.current_spend_amount, 0))
+              AND EXISTS (
+                  SELECT 1
+                  FROM benefit_rules eligible_rule
+                  WHERE eligible_rule.offer_id = offer.offer_id
+                    AND eligible_rule.rule_effect = 'grant'
+                    AND (eligible_rule.previous_spend_min_krw IS NULL
+                         OR eligible_rule.previous_spend_min_krw &lt;=
+                            COALESCE(previous_performance.current_spend_amount, 0))
+                    AND (eligible_rule.valid_from IS NULL
+                         OR eligible_rule.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
+                    AND (eligible_rule.valid_to IS NULL
+                         OR eligible_rule.valid_to &gt;= CONCAT(#{yearMonth}, '-01'))
+              )
+              AND (
+                  NOT EXISTS (
+                      SELECT 1
+                      FROM benefit_offer_option_requirements requirement
+                      WHERE requirement.offer_id = offer.offer_id
+                  )
+                  OR EXISTS (
+                      SELECT 1
+                      FROM benefit_offer_option_requirements requirement
+                      INNER JOIN user_card_option_selections selection
+                          ON selection.user_card_id = limit_card.user_card_id
+                         AND selection.option_group_id = requirement.option_group_id
+                         AND selection.option_choice_id = requirement.option_choice_id
+                      WHERE requirement.offer_id = offer.offer_id
+                  )
+              )
               AND NOT EXISTS (
                   SELECT 1
                   FROM benefit_limit_tiers higher_tier
@@ -171,14 +202,113 @@
     </select>
 
     <select id="sumMissedBenefitAmount" resultType="long">
-        SELECT COALESCE(SUM(outcome.missed_reward_value), 0)
-        FROM user_benefit_calculation_outcomes outcome
-        INNER JOIN user_cards uc ON uc.user_card_id = outcome.user_card_id
-        WHERE uc.user_id = #{userId}
-          AND uc.is_active = TRUE
-          AND outcome.reward_unit = 'KRW'
-          AND outcome.usage_date &gt;= CONCAT(#{yearMonth}, '-01')
-          AND outcome.usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+        WITH eligible_limit_rows AS (
+            SELECT uc.user_card_id,
+                   COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
+                   CASE
+                       WHEN policy.limit_type = 'reward_amount' AND policy.limit_unit = 'KRW'
+                           THEN tier.limit_value
+                       WHEN policy.limit_type = 'usage_count'
+                            AND policy.limit_unit = 'count'
+                            AND offer.value_type = 'fixed_amount'
+                            AND offer.reward_type IN ('discount', 'cashback')
+                            AND rule.reward_unit = 'KRW'
+                           THEN tier.limit_value * rule.reward_value
+                       ELSE 0
+                   END AS limit_amount
+            FROM user_cards uc
+            INNER JOIN cards card ON card.card_id = uc.card_id
+            INNER JOIN card_content_versions content ON content.card_id = card.card_id
+            INNER JOIN card_benefits benefit ON benefit.content_version_id = content.content_version_id
+            INNER JOIN benefit_offers offer ON offer.benefit_id = benefit.benefit_id
+            INNER JOIN benefit_rules rule ON rule.offer_id = offer.offer_id
+            INNER JOIN benefit_limit_policies policy ON policy.offer_id = offer.offer_id
+            INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
+            LEFT JOIN user_card_performance_snapshots previous_performance
+                ON previous_performance.user_card_id = uc.user_card_id
+               AND previous_performance.performance_month = DATE_FORMAT(
+                   DATE_SUB(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH), '%Y-%m')
+            WHERE uc.user_id = #{userId}
+              AND uc.is_active = TRUE
+              AND NOT EXISTS (
+                  SELECT 1 FROM card_content_versions newer
+                  WHERE newer.card_id = content.card_id
+                    AND (newer.last_seen_at &gt; content.last_seen_at
+                         OR (newer.last_seen_at = content.last_seen_at
+                             AND newer.content_version_id &gt; content.content_version_id))
+              )
+              AND offer.reward_type IN ('discount', 'cashback', 'points')
+              AND rule.rule_effect = 'grant'
+              AND rule.current_spend_min_krw IS NULL
+              AND (rule.previous_spend_min_krw IS NULL
+                   OR rule.previous_spend_min_krw &lt;= COALESCE(previous_performance.current_spend_amount, 0))
+              AND (rule.valid_from IS NULL OR rule.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
+              AND (rule.valid_to IS NULL OR rule.valid_to &gt;= CONCAT(#{yearMonth}, '-01'))
+              AND policy.limit_period = 'monthly'
+              AND (policy.valid_from IS NULL OR policy.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
+              AND (policy.valid_to IS NULL OR policy.valid_to &gt;= CONCAT(#{yearMonth}, '-01'))
+              AND tier.current_spend_min_krw IS NULL
+              AND (tier.previous_spend_min_krw IS NULL
+                   OR tier.previous_spend_min_krw &lt;= COALESCE(previous_performance.current_spend_amount, 0))
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM benefit_limit_tiers higher_tier
+                  WHERE higher_tier.limit_policy_id = tier.limit_policy_id
+                    AND higher_tier.current_spend_min_krw IS NULL
+                    AND (higher_tier.previous_spend_min_krw IS NULL
+                         OR higher_tier.previous_spend_min_krw &lt;=
+                            COALESCE(previous_performance.current_spend_amount, 0))
+                    AND (
+                        COALESCE(higher_tier.previous_spend_min_krw, 0)
+                            &gt; COALESCE(tier.previous_spend_min_krw, 0)
+                        OR (COALESCE(higher_tier.previous_spend_min_krw, 0)
+                                = COALESCE(tier.previous_spend_min_krw, 0)
+                            AND higher_tier.position &gt; tier.position)
+                    )
+              )
+              AND (
+                  NOT EXISTS (
+                      SELECT 1 FROM benefit_offer_option_requirements requirement
+                      WHERE requirement.offer_id = offer.offer_id
+                  )
+                  OR EXISTS (
+                      SELECT 1
+                      FROM benefit_offer_option_requirements requirement
+                      INNER JOIN user_card_option_selections selection
+                          ON selection.user_card_id = uc.user_card_id
+                         AND selection.option_group_id = requirement.option_group_id
+                         AND selection.option_choice_id = requirement.option_choice_id
+                      WHERE requirement.offer_id = offer.offer_id
+                  )
+              )
+        ), eligible_limit_groups AS (
+            SELECT user_card_id,
+                   limit_group_key,
+                   MAX(limit_amount) AS limit_amount
+            FROM eligible_limit_rows
+            WHERE limit_amount &gt; 0
+            GROUP BY user_card_id, limit_group_key
+        ), monthly_usage_groups AS (
+            SELECT benefit_usage.user_card_id,
+                   COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
+                   SUM(benefit_usage.reward_amount_krw) AS used_amount
+            FROM user_benefit_usages benefit_usage
+            INNER JOIN user_cards uc ON uc.user_card_id = benefit_usage.user_card_id
+            INNER JOIN benefit_limit_policies policy
+                ON policy.limit_policy_id = benefit_usage.limit_policy_id
+            WHERE uc.user_id = #{userId}
+              AND benefit_usage.usage_status = 'confirmed'
+              AND benefit_usage.usage_date &gt;= CONCAT(#{yearMonth}, '-01')
+              AND benefit_usage.usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+            GROUP BY benefit_usage.user_card_id,
+                     COALESCE(policy.shared_group_key, policy.limit_policy_id)
+        )
+        SELECT COALESCE(SUM(GREATEST(
+                   limits.limit_amount - COALESCE(usage_group.used_amount, 0), 0)), 0)
+        FROM eligible_limit_groups limits
+        LEFT JOIN monthly_usage_groups usage_group
+            ON usage_group.user_card_id = limits.user_card_id
+           AND usage_group.limit_group_key = limits.limit_group_key
     </select>
 
     <resultMap id="recentBenefitRowMap" type="com.moca.mocabe.domain.home.model.RecentBenefitRow">

@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.moca.mocabe.domain.home.dto.HomeCardResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
+import com.moca.mocabe.domain.report.mapper.ReportMapper;
+import com.moca.mocabe.domain.report.model.MissedBenefitRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -46,11 +48,15 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
     private static final String USER_ID = "10000000-0000-0000-0000-000000000001";
     private static final String TAPTAP_USER_CARD_ID =
             "20000000-0000-0000-0000-000000000003";
+    private static final String SELECT_UP_USER_CARD_ID =
+            "20000000-0000-0000-0000-000000000004";
     private static final String LOCAL_USER_ID = "37411c29-5adc-4643-8ca5-8fa1c14abf1d";
 
     private MySQLContainer container;
     private JdbcTemplate jdbcTemplate;
     private SqlSession sqlSession;
+    private HomeMapper homeMapper;
+    private ReportMapper reportMapper;
     private HomeQueryService homeQueryService;
 
     @BeforeAll
@@ -79,10 +85,9 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                         .getResources("classpath*:mapper/**/*.xml"));
         SqlSessionFactory sqlSessionFactory = factoryBean.getObject();
         sqlSession = sqlSessionFactory.openSession();
-        homeQueryService =
-                new HomeQueryService(
-                        sqlSession.getMapper(UserMapper.class),
-                        sqlSession.getMapper(HomeMapper.class));
+        homeMapper = sqlSession.getMapper(HomeMapper.class);
+        reportMapper = sqlSession.getMapper(ReportMapper.class);
+        homeQueryService = new HomeQueryService(sqlSession.getMapper(UserMapper.class), homeMapper);
     }
 
     @AfterAll
@@ -112,7 +117,7 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
 
         assertEquals(9, migrationCount);
         assertEquals(1, userCount);
-        assertEquals(3, cardCount);
+        assertEquals(4, cardCount);
     }
 
     @Test
@@ -123,10 +128,11 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
         assertCardSummary(summaries.get("2441"), "192300", "7640", "192300");
         assertCardSummary(summaries.get("13"), "197700", "10420", "197700");
         assertCardSummary(summaries.get("51"), "269900", "10000", "269900");
+        assertCardSummary(summaries.get("2986"), "0", "0", "0");
     }
 
     @Test
-    @DisplayName("홈 전체 8월 사용액과 실제 혜택 및 놓친 혜택을 집계한다")
+    @DisplayName("홈 전체 8월 사용액과 실제 혜택 및 거래별 미적용 예상 혜택을 집계한다")
     void aggregatesHomeMonthlyTotals() {
         BigDecimal totalSpend =
                 queryAmount(
@@ -144,7 +150,7 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                                 + "AND benefit_usage.usage_date < '2026-09-01' "
                                 + "AND benefit_usage.usage_status IN ('pending', 'confirmed')",
                         USER_ID);
-        BigDecimal missedBenefit =
+        BigDecimal unappliedBenefit =
                 queryAmount(
                         "SELECT SUM(outcome.missed_reward_value) "
                                 + "FROM user_benefit_calculation_outcomes outcome "
@@ -155,7 +161,7 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
 
         assertAmount("659900", totalSpend);
         assertAmount("28060", receivedBenefit);
-        assertAmount("15000", missedBenefit);
+        assertAmount("15000", unappliedBenefit);
     }
 
     @Test
@@ -167,7 +173,70 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
 
         assertBenefitSummary(cards.get("KB국민 My WE:SH 카드"), 7_640, 0, 0);
         assertBenefitSummary(cards.get("신한카드 Mr.Life"), 10_420, 0, 0);
-        assertBenefitSummary(cards.get("삼성카드 taptap O"), 10_000, 10_000, 0);
+        assertBenefitSummary(cards.get("삼성카드 taptap O"), 10_000, 25_000, 15_000);
+        assertBenefitSummary(cards.get("삼성 iD SELECT UP 카드"), 0, 510_000, 510_000);
+    }
+
+    @Test
+    @DisplayName("선택한 taptap O 패키지 1의 미사용 커피·쇼핑 한도 1만 5천원을 놓친 혜택으로 집계한다")
+    void aggregatesUnusedSelectedPackageLimitsAsMissedBenefit() {
+        Integer selectionCount =
+                jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM user_card_option_selections "
+                                + "WHERE user_card_id = ? AND option_choice_id = "
+                                + "'46100000-0000-0000-0000-000000000001'",
+                        Integer.class,
+                        TAPTAP_USER_CARD_ID);
+
+        assertEquals(1, selectionCount);
+        Map<String, MissedBenefitRow> missedBenefits =
+                reportMapper
+                        .findMonthlyRemainingBenefits(USER_ID, TAPTAP_USER_CARD_ID, "2026-08")
+                        .stream()
+                        .filter(row -> row.limitAmount() > row.usedAmount())
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        MissedBenefitRow::title,
+                                        row -> row,
+                                        (left, right) -> left,
+                                        LinkedHashMap::new));
+
+        assertEquals(2, missedBenefits.size());
+        assertRemainingBenefit(
+                missedBenefits.get("패키지 1 전월 30만원 이상 스타벅스 50%"), 0, 10_000);
+        assertRemainingBenefit(
+                missedBenefits.get("패키지 1 전월 30만원 이상 오픈마켓 7%"), 0, 5_000);
+    }
+
+    @Test
+    @DisplayName("iD SELECT UP은 기본 여가와 선택한 의료 한도를 놓친 혜택으로 집계한다")
+    void aggregatesIdSelectUpLeisureAndSelectedMedicalLimitsAsMissedBenefit() {
+        Integer medicalSelectionCount =
+                jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM user_card_option_selections "
+                                + "WHERE user_card_id = ? AND option_choice_id = "
+                                + "'46100000-0000-0000-0000-000000000007'",
+                        Integer.class,
+                        SELECT_UP_USER_CARD_ID);
+
+        List<MissedBenefitRow> missedBenefits =
+                reportMapper.findMonthlyRemainingBenefits(
+                        USER_ID, SELECT_UP_USER_CARD_ID, "2026-08");
+
+        assertEquals(1, medicalSelectionCount);
+        Map<String, MissedBenefitRow> benefitsByTitle =
+                missedBenefits.stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        MissedBenefitRow::title,
+                                        row -> row,
+                                        (left, right) -> left,
+                                        LinkedHashMap::new));
+
+        assertEquals(2, benefitsByTitle.size());
+        assertRemainingBenefit(benefitsByTitle.get("기본 여가 2%"), 0, 500_000);
+        assertRemainingBenefit(benefitsByTitle.get("SELECT 의료 20%"), 0, 10_000);
+        assertEquals(525_000L, homeMapper.sumMissedBenefitAmount(USER_ID, "2026-08"));
     }
 
     @Test
@@ -233,7 +302,7 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
     }
 
     @Test
-    @DisplayName("taptap O는 일 1회와 월 2회 초과 결제를 놓친 혜택으로 기록한다")
+    @DisplayName("taptap O는 일 1회와 월 2회 초과 결제를 거래별 미적용 예상 혜택으로 기록한다")
     void rejectsMoviePaymentsAfterUsageLimits() {
         Map<String, TaptapOutcome> outcomes = taptapOutcomes();
 
@@ -394,6 +463,12 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
         assertEquals(received, card.getSummary().getReceivedBenefitAmount());
         assertEquals(maximum, card.getSummary().getMaximumMonthlyBenefitAmount());
         assertEquals(available, card.getSummary().getAvailableBenefitAmount());
+    }
+
+    private void assertRemainingBenefit(
+            MissedBenefitRow row, long expectedUsedAmount, long expectedLimitAmount) {
+        assertEquals(expectedUsedAmount, row.usedAmount());
+        assertEquals(expectedLimitAmount, row.limitAmount());
     }
 
     private void assertAmount(String expected, BigDecimal actual) {

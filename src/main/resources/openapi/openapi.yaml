@@ -51,11 +51,11 @@ paths:
       tags: [Home]
       summary: 홈 인사와 놓친 혜택 조회
       description: |
-        인증 사용자의 홈 상단 인사말과 기준 월의 실제 미적용 혜택 합계를 반환합니다.
+        인증 사용자의 홈 상단 인사말과 기준 월에 사용하지 않고 남긴 월 혜택 한도 합계를 반환합니다.
         `data.nickname`은 인사말에 표시할 사용자 닉네임이고, `data.yearMonth`는 집계 기준 월입니다.
-        `data.missedBenefitAmount`는 승인별 예상 혜택과 실제 적용 혜택의 차이를 합산한 금액이며,
-        단순히 남아 있는 월 혜택 한도는 포함하지 않습니다. `data.message`는 이 합계를 바탕으로 만든 홈 노출 문구입니다.
-        yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하며, 미적용 혜택이 없으면 금액은 0입니다.
+        `data.missedBenefitAmount`는 전월 실적과 사용자가 선택한 카드 옵션에 따라 적용 가능한 월 한도에서
+        기준 월의 확정 혜택 사용액을 차감한 잔여액의 합계입니다. `data.message`는 이 합계를 바탕으로 만든 홈 노출 문구입니다.
+        yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하며, 남은 한도가 없으면 금액은 0입니다.
       operationId: getHomeGreeting
       security:
         - MocaBearerAuth: []
@@ -63,7 +63,7 @@ paths:
         - $ref: '#/components/parameters/YearMonth'
       responses:
         '200':
-          description: 사용자 닉네임, 집계 기준 월, 실제 미적용 혜택 합계와 홈 노출 문구
+          description: 사용자 닉네임, 집계 기준 월, 미사용 월 혜택 한도 합계와 홈 노출 문구
           content:
             application/json:
               schema:
@@ -249,12 +249,13 @@ paths:
   /reports/benefits/missed:
     get:
       tags: [Report]
-      summary: 카드별 실제 미적용 혜택 조회
+      summary: 카드별 미사용 월 혜택 한도 조회
       description: |
-        지정한 활성 보유카드에서 기준 월에 실제로 적용되지 않은 혜택을 반환합니다.
-        `data.userCard`에는 대상 카드가, `data.totalMissedBenefitAmount`에는 미적용 혜택 합계가,
+        지정한 활성 보유카드에서 기준 월에 사용하지 않고 남긴 월 혜택 한도를 반환합니다.
+        `data.userCard`에는 대상 카드가, `data.totalMissedBenefitAmount`에는 잔여 한도 합계가,
         `data.benefits`에는 규칙별 사용액·한도·잔여액이 담깁니다.
-        승인별 예상 혜택과 실제 적용 혜택의 차이만 집계하며, 사용하지 않고 남은 단순 월 한도는 포함하지 않습니다.
+        전월 실적과 사용자의 카드 옵션 선택을 모두 충족한 혜택만 집계합니다. 원화 혜택 한도와
+        정액 할인·캐시백의 월 이용 횟수 한도만 원화로 계산하며, 한도가 없거나 원화로 환산할 수 없는 혜택은 제외합니다.
       operationId: getBenefitReportMissed
       security: [{ MocaBearerAuth: [] }]
       parameters:
@@ -262,11 +263,11 @@ paths:
         - name: userCardId
           in: query
           required: true
-          description: 실제 미적용 혜택을 조회할 활성 보유카드의 식별자입니다.
+          description: 미사용 월 혜택 한도를 조회할 활성 보유카드의 식별자입니다.
           schema: { type: string, format: uuid }
       responses:
         '200':
-          description: 실제 미적용 혜택
+          description: 미사용 월 혜택 한도
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MissedBenefitsReportApiResponse' }
@@ -1421,7 +1422,7 @@ components:
           type: integer
           nullable: true
     HomeGreetingApiResponse:
-      description: '홈 인사와 실제 미적용 혜택 조회의 공통 응답입니다.'
+      description: '홈 인사와 미사용 월 혜택 한도 조회의 공통 응답입니다.'
       type: object
       properties:
         success:
@@ -1432,7 +1433,7 @@ components:
           description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/HomeGreetingResponse'
     HomeGreetingResponse:
-      description: '홈 상단 인사말과 기준 월의 실제 미적용 혜택 요약입니다.'
+      description: '홈 상단 인사말과 기준 월의 미사용 월 혜택 한도 요약입니다.'
       type: object
       required: [nickname, yearMonth, missedBenefitAmount, message]
       properties:
@@ -1444,7 +1445,7 @@ components:
           type: string
           example: 2026-07
         missedBenefitAmount:
-          description: '승인별 예상 혜택과 실제 적용 혜택 차이의 합계입니다. 단위는 원입니다.'
+          description: '전월 실적과 카드 옵션에 따라 적용 가능한 월 한도에서 확정 사용액을 차감한 잔여액 합계입니다. 단위는 원입니다.'
           type: integer
           format: int64
         message:
@@ -1761,7 +1762,7 @@ components:
         success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/MissedBenefitsReportResponse' }
     MissedBenefitsReportResponse:
-      description: '지정한 보유카드의 기준 월 실제 미적용 혜택 요약입니다.'
+      description: '지정한 보유카드의 기준 월 미사용 월 혜택 한도 요약입니다.'
       type: object
       required: [yearMonth, userCard, totalMissedBenefitAmount, benefits]
       properties:
@@ -1770,7 +1771,7 @@ components:
         totalMissedBenefitAmount:
           type: integer
           format: int64
-          description: 승인별 계산 결과에서 확인된 실제 미적용 혜택 합계
+          description: 전월 실적과 카드 옵션에 따라 적용 가능한 월 한도에서 확정 사용액을 차감한 잔여액 합계
         benefits:
           description: '조건에 해당하는 혜택 목록입니다. 내역이 없으면 빈 배열입니다.'
           type: array
@@ -1784,13 +1785,13 @@ components:
         cardName: { type: string , description: '카드 상품명입니다.'}
         cardColor: { type: string, nullable: true, description: 현재 카드 카탈로그에 색상 원천이 없어 null 가능 }
     MissedBenefitItemResponse:
-      description: '승인 계산 결과에서 확인된 실제 미적용 혜택 규칙 한 건입니다.'
+      description: '기준 월에 사용할 수 있었지만 전부 사용하지 않은 월 혜택 한도 한 건입니다.'
       type: object
       required: [benefitRuleId, title, type, usedAmount, limitAmount, remainingAmount, unit]
       properties:
         benefitRuleId: { type: string, format: uuid , description: '혜택 계산에 사용한 규칙 식별자입니다.'}
-        title: { type: string , description: '실제로 적용되지 않은 혜택의 제목입니다.'}
-        type: { type: string, enum: [DISCOUNT, CASHBACK, POINT] , description: '미적용 혜택 유형입니다.'}
+        title: { type: string , description: '월 한도가 남은 혜택의 제목입니다.'}
+        type: { type: string, enum: [DISCOUNT, CASHBACK, POINT] , description: '혜택 유형입니다.'}
         usedAmount: { type: integer, format: int64 , description: '현재까지 사용한 한도 금액입니다. 단위는 원입니다.'}
         limitAmount: { type: integer, format: int64 , description: '적용 가능한 전체 한도 금액입니다. 단위는 원입니다.'}
         remainingAmount: { type: integer, format: int64 , description: '아직 사용할 수 있는 잔여 한도 금액입니다. 단위는 원입니다.'}
