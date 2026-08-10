@@ -43,7 +43,8 @@ public interface LinkedCardMapper {
 
     int activateCards(@Param("linkId") String linkId,
                       @Param("userId") String userId,
-                      @Param("userCardIds") List<String> userCardIds);
+                      @Param("userCardIds") List<String> userCardIds,
+                      @Param("startOrder") int startOrder);
 
     void upsertOptionSelection(@Param("userCardId") String userCardId,
                                @Param("optionGroupId") String optionGroupId,
