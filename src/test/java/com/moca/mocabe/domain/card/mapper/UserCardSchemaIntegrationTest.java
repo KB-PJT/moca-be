@@ -129,6 +129,67 @@ class UserCardSchemaIntegrationTest {
                 () -> insertUserCard(ANOTHER_USER_CARD_ID, CARD_KEY_HASH, true, 2));
     }
 
+    @Test
+    @DisplayName("카드 연결 해제 시 자식 테이블을 먼저 지우고 user_cards를 삭제한다")
+    void disconnectsCardByDeletingChildRowsBeforeUserCard() {
+        insertUserCard(USER_CARD_ID, CARD_KEY_HASH, true, 1);
+        String optionGroupId = "01980d6a-5c0c-7aaf-9b85-010203040701";
+        String optionChoiceId = "01980d6a-5c0c-7aaf-9b85-010203040702";
+        String approvalId = "01980d6a-5c0c-7aaf-9b85-010203040703";
+        jdbcTemplate.update("INSERT INTO card_option_groups "
+                        + "(option_group_id, card_id, group_key, group_name, "
+                        + "selection_required, created_at, updated_at) "
+                        + "VALUES (?, ?, 'brand', '브랜드', FALSE, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                optionGroupId, CARD_ID);
+        jdbcTemplate.update("INSERT INTO card_option_choices "
+                        + "(option_choice_id, option_group_id, choice_key, choice_name, "
+                        + "created_at, updated_at) "
+                        + "VALUES (?, ?, 'visa', 'VISA', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                optionChoiceId, optionGroupId);
+        jdbcTemplate.update("INSERT INTO user_card_option_selections "
+                        + "(user_card_id, option_group_id, card_id, option_choice_id, selected_at) "
+                        + "VALUES (?, ?, ?, ?, UTC_TIMESTAMP(6))",
+                USER_CARD_ID, optionGroupId, CARD_ID, optionChoiceId);
+        jdbcTemplate.update("INSERT INTO user_card_performance_snapshots "
+                        + "(performance_snapshot_id, user_card_id, performance_month, current_spend_amount, "
+                        + "updated_at, created_at) "
+                        + "VALUES (?, ?, '2026-08', 100000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                "01980d6a-5c0c-7aaf-9b85-010203040704", USER_CARD_ID);
+        jdbcTemplate.update("INSERT INTO card_payment_approvals "
+                        + "(approval_id, user_id, user_card_id, approval_number, approved_at, "
+                        + "merchant_name, amount, approval_status, source_payload, created_at) "
+                        + "VALUES (?, ?, ?, 'A-1', UTC_TIMESTAMP(6), '테스트가맹점', 10000, 'approved', "
+                        + "JSON_OBJECT(), UTC_TIMESTAMP(6))",
+                approvalId, USER_ID, USER_CARD_ID);
+
+        userCardMapper.deleteBenefitCalculationOutcomesByUserCardId(USER_CARD_ID);
+        userCardMapper.deleteBenefitUsagesByUserCardId(USER_CARD_ID);
+        userCardMapper.deleteOptionSelectionsByUserCardId(USER_CARD_ID);
+        userCardMapper.deletePerformanceSnapshotsByUserCardId(USER_CARD_ID);
+        userCardMapper.deletePaymentApprovalsByUserCardId(USER_CARD_ID);
+        int deletedRows = userCardMapper.deleteUserCard(USER_CARD_ID, USER_ID);
+
+        assertEquals(1, deletedRows);
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_card_option_selections WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_card_performance_snapshots WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM card_payment_approvals WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_cards WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 보유 카드를 삭제하려 하면 영향받은 행이 없다")
+    void deletingMissingUserCardAffectsNoRows() {
+        assertEquals(0, userCardMapper.deleteUserCard(USER_CARD_ID, USER_ID));
+    }
+
     private void insertUserCard(String userCardId, String cardKeyHash, boolean active, int displayOrder) {
         jdbcTemplate.update("INSERT INTO user_cards "
                         + "(user_card_id, user_id, card_id, codef_account_credential_id, "
@@ -140,6 +201,11 @@ class UserCardSchemaIntegrationTest {
     }
 
     private void deleteTestData() {
+        jdbcTemplate.update("DELETE FROM card_payment_approvals");
+        jdbcTemplate.update("DELETE FROM user_card_performance_snapshots");
+        jdbcTemplate.update("DELETE FROM user_card_option_selections");
+        jdbcTemplate.update("DELETE FROM card_option_choices");
+        jdbcTemplate.update("DELETE FROM card_option_groups");
         jdbcTemplate.update("DELETE FROM user_cards");
         jdbcTemplate.update("DELETE FROM codef_account_credentials");
         jdbcTemplate.update("DELETE FROM card_content_versions");
