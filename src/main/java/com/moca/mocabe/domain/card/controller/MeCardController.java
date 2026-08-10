@@ -1,7 +1,7 @@
 package com.moca.mocabe.domain.card.controller;
 
-import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
+import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.card.dto.UpdateMemoRequest;
@@ -62,6 +62,7 @@ public class MeCardController {
                 currentUserProvider.getCurrentUserId(), userCardId, request.getMemo());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
 
     @PostMapping("/sync")
     public ResponseEntity<ApiResponse<SyncMyCardsResponse>> sync(
