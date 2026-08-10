@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -539,9 +540,27 @@ class CardLinkServiceTest {
 
         assertEquals(2, response.activatedCount());
         assertEquals(List.of("uc-1", "uc-2"), response.activatedUserCardIds());
-        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1", "uc-2"));
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1", "uc-2"), 0);
         verify(linkedCardMapper).upsertOptionSelection("uc-1", "group-1", "card-1", "choice-1");
         verify(linkedCardMapper, never()).upsertOptionSelection(eq("uc-2"), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("이미 활성 카드가 있는 상태에서 재활성화하면 그 뒤 순서부터 새로 매긴다")
+    void reactivatesCardsAfterCurrentMaxDisplayOrder() {
+        String linkId = "link-1";
+        when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
+        when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID)).thenReturn(List.of(
+                linkedCardRow("uc-1", "card-1"), linkedCardRow("uc-2", "card-2")));
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-2")).thenReturn(List.of());
+        // 이미 활성 카드 3장(0~2번)이 있어, 새로 활성화하는 카드는 예전 display_order를 버리고 3번부터 받아야 한다.
+        when(linkedCardMapper.findNextDisplayOrder(USER_ID)).thenReturn(3);
+        ActivateCardLinkCardsRequest request = activateRequest(List.of("uc-1", "uc-2"));
+
+        cardLinkService.activateCards(USER_ID, linkId, request);
+
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1", "uc-2"), 3);
     }
 
     @Test
@@ -557,7 +576,7 @@ class CardLinkServiceTest {
                 USER_ID, linkId, activateRequest(List.of("uc-1")));
 
         assertEquals(1, response.activatedCount());
-        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"));
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"), 0);
         verify(linkedCardMapper, never()).upsertOptionSelection(anyString(), any(), any(), any());
     }
 
@@ -632,7 +651,7 @@ class CardLinkServiceTest {
         assertEquals("uc-1", issue.userCardId());
         assertEquals("카드번호가 필요합니다.", issue.fields().get("cardNo"));
         assertEquals("카드 비밀번호가 필요합니다.", issue.fields().get("cardPassword"));
-        verify(linkedCardMapper, never()).activateCards(any(), any(), any());
+        verify(linkedCardMapper, never()).activateCards(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -659,7 +678,7 @@ class CardLinkServiceTest {
         assertEquals("uc-2", second.userCardId());
         assertEquals("카드번호가 필요합니다.", second.fields().get("cardNo"));
         assertNull(second.fields().get("cardPassword"));
-        verify(linkedCardMapper, never()).activateCards(any(), any(), any());
+        verify(linkedCardMapper, never()).activateCards(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -691,7 +710,7 @@ class CardLinkServiceTest {
                 USER_ID, linkId, activateRequest(List.of("uc-1")));
 
         assertEquals(1, response.activatedCount());
-        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"));
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"), 0);
     }
 
     @Test
@@ -728,7 +747,7 @@ class CardLinkServiceTest {
         verify(linkedCardMapper).updateCardCredentials(
                 userCardId, USER_ID, new byte[] {9}, new byte[] {5});
         // 옵션 검증 없이 바로 활성화하지 않는다 — 활성화는 activateCards(옵션 선택 포함)로만 한다.
-        verify(linkedCardMapper, never()).activateCards(any(), any(), any());
+        verify(linkedCardMapper, never()).activateCards(any(), any(), any(), anyInt());
     }
 
     @Test
