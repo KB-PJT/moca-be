@@ -48,7 +48,11 @@ import org.springframework.transaction.annotation.Transactional;
  * 문제인지 구분해서 전체를 실패로 처리). 비씨카드(0305)는 CODEF가 startDate 기준 "전월" 실적을 주는 카드사라 조회 대상 월보다 한 달 뒤를
  * startDate로 보내야 하며, 이 보정은 이 카드사에만 적용한다.
  *
- * <p>취소·부분취소·거절 및 해외결제는 반전 처리하지 않고 완전히 제외한다. 따라서 이 항목들은 승인 적재, 혜택 계산, 미적용 혜택 집계 어느 단계에도 들어가지 않으며 정상
+ * 대상 월의 실적과 더불어 바로 전 달(대상 월 - 1개월) 실적도 가능하면 함께 조회해 적재한다. 다만 지난 달 실적은 부가 정보이므로 카드사가 그만큼 과거를
+ * 지원하지 않거나(PerformanceUnsupportedException) CODEF 호출이 실패해도(PerformanceSyncFailedException) 대상 월 동기화
+ * 전체를 실패시키지 않고 지난 달분만 건너뛴다.
+ *
+ * 취소·부분취소·거절 및 해외결제는 반전 처리하지 않고 완전히 제외한다. 따라서 이 항목들은 승인 적재, 혜택 계산, 미적용 혜택 집계 어느 단계에도 들어가지 않으며 정상
  * 국내 승인건만 적재한다. 카드 매칭은 {@link ApprovalCardMatcher}, 가맹점 매칭은 {@link MerchantLookup}에 위임하며, 이미 적재된 건은
  * (카드+승인번호) 또는 (카드+시각+금액+가맹점명)으로 중복을 걸러낸다.
  */
@@ -182,10 +186,14 @@ public class CardSyncService {
     List<ApprovalInsert> inserts = new ArrayList<>();
     List<PerformanceSnapshotUpsert> performanceUpserts = new ArrayList<>();
     // 실적 조회 대상 월은 승인내역 조회 시작일(from)이 속한 달로 삼는다(기본값 이번 달 1일 → 이번 달).
+    // 지난 달 실적도 가능하면 함께 적재한다(카드사가 지원하지 않으면 대상 월 동기화는 살리고 지난 달만 건너뛴다).
     YearMonth targetMonth = YearMonth.from(from);
+    YearMonth previousMonth = targetMonth.minusMonths(1);
     YearMonth currentMonth = YearMonth.now(KST);
     long monthsBack = Math.max(0, ChronoUnit.MONTHS.between(targetMonth, currentMonth));
+    long previousMonthsBack = monthsBack + 1;
     String performanceMonth = targetMonth.format(PERFORMANCE_MONTH);
+    String previousPerformanceMonth = previousMonth.format(PERFORMANCE_MONTH);
     for (CodefConnection connection : connections) {
       String birthDate = encryptor.decrypt(connection.birthDateEnc());
       if (connection.requiresCardNo()) {
@@ -218,6 +226,9 @@ public class CardSyncService {
               targetMonth,
               monthsBack,
               performanceMonth,
+              previousMonth,
+              previousMonthsBack,
+              previousPerformanceMonth,
               merchantCandidates,
               seenKeys,
               stats,
@@ -237,6 +248,9 @@ public class CardSyncService {
             targetMonth,
             monthsBack,
             performanceMonth,
+            previousMonth,
+            previousMonthsBack,
+            previousPerformanceMonth,
             merchantCandidates,
             seenKeys,
             stats,
@@ -287,6 +301,9 @@ public class CardSyncService {
       YearMonth targetMonth,
       long monthsBack,
       String performanceMonth,
+      YearMonth previousMonth,
+      long previousMonthsBack,
+      String previousPerformanceMonth,
       MerchantCandidateSnapshot merchantCandidates,
       Set<String> seenKeys,
       IngestStats stats,
@@ -318,6 +335,57 @@ public class CardSyncService {
       if (upsert != null) {
         performanceUpserts.add(upsert);
       }
+    }
+
+    List<CodefCardPerformance> previousPerformances =
+        fetchPreviousPerformances(
+            connection,
+            birthDate,
+            previousMonth,
+            previousMonthsBack,
+            previousPerformanceMonth,
+            cardNo,
+            cardPassword);
+    for (CodefCardPerformance performance : previousPerformances) {
+      PerformanceSnapshotUpsert upsert =
+          toPerformanceUpsert(
+              userCards, performance, connection.issuerId(), previousPerformanceMonth);
+      if (upsert != null) {
+        performanceUpserts.add(upsert);
+      }
+    }
+  }
+
+  /**
+   * 지난 달 실적은 "가능하면" 함께 적재하는 부가 정보라, 조회 가능 범위를 벗어나거나(PerformanceUnsupportedException)
+   * CODEF 호출이 실패해도(PerformanceSyncFailedException) 대상 월 동기화 전체를 실패시키지 않고 지난 달만 건너뛴다.
+   */
+  private List<CodefCardPerformance> fetchPreviousPerformances(
+      CodefConnection connection,
+      String birthDate,
+      YearMonth previousMonth,
+      long previousMonthsBack,
+      String previousPerformanceMonth,
+      String cardNo,
+      String cardPassword) {
+    try {
+      return fetchPerformances(
+          connection,
+          birthDate,
+          previousMonth,
+          previousMonthsBack,
+          previousPerformanceMonth,
+          cardNo,
+          cardPassword);
+    } catch (PerformanceUnsupportedException | PerformanceSyncFailedException exception) {
+      LOGGER.fine(
+          "지난 달 실적조회를 건너뜁니다(issuerId="
+              + connection.issuerId()
+              + ", month="
+              + previousPerformanceMonth
+              + "). "
+              + exception.getMessage());
+      return List.of();
     }
   }
 
