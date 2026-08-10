@@ -191,7 +191,7 @@ public class CardSyncService {
     YearMonth previousMonth = targetMonth.minusMonths(1);
     YearMonth currentMonth = YearMonth.now(KST);
     long monthsBack = Math.max(0, ChronoUnit.MONTHS.between(targetMonth, currentMonth));
-    long previousMonthsBack = monthsBack + 1;
+    long previousMonthsBack = Math.max(0, ChronoUnit.MONTHS.between(previousMonth, currentMonth));
     String performanceMonth = targetMonth.format(PERFORMANCE_MONTH);
     String previousPerformanceMonth = previousMonth.format(PERFORMANCE_MONTH);
     for (CodefConnection connection : connections) {

@@ -323,6 +323,43 @@ class CardSyncServiceTest {
   }
 
   @Test
+  @DisplayName("지난 달 실적조회 호출 자체가 실패해도 건너뛸 뿐 대상 월 동기화는 성공한다")
+  void skipsPreviousMonthPerformanceWhenCodefCallFails() {
+    CodefConnection connection =
+        new CodefConnection(
+            "link-1", "cid", "0301", "issuer-1", "KB카드", 12, new byte[] {1, 2, 3}, false, false);
+    when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+    when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+        .thenReturn(List.of(connection));
+    when(encryptor.decrypt(any())).thenReturn("900101");
+    when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any()))
+        .thenReturn(List.of());
+    when(codefClient.getApprovals(
+            anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
+        .thenReturn(List.of());
+    when(approvalIngestStore.insertAll(any())).thenReturn(0);
+    when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), any(), any(), eq("202608")))
+        .thenReturn(List.of(new CodefCardPerformance("카드A", "1234****5678", 300000)));
+    when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), any(), any(), eq("202607")))
+        .thenThrow(new CodefUnavailableException("CODEF 실적조회에 실패했습니다."));
+    when(approvalCardMatcher.match(any(), eq("카드A"), eq("1234****5678"), eq("issuer-1")))
+        .thenReturn("uc-1");
+    when(performanceSnapshotStore.upsertAll(any()))
+        .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+    SyncMyCardsResponse response =
+        service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+    ArgumentCaptor<List<PerformanceSnapshotUpsert>> captor = ArgumentCaptor.forClass(List.class);
+    verify(performanceSnapshotStore).upsertAll(captor.capture());
+    List<PerformanceSnapshotUpsert> upserts = captor.getValue();
+    assertEquals(1, upserts.size());
+    assertEquals("2026-08", upserts.get(0).performanceMonth());
+    assertEquals(300000, upserts.get(0).currentSpendAmount());
+    assertEquals(1, response.getSyncedPerformanceCount());
+  }
+
+  @Test
   @DisplayName("실적조회 대상 월이 연동의 조회 가능 개월수를 벗어나면 실적조회 미지원 예외를 던져 전체 동기화를 중단한다")
   void throwsWhenTargetMonthExceedsLookback() {
     CodefConnection allowedConnection =
