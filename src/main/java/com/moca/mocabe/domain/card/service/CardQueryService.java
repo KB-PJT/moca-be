@@ -49,6 +49,13 @@ public class CardQueryService {
     }
 
     @Transactional
+    public void deactivateCard(String userId, String userCardId) {
+        if (userCardMapper.deactivateUserCard(userCardId, userId) == 0) {
+            throw new UserCardNotFoundException();
+        }
+    }
+
+    @Transactional
     public void disconnectCard(String userId, String userCardId) {
         if (userCardMapper.findByUserCardId(userCardId, userId) == null) {
             throw new UserCardNotFoundException();
