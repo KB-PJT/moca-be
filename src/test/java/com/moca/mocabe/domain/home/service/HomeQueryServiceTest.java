@@ -107,12 +107,12 @@ class HomeQueryServiceTest {
   }
 
   @Test
-  @DisplayName("저장된 카드 정렬 방식이 없으면 자동 정렬을 기본값으로 사용한다")
-  void defaultsToAutoOrderWhenSavedModeIsMissing() {
+  @DisplayName("저장된 카드 정렬 방식이 없으면 수동 정렬을 기본값으로 사용한다")
+  void defaultsToManualOrderWhenSavedModeIsMissing() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", null));
     when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of());
 
-    assertEquals("AUTO", homeQueryService.getCards(USER_ID, "2026-07", null).getOrderMode());
+    assertEquals("MANUAL", homeQueryService.getCards(USER_ID, "2026-07", null).getOrderMode());
   }
 
   @Test
