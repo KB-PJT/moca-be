@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -64,6 +65,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 @ExtendWith(MockitoExtension.class)
 class CardLinkServiceTest {
@@ -90,6 +93,8 @@ class CardLinkServiceTest {
     private CardCatalogMapper cardCatalogMapper;
     @Mock
     private LinkedCardMapper linkedCardMapper;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private CardLinkService cardLinkService;
 
@@ -98,7 +103,11 @@ class CardLinkServiceTest {
         cardLinkService = new CardLinkService(
                 codefClient, codefCredentialMapper, codefCredentialStore,
                 issuerMapper, encryptor, credentialHasher,
-                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper);
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager);
+        // 재조회 경로는 TransactionTemplate으로 lockOwnedLink를 감싸므로, 트랜잭션 매니저가 항상
+        // 유효한 트랜잭션을 돌려주는 상황을 기본으로 깔아둔다(실제 커밋/롤백 여부는 검증 대상이 아님).
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenReturn(mock(TransactionStatus.class));
         // 대부분의 테스트는 재조회 중복 방지 조회 결과에 관심이 없으므로 기본값(빈 목록)을 lenient로 깔아둔다.
         lenient().when(linkedCardMapper.findLinkedCardKeysByLinkId(anyString(), anyString()))
                 .thenReturn(List.of());
@@ -472,7 +481,10 @@ class CardLinkServiceTest {
         when(codefClient.getOwnedCards("cid-kb", "0301", null, null, null)).thenReturn(List.of(
                 new CodefOwnedCard("매칭 카드", "1111****2222", "신용", null)));
         when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("active-key");
-        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of());
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
         when(linkedCardMapper.findLinkedCardKeysByLinkId("link-kb", USER_ID))
                 .thenReturn(List.of(new LinkedCardKeyRow("active-uc-1", "active-key", true)));
 
