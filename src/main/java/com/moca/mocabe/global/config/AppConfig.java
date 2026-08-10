@@ -58,6 +58,7 @@ import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.transaction.PlatformTransactionManager;
 
 /** 애플리케이션 객체의 생성과 의존성 연결을 한 곳에서 관리한다. */
 @Configuration
@@ -172,11 +173,12 @@ public class AppConfig {
                                            CredentialHasher credentialHasher,
                                            CardCatalogMatcher cardCatalogMatcher,
                                            CardCatalogMapper cardCatalogMapper,
-                                           LinkedCardMapper linkedCardMapper) {
+                                           LinkedCardMapper linkedCardMapper,
+                                           PlatformTransactionManager transactionManager) {
         return new CardLinkService(
                 codefClient, codefCredentialMapper, codefCredentialStore,
                 issuerMapper, codefEncryptor, credentialHasher,
-                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper);
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager);
     }
 
     @Bean

@@ -54,11 +54,12 @@
         <constructor>
             <arg column="user_card_id" javaType="java.lang.String"/>
             <arg column="codef_card_key_hash" javaType="java.lang.String"/>
+            <arg column="is_active" javaType="_boolean"/>
         </constructor>
     </resultMap>
 
     <select id="findLinkedCardKeysByLinkId" resultMap="linkedCardKeyRowMap">
-        SELECT user_card_id, codef_card_key_hash
+        SELECT user_card_id, codef_card_key_hash, is_active
         FROM user_cards
         WHERE codef_account_credential_id = #{linkId}
           AND user_id = #{userId}
@@ -71,15 +72,23 @@
           AND codef_card_key_hash = #{codefCardKeyHash}
     </select>
 
-    <!-- 넘어온 user_card_id만 이 연동 범위 안에서 활성화한다. -->
+    <!-- 넘어온 user_card_id만 이 연동 범위 안에서 활성화한다. 재활성화 시 예전 display_order를 그대로
+         쓰면 그 사이 순서가 바뀐 활성 카드와 값이 겹칠 수 있어, startOrder부터 요청 순서대로 다시 매긴다. -->
     <update id="activateCards">
         UPDATE user_cards
-        SET is_active = TRUE, updated_at = UTC_TIMESTAMP(6)
+        SET is_active = TRUE,
+            display_order = CASE user_card_id
+            <foreach collection="userCardIds" item="userCardId" index="idx">
+                WHEN #{userCardId} THEN #{startOrder} + #{idx}
+            </foreach>
+            ELSE display_order
+            END,
+            updated_at = UTC_TIMESTAMP(6)
         WHERE codef_account_credential_id = #{linkId}
           AND user_id = #{userId}
           AND user_card_id IN
-        <foreach collection="userCardIds" item="id" open="(" separator="," close=")">
-            #{id}
+        <foreach collection="userCardIds" item="userCardId" open="(" separator="," close=")">
+            #{userCardId}
         </foreach>
     </update>
 

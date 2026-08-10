@@ -284,6 +284,82 @@ class CardSyncServiceTest {
   }
 
   @Test
+  @DisplayName("조회 가능 범위가 충분하면 지난 달 실적도 함께 조회해 대상 월과 별도로 upsert한다")
+  void ingestsPreviousMonthPerformanceWhenLookbackAllows() {
+    CodefConnection connection =
+        new CodefConnection(
+            "link-1", "cid", "0301", "issuer-1", "KB카드", 12, new byte[] {1, 2, 3}, false, false);
+    when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+    when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+        .thenReturn(List.of(connection));
+    when(encryptor.decrypt(any())).thenReturn("900101");
+    when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any()))
+        .thenReturn(List.of());
+    when(codefClient.getApprovals(
+            anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
+        .thenReturn(List.of());
+    when(approvalIngestStore.insertAll(any())).thenReturn(0);
+    when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), any(), any(), eq("202608")))
+        .thenReturn(List.of(new CodefCardPerformance("카드A", "1234****5678", 300000)));
+    when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), any(), any(), eq("202607")))
+        .thenReturn(List.of(new CodefCardPerformance("카드A", "1234****5678", 200000)));
+    when(approvalCardMatcher.match(any(), eq("카드A"), eq("1234****5678"), eq("issuer-1")))
+        .thenReturn("uc-1");
+    when(performanceSnapshotStore.upsertAll(any()))
+        .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+    SyncMyCardsResponse response =
+        service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+    ArgumentCaptor<List<PerformanceSnapshotUpsert>> captor = ArgumentCaptor.forClass(List.class);
+    verify(performanceSnapshotStore).upsertAll(captor.capture());
+    List<PerformanceSnapshotUpsert> upserts = captor.getValue();
+    assertEquals(2, upserts.size());
+    assertTrue(upserts.stream().anyMatch(u -> u.performanceMonth().equals("2026-08")
+        && u.currentSpendAmount() == 300000));
+    assertTrue(upserts.stream().anyMatch(u -> u.performanceMonth().equals("2026-07")
+        && u.currentSpendAmount() == 200000));
+    assertEquals(2, response.getSyncedPerformanceCount());
+  }
+
+  @Test
+  @DisplayName("지난 달 실적조회 호출 자체가 실패해도 건너뛸 뿐 대상 월 동기화는 성공한다")
+  void skipsPreviousMonthPerformanceWhenCodefCallFails() {
+    CodefConnection connection =
+        new CodefConnection(
+            "link-1", "cid", "0301", "issuer-1", "KB카드", 12, new byte[] {1, 2, 3}, false, false);
+    when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+    when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+        .thenReturn(List.of(connection));
+    when(encryptor.decrypt(any())).thenReturn("900101");
+    when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any()))
+        .thenReturn(List.of());
+    when(codefClient.getApprovals(
+            anyString(), anyString(), anyString(), anyString(), anyString(), any(), any()))
+        .thenReturn(List.of());
+    when(approvalIngestStore.insertAll(any())).thenReturn(0);
+    when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), any(), any(), eq("202608")))
+        .thenReturn(List.of(new CodefCardPerformance("카드A", "1234****5678", 300000)));
+    when(codefClient.getPerformance(eq("cid"), eq("0301"), eq("900101"), any(), any(), eq("202607")))
+        .thenThrow(new CodefUnavailableException("CODEF 실적조회에 실패했습니다."));
+    when(approvalCardMatcher.match(any(), eq("카드A"), eq("1234****5678"), eq("issuer-1")))
+        .thenReturn("uc-1");
+    when(performanceSnapshotStore.upsertAll(any()))
+        .thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+
+    SyncMyCardsResponse response =
+        service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+    ArgumentCaptor<List<PerformanceSnapshotUpsert>> captor = ArgumentCaptor.forClass(List.class);
+    verify(performanceSnapshotStore).upsertAll(captor.capture());
+    List<PerformanceSnapshotUpsert> upserts = captor.getValue();
+    assertEquals(1, upserts.size());
+    assertEquals("2026-08", upserts.get(0).performanceMonth());
+    assertEquals(300000, upserts.get(0).currentSpendAmount());
+    assertEquals(1, response.getSyncedPerformanceCount());
+  }
+
+  @Test
   @DisplayName("실적조회 대상 월이 연동의 조회 가능 개월수를 벗어나면 실적조회 미지원 예외를 던져 전체 동기화를 중단한다")
   void throwsWhenTargetMonthExceedsLookback() {
     CodefConnection allowedConnection =
@@ -322,7 +398,8 @@ class CardSyncServiceTest {
             () -> service.sync(USER_ID, sevenMonthsAgo, sevenMonthsAgo.plusDays(2)));
 
     assertTrue(exception.getMessage().contains("신한카드"));
-    verify(codefClient)
+    // 대상 월(7개월 전, lookback 12 이내)과 지난 달(8개월 전, lookback 12 이내) 모두 허용되어 두 번 조회한다.
+    verify(codefClient, times(2))
         .getPerformance(eq("cid-1"), eq("0301"), eq("900101"), any(), any(), anyString());
     verify(codefClient, never())
         .getPerformance(eq("cid-2"), anyString(), anyString(), any(), any(), anyString());
@@ -495,7 +572,8 @@ class CardSyncServiceTest {
             anyString(),
             eq("9999888877776666"),
             eq("5678"));
-    verify(codefClient)
+    // 대상 월과 지난 달 실적을 각각 조회한다.
+    verify(codefClient, times(2))
         .getPerformance(
             eq("cid-1"), eq("0301"), eq("900101"), eq("9999888877776666"), eq("5678"), anyString());
     // 연동 전체를 한 번에 조회하는 기존 방식(카드번호 없이)은 호출되지 않는다.

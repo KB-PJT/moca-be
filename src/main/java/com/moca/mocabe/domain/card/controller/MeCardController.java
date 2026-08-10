@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.card.controller;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
+import com.moca.mocabe.domain.card.dto.ReorderMyCardsRequest;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.card.dto.UpdateMemoRequest;
 import com.moca.mocabe.domain.card.service.CardQueryService;
@@ -65,6 +66,15 @@ public class MeCardController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+
+    @PatchMapping("/order")
+    public ResponseEntity<ApiResponse<MeCardsResponse>> reorderCards(
+            @Valid @RequestBody ReorderMyCardsRequest request
+    ) {
+        MeCardsResponse response = cardQueryService.reorderCards(
+                currentUserProvider.getCurrentUserId(), request.getUserCardIds());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
     @PatchMapping("/{userCardId}/deactivate")
     public ResponseEntity<ApiResponse<SuccessResponse>> deactivateCard(

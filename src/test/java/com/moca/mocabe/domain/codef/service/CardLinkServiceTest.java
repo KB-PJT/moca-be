@@ -7,9 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -64,6 +66,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 @ExtendWith(MockitoExtension.class)
 class CardLinkServiceTest {
@@ -90,6 +94,8 @@ class CardLinkServiceTest {
     private CardCatalogMapper cardCatalogMapper;
     @Mock
     private LinkedCardMapper linkedCardMapper;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private CardLinkService cardLinkService;
 
@@ -98,7 +104,11 @@ class CardLinkServiceTest {
         cardLinkService = new CardLinkService(
                 codefClient, codefCredentialMapper, codefCredentialStore,
                 issuerMapper, encryptor, credentialHasher,
-                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper);
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager);
+        // 재조회 경로는 TransactionTemplate으로 lockOwnedLink를 감싸므로, 트랜잭션 매니저가 항상
+        // 유효한 트랜잭션을 돌려주는 상황을 기본으로 깔아둔다(실제 커밋/롤백 여부는 검증 대상이 아님).
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenReturn(mock(TransactionStatus.class));
         // 대부분의 테스트는 재조회 중복 방지 조회 결과에 관심이 없으므로 기본값(빈 목록)을 lenient로 깔아둔다.
         lenient().when(linkedCardMapper.findLinkedCardKeysByLinkId(anyString(), anyString()))
                 .thenReturn(List.of());
@@ -450,7 +460,7 @@ class CardLinkServiceTest {
         when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
         when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
         when(linkedCardMapper.findLinkedCardKeysByLinkId("link-kb", USER_ID))
-                .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key")));
+                .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key", false)));
 
         SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
 
@@ -458,6 +468,32 @@ class CardLinkServiceTest {
         CardLinkCardResponse card = response.results().get(0).cards().get(0);
         assertEquals("existing-uc-1", card.userCardId());
         assertTrue(card.matched());
+        verify(codefCredentialStore, never()).saveCard(any());
+    }
+
+    @Test
+    @DisplayName("이미 활성화된 카드는 재조회 응답에서 제외한다")
+    void excludesAlreadyActiveCardFromResyncResponse() {
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], false, false);
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
+        CodefIssuerPolicy policy = cardPolicy();
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(policy);
+        when(codefClient.getOwnedCards("cid-kb", "0301", null, null, null)).thenReturn(List.of(
+                new CodefOwnedCard("매칭 카드", "1111****2222", "신용", null)));
+        when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("active-key");
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
+        when(linkedCardMapper.findLinkedCardKeysByLinkId("link-kb", USER_ID))
+                .thenReturn(List.of(new LinkedCardKeyRow("active-uc-1", "active-key", true)));
+
+        SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
+
+        assertEquals(1, response.results().size());
+        assertTrue(response.results().get(0).success());
+        assertTrue(response.results().get(0).cards().isEmpty());
         verify(codefCredentialStore, never()).saveCard(any());
     }
 
@@ -504,9 +540,27 @@ class CardLinkServiceTest {
 
         assertEquals(2, response.activatedCount());
         assertEquals(List.of("uc-1", "uc-2"), response.activatedUserCardIds());
-        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1", "uc-2"));
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1", "uc-2"), 0);
         verify(linkedCardMapper).upsertOptionSelection("uc-1", "group-1", "card-1", "choice-1");
         verify(linkedCardMapper, never()).upsertOptionSelection(eq("uc-2"), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("이미 활성 카드가 있는 상태에서 재활성화하면 그 뒤 순서부터 새로 매긴다")
+    void reactivatesCardsAfterCurrentMaxDisplayOrder() {
+        String linkId = "link-1";
+        when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
+        when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID)).thenReturn(List.of(
+                linkedCardRow("uc-1", "card-1"), linkedCardRow("uc-2", "card-2")));
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-2")).thenReturn(List.of());
+        // 이미 활성 카드 3장(0~2번)이 있어, 새로 활성화하는 카드는 예전 display_order를 버리고 3번부터 받아야 한다.
+        when(linkedCardMapper.findNextDisplayOrder(USER_ID)).thenReturn(3);
+        ActivateCardLinkCardsRequest request = activateRequest(List.of("uc-1", "uc-2"));
+
+        cardLinkService.activateCards(USER_ID, linkId, request);
+
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1", "uc-2"), 3);
     }
 
     @Test
@@ -522,7 +576,7 @@ class CardLinkServiceTest {
                 USER_ID, linkId, activateRequest(List.of("uc-1")));
 
         assertEquals(1, response.activatedCount());
-        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"));
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"), 0);
         verify(linkedCardMapper, never()).upsertOptionSelection(anyString(), any(), any(), any());
     }
 
@@ -597,7 +651,7 @@ class CardLinkServiceTest {
         assertEquals("uc-1", issue.userCardId());
         assertEquals("카드번호가 필요합니다.", issue.fields().get("cardNo"));
         assertEquals("카드 비밀번호가 필요합니다.", issue.fields().get("cardPassword"));
-        verify(linkedCardMapper, never()).activateCards(any(), any(), any());
+        verify(linkedCardMapper, never()).activateCards(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -624,7 +678,7 @@ class CardLinkServiceTest {
         assertEquals("uc-2", second.userCardId());
         assertEquals("카드번호가 필요합니다.", second.fields().get("cardNo"));
         assertNull(second.fields().get("cardPassword"));
-        verify(linkedCardMapper, never()).activateCards(any(), any(), any());
+        verify(linkedCardMapper, never()).activateCards(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -656,7 +710,7 @@ class CardLinkServiceTest {
                 USER_ID, linkId, activateRequest(List.of("uc-1")));
 
         assertEquals(1, response.activatedCount());
-        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"));
+        verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1"), 0);
     }
 
     @Test
@@ -693,7 +747,7 @@ class CardLinkServiceTest {
         verify(linkedCardMapper).updateCardCredentials(
                 userCardId, USER_ID, new byte[] {9}, new byte[] {5});
         // 옵션 검증 없이 바로 활성화하지 않는다 — 활성화는 activateCards(옵션 선택 포함)로만 한다.
-        verify(linkedCardMapper, never()).activateCards(any(), any(), any());
+        verify(linkedCardMapper, never()).activateCards(any(), any(), any(), anyInt());
     }
 
     @Test

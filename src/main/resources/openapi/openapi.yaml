@@ -872,10 +872,12 @@ paths:
         취소·부분취소·거절 및 해외결제는 반전 처리하지 않으며 승인 적재·혜택 계산·미적용 혜택 집계에서 모두 제외합니다.
         startDate/endDate를 생략하면 이번 달 1일부터 오늘까지(KST) 조회합니다.
         또한 카드별 실적현황을 CODEF에서 조회해 인정 실적금액을 최신 값으로 upsert합니다. 실적 조회 대상 월은
-        startDate가 속한 달(기본값 이번 달)입니다. 연동 중 하나라도 승인내역 또는 실적조회 호출 자체가
-        실패하면 전체 동기화를 실패로 처리하고 재시도 가능한 503으로 응답합니다. 요청한 달을 카드사가
-        애초에 지원하지 않는 경우(카드사 실적조회 미지원 또는 조회 가능 범위 초과)는 재시도해도 항상
-        실패하는 영구 조건이므로 503이 아니라 400으로 응답합니다.
+        startDate가 속한 달(기본값 이번 달)이며, 가능하면 그 전월 실적도 함께 조회해 적재합니다. 연동 중
+        하나라도 승인내역 또는 대상 월 실적조회 호출 자체가 실패하면 전체 동기화를 실패로 처리하고 재시도
+        가능한 503으로 응답합니다. 요청한 달을 카드사가 애초에 지원하지 않는 경우(카드사 실적조회 미지원
+        또는 조회 가능 범위 초과)는 재시도해도 항상 실패하는 영구 조건이므로 503이 아니라 400으로 응답합니다.
+        전월 실적은 부가 정보라 카드사가 지원하지 않거나 조회에 실패해도 전월분만 건너뛸 뿐 전체 동기화를
+        실패시키지 않습니다.
       operationId: syncMyCardApprovals
       security:
         - MocaBearerAuth: []
@@ -1072,6 +1074,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /me/cards/order:
+    patch:
+      tags: [Card]
+      summary: 보유 카드 순서 변경
+      description: |
+        인증 사용자의 활성 보유 카드 표시 순서를 변경합니다.
+        userCardIds는 사용자가 보유한 활성 카드 전체를 원하는 순서대로 중복 없이 포함해야 하며,
+        목록 내 위치가 곧 새 display_order가 됩니다.
+        누락되거나 중복되거나 본인 소유가 아닌 카드가 포함되면 400을 반환합니다.
+      operationId: reorderMyCards
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        description: 활성 보유 카드의 새 순서입니다.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderMyCardsRequest'
+      responses:
+        '200':
+          description: 순서 변경 성공(갱신된 카드 목록 반환)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeCardsApiResponse'
+        '400':
+          description: 요청값 검증 실패(code=VALIDATION_FAILED) 또는 활성 카드 전체와 불일치(code=INVALID_CARD_ORDER)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
   /me/card-sort-mode:
     patch:
       tags: [User]
@@ -2369,6 +2405,21 @@ components:
         data:
           description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/MeCardItemResponse'
+    ReorderMyCardsRequest:
+      description: '보유 카드의 새 표시 순서입니다.'
+      type: object
+      required: [userCardIds]
+      properties:
+        userCardIds:
+          description: '활성 보유 카드 전체를 원하는 순서대로 중복 없이 나열한 목록입니다.'
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+          example:
+            - 01980d6a-5c0c-7aaf-9b85-010203040531
+            - 01980d6a-5c0c-7aaf-9b85-010203040532
     UpdateMemoRequest:
       description: '보유 카드에 저장할 새 메모입니다.'
       type: object
