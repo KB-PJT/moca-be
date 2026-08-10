@@ -85,24 +85,6 @@ Docker 기반 MySQL 통합 테스트는 Testcontainers로 매번 독립 컨테�
 
 `integrationTest`를 실행하려면 Docker Desktop 또는 Docker Engine이 실행 중이어야 합니다.
 
-### 고정 local-test access token
-
-Google 로그인 없이 보호 API를 확인할 때만 `local-test` 모드를 사용합니다. 이 모드는 Redis DB 1을 기본으로
-사용하며, `.env`에 지정한 **단 하나의 access token** 해시만 인증합니다. 기존 Redis 세션이나 로그인 과정에서
-발급된 다른 토큰은 이 모드에서 사용할 수 없습니다.
-
-```dotenv
-MOCA_PROFILE=local-test
-MOCA_REDIS_DATABASE=1
-MOCA_TOKEN_HASH_PEPPER=local-test-only-random-pepper
-MOCA_LOCAL_TEST_ACCESS_TOKEN=직접_생성한_충분히_긴_랜덤_문자열
-MOCA_LOCAL_TEST_USER_ID=활성_상태로_존재하는_사용자_UUID
-MOCA_LOCAL_TEST_USER_TYPE=user
-```
-
-`MOCA_LOCAL_TEST_USER_ID`는 MySQL `users` 테이블에 이미 존재하는 사용자 UUID여야 합니다.
-재기동하면 해당 토큰의 Redis TTL이 다시 설정됩니다. 테스트가 끝나면 `MOCA_PROFILE=local`로 되돌립니다.
-
 ### 외부 Tomcat 환경 변수
 
 외부 Tomcat 배포에서는 `$CATALINA_BASE/bin/setenv.sh`에 DB·Redis·보안 값을 설정합니다. 프로젝트 루트가
