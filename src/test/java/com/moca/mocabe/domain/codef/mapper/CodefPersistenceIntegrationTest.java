@@ -419,12 +419,13 @@ class CodefPersistenceIntegrationTest {
                 CredentialHasher credentialHasher,
                 CardCatalogMatcher cardCatalogMatcher,
                 CardCatalogMapper cardCatalogMapper,
-                LinkedCardMapper linkedCardMapper
+                LinkedCardMapper linkedCardMapper,
+                PlatformTransactionManager transactionManager
         ) {
             return new CardLinkService(
                     codefClient, codefCredentialMapper, codefCredentialStore,
                     issuerMapper, encryptor, credentialHasher,
-                    cardCatalogMatcher, cardCatalogMapper, linkedCardMapper);
+                    cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager);
         }
 
         @Bean

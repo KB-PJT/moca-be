@@ -54,7 +54,9 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Connected ID 생성·보유카드 적재(비활성)와 사용자 활성화·옵션 선택 유스케이스를 담당한다. */
 public class CardLinkService {
@@ -74,12 +76,13 @@ public class CardLinkService {
     private final CardCatalogMatcher cardCatalogMatcher;
     private final CardCatalogMapper cardCatalogMapper;
     private final LinkedCardMapper linkedCardMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public CardLinkService(CodefClient codefClient, CodefCredentialMapper codefCredentialMapper,
                            CodefCredentialStore codefCredentialStore, IssuerMapper issuerMapper,
                            Encryptor encryptor, CredentialHasher credentialHasher,
                            CardCatalogMatcher cardCatalogMatcher, CardCatalogMapper cardCatalogMapper,
-                           LinkedCardMapper linkedCardMapper) {
+                           LinkedCardMapper linkedCardMapper, PlatformTransactionManager transactionManager) {
         this.codefClient = codefClient;
         this.codefCredentialMapper = codefCredentialMapper;
         this.codefCredentialStore = codefCredentialStore;
@@ -89,6 +92,7 @@ public class CardLinkService {
         this.cardCatalogMatcher = cardCatalogMatcher;
         this.cardCatalogMapper = cardCatalogMapper;
         this.linkedCardMapper = linkedCardMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     public CardLinkResponse createLink(String userId, CreateCardLinkRequest request) {
@@ -181,8 +185,8 @@ public class CardLinkService {
             List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
                     connection.connectedId(), connection.institutionCode(), birthDate, cardNo, cardPassword);
             // 재조회 시점엔 새로 입력된 카드번호가 없으므로 매칭 카드는 항상 비활성+크리덴셜 null로 적재한다.
-            List<CardLinkCardResponse> cards = matchAndPersistOwnedCards(
-                    userId, connection.codefAccountCredentialId(), policy, ownedCards, null, null);
+            List<CardLinkCardResponse> cards = matchAndPersistOwnedCardsForSync(
+                    userId, connection.codefAccountCredentialId(), policy, ownedCards);
             return new SyncOwnedCardsResult(
                     connection.codefAccountCredentialId(), connection.institutionCode(), true, cards);
         } catch (RuntimeException exception) {
@@ -191,6 +195,22 @@ public class CardLinkService {
             return new SyncOwnedCardsResult(
                     connection.codefAccountCredentialId(), connection.institutionCode(), false, List.of());
         }
+    }
+
+    /**
+     * 재조회 경로 전용. activateCards(PATCH /card-links/{linkId}/cards)와 같은 lockOwnedLink로
+     * 연동 행을 잠근 채 활성 상태 조회부터 응답 결정·저장까지 한 트랜잭션으로 묶는다. 잠금 없이 이 둘을
+     * 분리하면, 활성 상태를 읽은 뒤 응답을 만드는 사이에 동시 활성화 요청이 끼어들어 이미 활성화된 카드가
+     * 재조회 응답에 다시 노출될 수 있다. 연동 생성(createLink)은 아직 활성 카드가 없는 새 연동이라
+     * 이 잠금이 필요 없으므로 matchAndPersistOwnedCards를 잠금 없이 직접 호출한다.
+     */
+    private List<CardLinkCardResponse> matchAndPersistOwnedCardsForSync(String userId, String linkId,
+                                                                         CodefIssuerPolicy policy,
+                                                                         List<CodefOwnedCard> ownedCards) {
+        return transactionTemplate.execute(status -> {
+            codefCredentialMapper.lockOwnedLink(linkId, userId);
+            return matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, null, null);
+        });
     }
 
     /**
@@ -212,8 +232,8 @@ public class CardLinkService {
                                                                   String creatorCardPassword) {
         // (user_id, codef_card_key_hash)가 DB에서 UNIQUE라 이 조회 이후 실제 적재 시점 사이에 다른
         // 요청이 끼어들 수 있다(동시 재조회). 그 경우는 saveCard가 UNIQUE 충돌을 잡아 처리한다.
-        Map<String, String> existingUserCardIdByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
-                .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, LinkedCardKeyRow::userCardId));
+        Map<String, LinkedCardKeyRow> existingRowByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
+                .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, row -> row));
 
         List<CardLinkCardResponse> cards = new ArrayList<>();
         Set<String> cardKeyHashes = new HashSet<>();
@@ -229,7 +249,12 @@ public class CardLinkService {
             if (!cardKeyHashes.add(cardKeyHash)) {
                 continue;
             }
-            String userCardId = existingUserCardIdByHash.get(cardKeyHash);
+            LinkedCardKeyRow existingRow = existingRowByHash.get(cardKeyHash);
+            if (existingRow != null && existingRow.isActive()) {
+                // 이미 활성화된 카드는 재조회 응답에서 제외한다(재활성화/중복 노출 방지).
+                continue;
+            }
+            String userCardId = existingRow == null ? null : existingRow.userCardId();
             if (userCardId == null && matched != null) {
                 boolean isCreatorCard = creatorCardNo != null
                         && MaskedCardNoMatcher.matches(creatorCardNo, ownedCard.cardNumber());
