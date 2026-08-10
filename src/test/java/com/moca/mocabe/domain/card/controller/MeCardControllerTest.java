@@ -21,6 +21,7 @@ import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
+import com.moca.mocabe.domain.card.exception.InvalidCardOrderException;
 import com.moca.mocabe.domain.card.model.CardBenefitRow;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.card.service.CardQueryService;
@@ -44,6 +45,7 @@ class MeCardControllerTest {
 
     private static final String USER_ID = "01980d6a-5c0c-7aaf-9b85-010203040506";
     private static final String ACTIVE_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040531";
+    private static final String OTHER_ACTIVE_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040532";
     private static final String INACTIVE_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040533";
     private static final String ISSUER_ID = "00000000-0000-4000-8000-000000000301";
 
@@ -357,6 +359,71 @@ class MeCardControllerTest {
         when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
 
         mockMvc.perform(get("/me/cards/" + ACTIVE_USER_CARD_ID))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(cardQueryService);
+    }
+
+    @Test
+    @DisplayName("순서 변경 요청을 현재 사용자 기준으로 서비스에 전달하고 갱신된 목록을 반환한다")
+    void reordersCards() throws Exception {
+        List<String> newOrder = List.of(OTHER_ACTIVE_USER_CARD_ID, ACTIVE_USER_CARD_ID);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.reorderCards(USER_ID, newOrder)).thenReturn(new MeCardsResponse(
+                null,
+                List.of(card(OTHER_ACTIVE_USER_CARD_ID, "KB 국민 일반", null, null),
+                        card(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null)),
+                List.of()));
+
+        String response = mockMvc.perform(patch("/me/cards/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userCardIds\":[\"" + OTHER_ACTIVE_USER_CARD_ID
+                                + "\",\"" + ACTIVE_USER_CARD_ID + "\"]}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode data = new ObjectMapper().readTree(response).path("data");
+        assertEquals(OTHER_ACTIVE_USER_CARD_ID, data.path("activeCards").get(0).path("userCardId").asText());
+        assertEquals(ACTIVE_USER_CARD_ID, data.path("activeCards").get(1).path("userCardId").asText());
+        verify(cardQueryService).reorderCards(USER_ID, newOrder);
+    }
+
+    @Test
+    @DisplayName("userCardIds가 비어 있으면 400 검증 오류를 반환하고 서비스를 호출하지 않는다")
+    void rejectsEmptyReorderRequest() throws Exception {
+        mockMvc.perform(patch("/me/cards/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userCardIds\":[]}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(cardQueryService);
+    }
+
+    @Test
+    @DisplayName("요청 카드 목록이 활성 카드 전체와 다르면 400을 반환한다")
+    void rejectsReorderWhenCardSetMismatches() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.reorderCards(USER_ID, List.of(ACTIVE_USER_CARD_ID)))
+                .thenThrow(new InvalidCardOrderException("보유한 활성 카드 전체를 중복 없이 포함해야 합니다."));
+
+        String response = mockMvc.perform(patch("/me/cards/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userCardIds\":[\"" + ACTIVE_USER_CARD_ID + "\"]}"))
+                .andExpect(status().isBadRequest())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("INVALID_CARD_ORDER",
+                new ObjectMapper().readTree(response).path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("인증 정보가 없으면 순서 변경 서비스를 호출하지 않고 401을 반환한다")
+    void rejectsUnauthenticatedReorderRequest() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
+
+        mockMvc.perform(patch("/me/cards/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userCardIds\":[\"" + ACTIVE_USER_CARD_ID + "\"]}"))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(cardQueryService);

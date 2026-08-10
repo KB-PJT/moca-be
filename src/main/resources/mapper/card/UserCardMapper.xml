@@ -142,4 +142,21 @@
         WHERE user_card_id = #{userCardId}
             AND user_id = #{userId}
     </update>
+
+    <!-- userCardIds의 목록 내 위치를 새 display_order로 저장한다. -->
+    <update id="updateDisplayOrders">
+        UPDATE user_cards
+        SET display_order = CASE user_card_id
+            <foreach collection="userCardIds" item="userCardId" index="displayOrder">
+                WHEN #{userCardId} THEN #{displayOrder}
+            </foreach>
+            ELSE display_order
+            END,
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_id = #{userId}
+            AND user_card_id IN
+            <foreach collection="userCardIds" item="userCardId" open="(" separator="," close=")">
+                #{userCardId}
+            </foreach>
+    </update>
 </mapper>

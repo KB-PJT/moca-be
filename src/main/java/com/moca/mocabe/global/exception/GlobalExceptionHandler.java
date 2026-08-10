@@ -18,6 +18,7 @@ import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.PerformanceUnsupportedException;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import com.moca.mocabe.domain.codef.model.CardCredentialIssue;
+import com.moca.mocabe.domain.card.exception.InvalidCardOrderException;
 import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
@@ -97,6 +98,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleCodefConnectionNotFound(
             CodefConnectionNotFoundException exception) {
         return error(HttpStatus.NOT_FOUND, "CODEF_CONNECTION_NOT_FOUND", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCardOrderException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCardOrder(InvalidCardOrderException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_CARD_ORDER", exception.getMessage());
     }
 
     @ExceptionHandler(InvalidCardSelectionException.class)

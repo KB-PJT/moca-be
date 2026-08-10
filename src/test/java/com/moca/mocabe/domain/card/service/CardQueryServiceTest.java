@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
+import com.moca.mocabe.domain.card.exception.InvalidCardOrderException;
 import com.moca.mocabe.domain.card.mapper.CardBenefitMapper;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.model.CardBenefitRow;
@@ -30,6 +31,7 @@ class CardQueryServiceTest {
 
     private static final String USER_ID = "01980d6a-5c0c-7aaf-9b85-010203040506";
     private static final String ACTIVE_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040531";
+    private static final String OTHER_ACTIVE_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040532";
     private static final String INACTIVE_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040533";
     private static final String ISSUER_ID = "00000000-0000-4000-8000-000000000301";
 
@@ -179,6 +181,55 @@ class CardQueryServiceTest {
 
         assertThrows(UserCardNotFoundException.class,
                 () -> cardQueryService.getCardDetail(USER_ID, ACTIVE_USER_CARD_ID));
+    }
+
+    @Test
+    @DisplayName("요청한 순서가 활성 카드 전체와 일치하면 순서를 저장하고 갱신된 목록을 반환한다")
+    void reordersOwnedActiveCards() {
+        List<String> newOrder = List.of(OTHER_ACTIVE_USER_CARD_ID, ACTIVE_USER_CARD_ID);
+        when(userCardMapper.findActiveByUserId(USER_ID))
+                .thenReturn(List.of(
+                        userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null),
+                        userCard(OTHER_ACTIVE_USER_CARD_ID, "KB 국민 일반", null, null)))
+                .thenReturn(List.of(
+                        userCard(OTHER_ACTIVE_USER_CARD_ID, "KB 국민 일반", null, null),
+                        userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null)));
+        when(userCardMapper.findInactiveByUserId(USER_ID)).thenReturn(List.of());
+
+        MeCardsResponse response = cardQueryService.reorderCards(USER_ID, newOrder);
+
+        verify(userCardMapper).updateDisplayOrders(USER_ID, newOrder);
+        assertEquals(OTHER_ACTIVE_USER_CARD_ID, response.getActiveCards().get(0).getUserCardId());
+        assertEquals(ACTIVE_USER_CARD_ID, response.getActiveCards().get(1).getUserCardId());
+    }
+
+    @Test
+    @DisplayName("요청한 카드 목록이 활성 카드 전체와 다르면 저장하지 않고 예외를 던진다")
+    void rejectsReorderWhenCardSetMismatches() {
+        when(userCardMapper.findActiveByUserId(USER_ID)).thenReturn(List.of(
+                userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null),
+                userCard(OTHER_ACTIVE_USER_CARD_ID, "KB 국민 일반", null, null)));
+
+        assertThrows(InvalidCardOrderException.class,
+                () -> cardQueryService.reorderCards(USER_ID, List.of(ACTIVE_USER_CARD_ID)));
+
+        verify(userCardMapper, never()).updateDisplayOrders(org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    @DisplayName("요청한 카드 목록에 중복이 있으면 저장하지 않고 예외를 던진다")
+    void rejectsReorderWhenDuplicateIdsProvided() {
+        when(userCardMapper.findActiveByUserId(USER_ID)).thenReturn(List.of(
+                userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null),
+                userCard(OTHER_ACTIVE_USER_CARD_ID, "KB 국민 일반", null, null)));
+
+        assertThrows(InvalidCardOrderException.class,
+                () -> cardQueryService.reorderCards(USER_ID,
+                        List.of(ACTIVE_USER_CARD_ID, ACTIVE_USER_CARD_ID)));
+
+        verify(userCardMapper, never()).updateDisplayOrders(org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.anyList());
     }
 
     @Test
