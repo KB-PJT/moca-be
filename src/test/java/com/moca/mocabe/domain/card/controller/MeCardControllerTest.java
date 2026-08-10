@@ -240,6 +240,37 @@ class MeCardControllerTest {
     }
 
     @Test
+    @DisplayName("non-BMP 문자 500 코드포인트는 UTF-16 단위로 1000이어도 통과한다")
+    void allowsNonBmpMemoAtCodePointLimit() throws Exception {
+        String emoji = new String(Character.toChars(0x1F600));
+        String memo = emoji.repeat(500);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, memo))
+                .thenReturn(card(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, memo));
+
+        mockMvc.perform(patch("/me/cards/" + ACTIVE_USER_CARD_ID + "/memo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(new ObjectMapper().writeValueAsString(java.util.Map.of("memo", memo))))
+                .andExpect(status().isOk());
+
+        verify(cardQueryService).updateMemo(USER_ID, ACTIVE_USER_CARD_ID, memo);
+    }
+
+    @Test
+    @DisplayName("non-BMP 문자가 500 코드포인트를 초과하면 400을 반환한다")
+    void rejectsNonBmpMemoOverCodePointLimit() throws Exception {
+        String emoji = new String(Character.toChars(0x1F600));
+        String memo = emoji.repeat(501);
+
+        mockMvc.perform(patch("/me/cards/" + ACTIVE_USER_CARD_ID + "/memo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(new ObjectMapper().writeValueAsString(java.util.Map.of("memo", memo))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(cardQueryService);
+    }
+
+    @Test
     @DisplayName("인증 정보가 없으면 메모 수정 서비스를 호출하지 않고 401을 반환한다")
     void rejectsUnauthenticatedMemoUpdate() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
