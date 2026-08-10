@@ -12,6 +12,7 @@
         <result property="issuerName" column="issuer_name"/>
         <result property="cardImageUrl" column="card_image_url"/>
         <result property="memo" column="memo"/>
+        <result property="contentVersionId" column="content_version_id"/>
     </resultMap>
 
     <sql id="userCardColumns">
@@ -21,7 +22,8 @@
         i.issuer_id,
         i.issuer_name,
         NULLIF(cv.image_url, '') AS card_image_url,
-        uc.memo
+        uc.memo,
+        cv.content_version_id
     </sql>
 
     <!-- 카드별 최신 콘텐츠 버전(가장 최근 last_seen_at, 동률이면 content_version_id 큰 것)만 연결한다. -->
