@@ -10,6 +10,7 @@ public class UserCardListRow {
     private String issuerName;
     private String cardImageUrl;
     private String memo;
+    private String contentVersionId;
 
     public String getUserCardId() {
         return userCardId;
@@ -65,5 +66,13 @@ public class UserCardListRow {
 
     public void setMemo(String memo) {
         this.memo = memo;
+    }
+
+    public String getContentVersionId() {
+        return contentVersionId;
+    }
+
+    public void setContentVersionId(String contentVersionId) {
+        this.contentVersionId = contentVersionId;
     }
 }

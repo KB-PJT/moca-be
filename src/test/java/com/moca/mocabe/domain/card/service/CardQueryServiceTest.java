@@ -7,9 +7,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
+import com.moca.mocabe.domain.card.mapper.CardBenefitMapper;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
+import com.moca.mocabe.domain.card.model.CardBenefitRow;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import java.util.List;
@@ -28,14 +31,19 @@ class CardQueryServiceTest {
     private static final String INACTIVE_USER_CARD_ID = "01980d6a-5c0c-7aaf-9b85-010203040533";
     private static final String ISSUER_ID = "00000000-0000-4000-8000-000000000301";
 
+    private static final String CONTENT_VERSION_ID = "01980d6a-5c0c-7aaf-9b85-010203040540";
+
     @Mock
     private UserCardMapper userCardMapper;
+
+    @Mock
+    private CardBenefitMapper cardBenefitMapper;
 
     private CardQueryService cardQueryService;
 
     @BeforeEach
     void setUp() {
-        cardQueryService = new CardQueryService(userCardMapper);
+        cardQueryService = new CardQueryService(userCardMapper, cardBenefitMapper);
     }
 
     @Test
@@ -124,6 +132,68 @@ class CardQueryServiceTest {
                 () -> cardQueryService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, "메모"));
 
         verify(userCardMapper, never()).findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID);
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드면 혜택을 유형별로 나눠 상세정보를 반환한다")
+    void returnsCardDetailSplitByRecordType() {
+        UserCardListRow cardRow = userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH",
+                "https://example.com/card.png", "배달 귀요미 카드");
+        cardRow.setContentVersionId(CONTENT_VERSION_ID);
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(cardRow);
+        when(cardBenefitMapper.findByContentVersionId(CONTENT_VERSION_ID)).thenReturn(List.of(
+                benefitRow("benefit", "카페 10% 할인", "월 최대 5,000원", "카페 상세", "<p>카페 상세</p>"),
+                benefitRow("notice", "할인서비스 적용 안내", null, "유의사항 상세", "<p>유의사항 상세</p>")));
+
+        CardDetailResponse response = cardQueryService.getCardDetail(USER_ID, ACTIVE_USER_CARD_ID);
+
+        assertEquals(ACTIVE_USER_CARD_ID, response.getUserCardId());
+        assertEquals("배달 귀요미 카드", response.getMemo());
+        assertEquals(1, response.getBenefits().size());
+        assertEquals("카페 10% 할인", response.getBenefits().get(0).getTitle());
+        assertEquals("카페 상세", response.getBenefits().get(0).getDetailText());
+        assertEquals("<p>카페 상세</p>", response.getBenefits().get(0).getDetailHtml());
+        assertEquals(1, response.getNotices().size());
+        assertEquals("할인서비스 적용 안내", response.getNotices().get(0).getTitle());
+    }
+
+    @Test
+    @DisplayName("카드가 카탈로그와 매칭되지 않으면 혜택 조회 없이 빈 목록을 반환한다")
+    void returnsEmptyBenefitsWhenNoContentVersion() {
+        UserCardListRow cardRow = userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null);
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(cardRow);
+
+        CardDetailResponse response = cardQueryService.getCardDetail(USER_ID, ACTIVE_USER_CARD_ID);
+
+        assertEquals(List.of(), response.getBenefits());
+        assertEquals(List.of(), response.getNotices());
+        verify(cardBenefitMapper, never()).findByContentVersionId(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드가 아니면 예외를 던진다")
+    void rejectsDetailForUnknownCard() {
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(null);
+
+        assertThrows(UserCardNotFoundException.class,
+                () -> cardQueryService.getCardDetail(USER_ID, ACTIVE_USER_CARD_ID));
+    }
+
+    private CardBenefitRow benefitRow(
+            String recordType,
+            String title,
+            String summary,
+            String detailText,
+            String detailHtml
+    ) {
+        CardBenefitRow row = new CardBenefitRow();
+        row.setBenefitId("01980d6a-5c0c-7aaf-9b85-010203040550");
+        row.setRecordType(recordType);
+        row.setTitle(title);
+        row.setSummary(summary);
+        row.setDetailText(detailText);
+        row.setDetailHtml(detailHtml);
+        return row;
     }
 
     private UserCardListRow userCard(

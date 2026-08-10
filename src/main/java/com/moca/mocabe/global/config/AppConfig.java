@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
 import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
+import com.moca.mocabe.domain.card.mapper.CardBenefitMapper;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.mapper.CardApprovalMapper;
@@ -82,8 +83,8 @@ public class AppConfig {
     }
 
     @Bean
-    public CardQueryService cardQueryService(UserCardMapper userCardMapper) {
-        return new CardQueryService(userCardMapper);
+    public CardQueryService cardQueryService(UserCardMapper userCardMapper, CardBenefitMapper cardBenefitMapper) {
+        return new CardQueryService(userCardMapper, cardBenefitMapper);
     }
 
     @Bean

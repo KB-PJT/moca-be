@@ -15,9 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.moca.mocabe.domain.card.dto.CardBenefitResponse;
+import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
+import com.moca.mocabe.domain.card.model.CardBenefitRow;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
@@ -264,6 +267,67 @@ class MeCardControllerTest {
 
         assertEquals("USER_CARD_NOT_FOUND",
                 new ObjectMapper().readTree(response).path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("카드 상세정보 조회 요청을 현재 사용자·userCardId 기준으로 서비스에 전달한다")
+    void getsCardDetail() throws Exception {
+        UserCardListRow cardRow = new UserCardListRow();
+        cardRow.setUserCardId(ACTIVE_USER_CARD_ID);
+        cardRow.setCardName("KB My WE:SH");
+        cardRow.setIssuerId(ISSUER_ID);
+        cardRow.setIssuerName("KB카드");
+        cardRow.setCardImageUrl("https://example.com/card.png");
+        cardRow.setMemo("배달 귀요미 카드");
+        CardBenefitRow benefitRow = new CardBenefitRow();
+        benefitRow.setBenefitId("01980d6a-5c0c-7aaf-9b85-010203040550");
+        benefitRow.setRecordType("benefit");
+        benefitRow.setTitle("카페 10% 할인");
+        benefitRow.setSummary("월 최대 5,000원");
+        benefitRow.setDetailText("카페 상세");
+        benefitRow.setDetailHtml("<p>카페 상세</p>");
+
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.getCardDetail(USER_ID, ACTIVE_USER_CARD_ID)).thenReturn(
+                new CardDetailResponse(cardRow, List.of(new CardBenefitResponse(benefitRow)), List.of()));
+
+        String response = mockMvc.perform(get("/me/cards/" + ACTIVE_USER_CARD_ID))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode data = new ObjectMapper().readTree(response).path("data");
+
+        assertEquals(ACTIVE_USER_CARD_ID, data.path("userCardId").asText());
+        assertEquals("배달 귀요미 카드", data.path("memo").asText());
+        assertEquals("카페 10% 할인", data.path("benefits").get(0).path("title").asText());
+        assertEquals("카페 상세", data.path("benefits").get(0).path("detailText").asText());
+        assertTrue(data.path("notices").isEmpty());
+        verify(cardQueryService).getCardDetail(USER_ID, ACTIVE_USER_CARD_ID);
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드가 아니면 상세정보 조회도 404를 반환한다")
+    void rejectsUnknownCardForDetail() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardQueryService.getCardDetail(USER_ID, ACTIVE_USER_CARD_ID))
+                .thenThrow(new UserCardNotFoundException());
+
+        String response = mockMvc.perform(get("/me/cards/" + ACTIVE_USER_CARD_ID))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("USER_CARD_NOT_FOUND",
+                new ObjectMapper().readTree(response).path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("인증 정보가 없으면 상세정보 조회 서비스를 호출하지 않고 401을 반환한다")
+    void rejectsUnauthenticatedDetailRequest() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
+
+        mockMvc.perform(get("/me/cards/" + ACTIVE_USER_CARD_ID))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(cardQueryService);
     }
 
     private MeCardItemResponse card(String userCardId, String cardName, String cardImageUrl, String memo) {

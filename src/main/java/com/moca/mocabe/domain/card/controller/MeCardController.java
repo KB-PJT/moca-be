@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.card.controller;
 
+import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
@@ -40,6 +41,15 @@ public class MeCardController {
         boolean activeOnly = includeInactive;
         MeCardsResponse response = cardQueryService.getMyCards(
                 currentUserProvider.getCurrentUserId(), activeOnly);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{userCardId}")
+    public ResponseEntity<ApiResponse<CardDetailResponse>> getCardDetail(
+            @PathVariable String userCardId
+    ) {
+        CardDetailResponse response = cardQueryService.getCardDetail(
+                currentUserProvider.getCurrentUserId(), userCardId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
