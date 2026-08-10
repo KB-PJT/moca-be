@@ -203,6 +203,20 @@ class HomeQueryServiceTest {
   }
 
   @Test
+  @DisplayName("받은 혜택이 계산 가능한 월 한도보다 크면 잔여 혜택을 0으로 표시한다")
+  void clampsAvailableBenefitAmountToZero() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "MANUAL"));
+    HomeCardRow row = card("card-1", "한도 미확인 카드", 1, 0, 7_640, 0, 0);
+    when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of(row));
+
+    HomeCardsResponse response = homeQueryService.getCards(USER_ID, "2026-07", null);
+
+    assertEquals(0, response.getCards().get(0).getSummary().getMaximumMonthlyBenefitAmount());
+    assertEquals(7_640, response.getCards().get(0).getSummary().getReceivedBenefitAmount());
+    assertEquals(0, response.getCards().get(0).getSummary().getAvailableBenefitAmount());
+  }
+
+  @Test
   @DisplayName("실적 목표가 없는 카드는 자동 정렬 뒤로 보내고 달성률을 0으로 표시한다")
   void sortsCardsWithoutPerformanceTargetLast() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
