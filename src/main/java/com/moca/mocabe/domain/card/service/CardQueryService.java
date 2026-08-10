@@ -4,13 +4,16 @@ import com.moca.mocabe.domain.card.dto.CardBenefitResponse;
 import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
+import com.moca.mocabe.domain.card.exception.InvalidCardOrderException;
 import com.moca.mocabe.domain.card.mapper.CardBenefitMapper;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.model.CardBenefitRow;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 인증 사용자의 보유 카드 목록·상세 조회 유스케이스를 담당한다. */
@@ -53,6 +56,23 @@ public class CardQueryService {
         if (userCardMapper.deactivateUserCard(userCardId, userId) == 0) {
             throw new UserCardNotFoundException();
         }
+    }
+
+    @Transactional
+    public MeCardsResponse reorderCards(String userId, List<String> userCardIds) {
+        List<UserCardListRow> activeCards = userCardMapper.findActiveByUserId(userId);
+        Set<String> activeCardIds = new HashSet<>();
+        for (UserCardListRow activeCard : activeCards) {
+            activeCardIds.add(activeCard.getUserCardId());
+        }
+
+        Set<String> requestedCardIds = new HashSet<>(userCardIds);
+        if (requestedCardIds.size() != userCardIds.size() || !requestedCardIds.equals(activeCardIds)) {
+            throw new InvalidCardOrderException("보유한 활성 카드 전체를 중복 없이 포함해야 합니다.");
+        }
+
+        userCardMapper.updateDisplayOrders(userId, userCardIds);
+        return getMyCards(userId, false);
     }
 
     @Transactional
