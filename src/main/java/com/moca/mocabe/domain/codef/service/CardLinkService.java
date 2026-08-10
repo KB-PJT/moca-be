@@ -340,7 +340,8 @@ public class CardLinkService {
             validateOptions(selectionsByCard.getOrDefault(userCardId, List.of()), options);
         }
 
-        linkedCardMapper.activateCards(linkId, userId, new ArrayList<>(activeIds));
+        int startOrder = linkedCardMapper.findNextDisplayOrder(userId);
+        linkedCardMapper.activateCards(linkId, userId, new ArrayList<>(activeIds), startOrder);
         for (String userCardId : activeIds) {
             String cardId = cardsByUserCard.get(userCardId).cardId();
             for (OptionSelectionRequest selection : selectionsByCard.getOrDefault(userCardId, List.of())) {
