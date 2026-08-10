@@ -98,7 +98,7 @@ public class AuthConfig {
 
     @Bean
     public RefreshCookiePolicy refreshCookiePolicy(Environment environment) {
-        boolean localProfile = environment.matchesProfiles("local", "local-test");
+        boolean localProfile = environment.matchesProfiles("local");
         boolean secure = !localProfile || environment.getProperty("MOCA_REFRESH_COOKIE_SECURE", Boolean.class, false);
         return new RefreshCookiePolicy(secure);
     }

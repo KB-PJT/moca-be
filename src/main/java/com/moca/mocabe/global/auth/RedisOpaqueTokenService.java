@@ -48,7 +48,6 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
     private final String hashAlgorithm;
     private final DefaultRedisScript<String> refreshRotationScript;
     private final SecureRandom secureRandom = new SecureRandom();
-    private String localTestAccessTokenHash;
 
     public RedisOpaqueTokenService(StringRedisTemplate redisTemplate, String pepper,
                                    OpaqueTokenPolicy tokenPolicy) {
@@ -71,21 +70,6 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
                 tokenPolicy.getRefreshTokenTtl());
         trackUserSession(userId, sessionId);
         return issueForSession(sessionId);
-    }
-
-    /** local-test 프로필에서 지정한 단일 access token만 인증할 수 있도록 등록한다. */
-    public void registerLocalTestAccessToken(String accessToken, String userId, String userType) {
-        if (isBlank(accessToken) || isBlank(userId) || isBlank(userType)) {
-            throw new IllegalArgumentException("local-test access token, user ID, user type은 필수입니다.");
-        }
-        String sessionId = UUID.randomUUID().toString();
-        localTestAccessTokenHash = hash(accessToken);
-        redisTemplate.opsForValue().set(sessionKey(sessionId), serialize(userId, userType),
-                tokenPolicy.getAccessTokenTtl());
-        redisTemplate.opsForValue().set(ACCESS_KEY_PREFIX + localTestAccessTokenHash, sessionId,
-                tokenPolicy.getAccessTokenTtl());
-        trackSessionToken(sessionId, ACCESS_KEY_PREFIX + localTestAccessTokenHash);
-        trackUserSession(userId, sessionId);
     }
 
     @Override
@@ -112,9 +96,6 @@ public class RedisOpaqueTokenService implements OpaqueTokenService {
             throw new InvalidOpaqueTokenException();
         }
         String accessTokenHash = hash(accessToken);
-        if (localTestAccessTokenHash != null && !localTestAccessTokenHash.equals(accessTokenHash)) {
-            throw new InvalidOpaqueTokenException();
-        }
         String sessionId = redisTemplate.opsForValue().get(ACCESS_KEY_PREFIX + accessTokenHash);
         String sessionValue = sessionId == null ? null : redisTemplate.opsForValue().get(sessionKey(sessionId));
         if (sessionValue == null) {

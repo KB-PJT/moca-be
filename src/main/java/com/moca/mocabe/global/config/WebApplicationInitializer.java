@@ -10,7 +10,7 @@ public class WebApplicationInitializer extends AbstractAnnotationConfigDispatche
 
     @Override
     protected Class<?>[] getRootConfigClasses() {
-        return new Class<?>[]{PersistenceConfig.class, RedisConfig.class, AuthConfig.class, LocalTestAuthConfig.class,
+        return new Class<?>[]{PersistenceConfig.class, RedisConfig.class, AuthConfig.class,
                 AppConfig.class};
     }
 
