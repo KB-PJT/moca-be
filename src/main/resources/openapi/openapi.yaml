@@ -988,6 +988,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /me/cards/{userCardId}/deactivate:
+    patch:
+      tags: [Card]
+      summary: 보유 카드 비활성화
+      description: |
+        인증 사용자가 소유한 보유 카드(user_cards)를 비활성화합니다.
+        연결 해제와 달리 데이터는 삭제되지 않고 is_active만 false로 변경되어
+        홈/목록 조회에서 활성 카드 목록 대신 비활성 카드 목록으로 이동합니다.
+        본인 소유가 아니거나 존재하지 않는 카드면 404를 반환합니다.
+      operationId: deactivateMyCard
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: userCardId
+          in: path
+          required: true
+          description: 비활성화할 보유카드(user_cards)의 식별자
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 카드 비활성화 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+        '404':
+          description: 본인 소유의 카드를 찾을 수 없음(code=USER_CARD_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /me/cards/{userCardId}/memo:
     patch:
       tags: [Card]
