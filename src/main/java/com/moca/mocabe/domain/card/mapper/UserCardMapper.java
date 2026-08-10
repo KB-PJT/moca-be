@@ -38,4 +38,7 @@ public interface UserCardMapper {
     int deleteUserCard(@Param("userCardId") String userCardId, @Param("userId") String userId);
 
     int deactivateUserCard(@Param("userCardId") String userCardId, @Param("userId") String userId);
+
+    int updateDisplayOrders(@Param("userId") String userId,
+                            @Param("userCardIds") List<String> userCardIds);
 }
