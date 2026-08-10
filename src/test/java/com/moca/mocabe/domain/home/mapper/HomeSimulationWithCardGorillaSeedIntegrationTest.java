@@ -8,6 +8,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -16,8 +17,15 @@ import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Tag("integration")
+@EnabledIf(value = "isSeedScriptAvailable", disabledReason = "로컬 생성 seed SQL이 없어 검증을 건너뜁니다.")
 @DisplayName("카드고릴라 seed 기반 홈 시뮬레이션 fixture")
 class HomeSimulationWithCardGorillaSeedIntegrationTest {
+
+    private static final String SEED_PATH = "db/seed/card_gorilla_without_summary_benefits.sql";
+
+    static boolean isSeedScriptAvailable() {
+        return new ClassPathResource(SEED_PATH).exists();
+    }
 
     @Test
     @DisplayName("기존 카드사·카드·콘텐츠를 재사용해 중복키 충돌 없이 적재한다")
@@ -37,8 +45,7 @@ class HomeSimulationWithCardGorillaSeedIntegrationTest {
                     .migrate();
 
             new ResourceDatabasePopulator(
-                            new ClassPathResource(
-                                    "db/seed/card_gorilla_without_summary_benefits.sql"))
+                            new ClassPathResource(SEED_PATH))
                     .execute(dataSource);
             new ResourceDatabasePopulator(
                             new ClassPathResource(
