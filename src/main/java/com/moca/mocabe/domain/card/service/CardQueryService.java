@@ -1,20 +1,27 @@
 package com.moca.mocabe.domain.card.service;
 
+import com.moca.mocabe.domain.card.dto.CardBenefitResponse;
+import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
+import com.moca.mocabe.domain.card.mapper.CardBenefitMapper;
 import com.moca.mocabe.domain.card.mapper.UserCardMapper;
+import com.moca.mocabe.domain.card.model.CardBenefitRow;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
+import java.util.Collections;
 import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 인증 사용자의 보유 카드 목록 조회 유스케이스를 담당한다. */
+/** 인증 사용자의 보유 카드 목록·상세 조회 유스케이스를 담당한다. */
 public class CardQueryService {
 
     private final UserCardMapper userCardMapper;
+    private final CardBenefitMapper cardBenefitMapper;
 
-    public CardQueryService(UserCardMapper userCardMapper) {
+    public CardQueryService(UserCardMapper userCardMapper, CardBenefitMapper cardBenefitMapper) {
         this.userCardMapper = userCardMapper;
+        this.cardBenefitMapper = cardBenefitMapper;
     }
 
     @Transactional(readOnly = true)
@@ -39,6 +46,52 @@ public class CardQueryService {
             throw new UserCardNotFoundException();
         }
         return new MeCardItemResponse(userCardMapper.findByUserCardId(userCardId, userId));
+    }
+
+    @Transactional
+    public void deactivateCard(String userId, String userCardId) {
+        if (userCardMapper.deactivateUserCard(userCardId, userId) == 0) {
+            throw new UserCardNotFoundException();
+        }
+    }
+
+    @Transactional
+    public void disconnectCard(String userId, String userCardId) {
+        if (userCardMapper.findByUserCardId(userCardId, userId) == null) {
+            throw new UserCardNotFoundException();
+        }
+        // user_cards를 참조하는 자식 테이블부터 순차적으로 삭제해야 FK 제약을 위반하지 않는다.
+        userCardMapper.deleteBenefitCalculationOutcomesByUserCardId(userCardId);
+        userCardMapper.deleteBenefitUsagesByUserCardId(userCardId);
+        userCardMapper.deleteOptionSelectionsByUserCardId(userCardId);
+        userCardMapper.deletePerformanceSnapshotsByUserCardId(userCardId);
+        userCardMapper.deletePaymentApprovalsByUserCardId(userCardId);
+        if (userCardMapper.deleteUserCard(userCardId, userId) == 0) {
+            throw new UserCardNotFoundException();
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public CardDetailResponse getCardDetail(String userId, String userCardId) {
+        UserCardListRow cardRow = userCardMapper.findByUserCardId(userCardId, userId);
+        if (cardRow == null) {
+            throw new UserCardNotFoundException();
+        }
+
+        List<CardBenefitRow> benefitRows = cardRow.getContentVersionId() == null
+                ? Collections.emptyList()
+                : cardBenefitMapper.findByContentVersionId(cardRow.getContentVersionId());
+
+        List<CardBenefitResponse> benefits = benefitRows.stream()
+                .filter(row -> "benefit".equals(row.getRecordType()))
+                .map(CardBenefitResponse::new)
+                .toList();
+        List<CardBenefitResponse> notices = benefitRows.stream()
+                .filter(row -> "notice".equals(row.getRecordType()))
+                .map(CardBenefitResponse::new)
+                .toList();
+
+        return new CardDetailResponse(cardRow, benefits, notices);
     }
 
     private List<MeCardItemResponse> mapCards(List<UserCardListRow> cardRows) {

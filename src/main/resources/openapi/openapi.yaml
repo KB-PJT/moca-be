@@ -917,6 +917,114 @@ paths:
           $ref: '#/components/responses/AuthorizationError'
         '503':
           $ref: '#/components/responses/CardSyncFailedError'
+  /me/cards/{userCardId}:
+    get:
+      tags: [Card]
+      summary: 보유 카드 상세정보 조회
+      description: |
+        인증 사용자가 소유한 보유 카드 한 장의 상세정보(카드 정보·메모·주요 혜택·유의사항)를 반환합니다.
+        benefits/notices는 card_benefits의 record_type이 각각 benefit/notice인 항목이며,
+        detailText/detailHtml을 함께 포함합니다. 본인 소유가 아니거나 존재하지 않는 카드면 404를 반환합니다.
+      operationId: getMyCardDetail
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: userCardId
+          in: path
+          required: true
+          description: 상세정보를 조회할 보유카드(user_cards)의 식별자
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 보유 카드 상세정보 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDetailApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+        '404':
+          description: 본인 소유의 카드를 찾을 수 없음(code=USER_CARD_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Card]
+      summary: 보유 카드 연결 해제
+      description: |
+        인증 사용자가 소유한 보유 카드(user_cards)의 연결을 해제합니다.
+        해당 카드를 참조하는 승인내역·혜택 사용/계산 내역·옵션 선택·실적 스냅샷을 모두 함께 삭제한 뒤
+        user_cards 행을 삭제합니다. 본인 소유가 아니거나 존재하지 않는 카드면 404를 반환합니다.
+      operationId: disconnectMyCard
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: userCardId
+          in: path
+          required: true
+          description: 연결을 해제할 보유카드(user_cards)의 식별자
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 카드 연결 해제 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+        '404':
+          description: 본인 소유의 카드를 찾을 수 없음(code=USER_CARD_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /me/cards/{userCardId}/deactivate:
+    patch:
+      tags: [Card]
+      summary: 보유 카드 비활성화
+      description: |
+        인증 사용자가 소유한 보유 카드(user_cards)를 비활성화합니다.
+        연결 해제와 달리 데이터는 삭제되지 않고 is_active만 false로 변경되어
+        홈/목록 조회에서 활성 카드 목록 대신 비활성 카드 목록으로 이동합니다.
+        본인 소유가 아니거나 존재하지 않는 카드면 404를 반환합니다.
+      operationId: deactivateMyCard
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: userCardId
+          in: path
+          required: true
+          description: 비활성화할 보유카드(user_cards)의 식별자
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 카드 비활성화 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
+        '404':
+          description: 본인 소유의 카드를 찾을 수 없음(code=USER_CARD_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /me/cards/{userCardId}/memo:
     patch:
       tags: [Card]
@@ -2161,6 +2269,94 @@ components:
           type: string
           nullable: true
           example: 카페 전용 카드
+    CardDetailApiResponse:
+      description: 'CardDetail API의 공통 성공 응답입니다.'
+      type: object
+      properties:
+        success:
+          description: '요청 처리 성공 여부입니다.'
+          type: boolean
+          example: true
+        data:
+          description: 'API의 실제 처리 결과입니다.'
+          $ref: '#/components/schemas/CardDetailResponse'
+    CardDetailResponse:
+      description: '보유 카드 상세정보입니다.'
+      type: object
+      required: [userCardId, cardName, cardNo, issuerId, issuerName, cardImageUrl, memo, benefits, notices]
+      properties:
+        userCardId:
+          description: 'userCard 리소스의 식별자입니다.'
+          type: string
+          format: uuid
+          example: 01980d6a-5c0c-7aaf-9b85-010203040531
+        cardName:
+          description: '카드 상품명입니다.'
+          type: string
+          example: KB My WE:SH
+        cardNo:
+          type: string
+          nullable: true
+          description: CODEF resCardNo(마스킹된 카드번호)
+          example: "943646******1069"
+        issuerId:
+          description: '카드 발급사 식별자입니다.'
+          type: string
+          format: uuid
+          example: 00000000-0000-4000-8000-000000000301
+        issuerName:
+          type: string
+          description: issuer 기준정보에 등록된 확정 카드사명입니다.
+          example: KB카드
+        cardImageUrl:
+          type: string
+          nullable: true
+          description: 카드 이미지 URL. 없으면 null이며 기본 이미지는 프론트가 처리합니다.
+          example: https://example.com/card.png
+        memo:
+          description: '사용자가 카드에 작성한 메모입니다. 작성하지 않으면 null입니다.'
+          type: string
+          nullable: true
+          example: 배달 귀요미 카드
+        benefits:
+          description: '카드의 주요 혜택 목록(card_benefits.record_type=benefit)입니다. 카드 카탈로그와 매칭되지 않으면 빈 배열입니다.'
+          type: array
+          items:
+            $ref: '#/components/schemas/CardBenefitResponse'
+        notices:
+          description: '카드의 유의사항 목록(card_benefits.record_type=notice)입니다. 카드 카탈로그와 매칭되지 않으면 빈 배열입니다.'
+          type: array
+          items:
+            $ref: '#/components/schemas/CardBenefitResponse'
+    CardBenefitResponse:
+      description: '카드 상세정보에 포함되는 혜택 또는 유의사항 한 건입니다.'
+      type: object
+      required: [benefitId, title, summary, detailText, detailHtml]
+      properties:
+        benefitId:
+          description: 'card_benefits 리소스의 식별자입니다.'
+          type: string
+          format: uuid
+          example: 01980d6a-5c0c-7aaf-9b85-010203040532
+        title:
+          type: string
+          description: 혜택/유의사항의 제목입니다.
+          example: 카페 10% 할인
+        summary:
+          type: string
+          nullable: true
+          description: 목록에 표시할 요약 문구입니다. 없으면 null입니다.
+          example: 월 최대 5,000원
+        detailText:
+          type: string
+          nullable: true
+          description: 상세 설명(순수 텍스트)입니다. 없으면 null입니다.
+          example: 스타벅스·이디야·투썸플레이스 등 카페 가맹점 결제 시 10% 할인. 전월 실적 30만원 이상 시 적용, 월 최대 5,000원.
+        detailHtml:
+          type: string
+          nullable: true
+          description: 상세 설명(HTML)입니다. 없으면 null입니다.
+          example: "<p>스타벅스·이디야·투썸플레이스 등 카페 가맹점 결제 시 <b>10% 할인</b></p>"
     MeCardItemApiResponse:
       description: 'MeCardItem API의 공통 성공 응답입니다.'
       type: object

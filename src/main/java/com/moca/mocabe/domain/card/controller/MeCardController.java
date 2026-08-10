@@ -1,11 +1,13 @@
 package com.moca.mocabe.domain.card.controller;
 
 import com.moca.mocabe.domain.card.dto.MeCardItemResponse;
+import com.moca.mocabe.domain.card.dto.CardDetailResponse;
 import com.moca.mocabe.domain.card.dto.MeCardsResponse;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.card.dto.UpdateMemoRequest;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
+import com.moca.mocabe.domain.user.dto.SuccessResponse;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.response.ApiResponse;
 import java.time.LocalDate;
@@ -13,6 +15,7 @@ import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,6 +46,15 @@ public class MeCardController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/{userCardId}")
+    public ResponseEntity<ApiResponse<CardDetailResponse>> getCardDetail(
+            @PathVariable String userCardId
+    ) {
+        CardDetailResponse response = cardQueryService.getCardDetail(
+                currentUserProvider.getCurrentUserId(), userCardId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @PatchMapping("/{userCardId}/memo")
     public ResponseEntity<ApiResponse<MeCardItemResponse>> updateMemo(
             @PathVariable String userCardId,
@@ -51,6 +63,23 @@ public class MeCardController {
         MeCardItemResponse response = cardQueryService.updateMemo(
                 currentUserProvider.getCurrentUserId(), userCardId, request.getMemo());
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+
+    @PatchMapping("/{userCardId}/deactivate")
+    public ResponseEntity<ApiResponse<SuccessResponse>> deactivateCard(
+            @PathVariable String userCardId
+    ) {
+        cardQueryService.deactivateCard(currentUserProvider.getCurrentUserId(), userCardId);
+        return ResponseEntity.ok(ApiResponse.success(new SuccessResponse(true)));
+    }
+
+    @DeleteMapping("/{userCardId}")
+    public ResponseEntity<ApiResponse<SuccessResponse>> disconnectCard(
+            @PathVariable String userCardId
+    ) {
+        cardQueryService.disconnectCard(currentUserProvider.getCurrentUserId(), userCardId);
+        return ResponseEntity.ok(ApiResponse.success(new SuccessResponse(true)));
     }
 
     @PostMapping("/sync")
