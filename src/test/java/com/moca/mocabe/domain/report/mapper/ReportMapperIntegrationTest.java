@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.report.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
+import com.moca.mocabe.domain.report.model.MissedBenefitRow;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -198,6 +199,18 @@ class ReportMapperIntegrationTest {
     assertEquals(
         500000L, mapper.findPerformanceCard(USER, USER_CARD, "2026-07").currentTierTargetAmount());
     assertEquals(1, mapper.findPerformanceCards(USER, "2026-07").size());
+  }
+
+  @Test
+  void returnsUnusedMonthlyLimitWithoutCalculationOutcomesOrUsages() {
+    jdbc.update("DELETE FROM user_benefit_calculation_outcomes WHERE user_card_id = ?", USER_CARD);
+    jdbc.update("DELETE FROM user_benefit_usages WHERE user_card_id = ?", USER_CARD);
+
+    MissedBenefitRow row =
+        mapper.findMonthlyRemainingBenefits(USER, USER_CARD, "2026-07").get(0);
+
+    assertEquals(0L, row.usedAmount());
+    assertEquals(5_000L, row.limitAmount());
   }
 
   @Test

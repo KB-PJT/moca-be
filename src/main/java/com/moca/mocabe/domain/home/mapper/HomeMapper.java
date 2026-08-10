@@ -15,7 +15,7 @@ public interface HomeMapper {
   List<HomeCardRow> findHomeCards(
       @Param("userId") String userId, @Param("yearMonth") String yearMonth);
 
-  /** 계산 결과 원장 기준으로 지정 월의 실제 미적용 원화 혜택을 합산한다. */
+  /** 선택 옵션과 실적에 따라 제공된 지정 월 한도 중 사용하지 않은 원화 혜택을 합산한다. */
   Long sumMissedBenefitAmount(@Param("userId") String userId, @Param("yearMonth") String yearMonth);
 
   /** 지정한 서울 월 범위에 발생한 최근 확정 혜택을 최신순으로 조회한다. */

@@ -63,7 +63,7 @@ class ReportQueryServiceTest {
   }
 
   @Test
-  void exposesOnlyCalculatedButUnappliedBenefitAsMissedBenefit() {
+  void exposesUnusedMonthlyLimitAsMissedBenefit() {
     PerformanceCardRow card = new PerformanceCardRow(CARD_ID, "카드", null, 300_000, 500_000, 1);
     when(reportMapper.findPerformanceCard(USER_ID, CARD_ID, "2026-07")).thenReturn(card);
     when(reportMapper.findMonthlyRemainingBenefits(USER_ID, CARD_ID, "2026-07"))
