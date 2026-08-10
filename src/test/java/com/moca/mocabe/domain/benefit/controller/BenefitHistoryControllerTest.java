@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistoryDetailResponse;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistoryMetaResponse;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistoryResponse;
+import com.moca.mocabe.domain.benefit.dto.BenefitHistorySummaryResponse;
 import com.moca.mocabe.domain.benefit.dto.MonthlyLimitResponse;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
@@ -21,7 +22,10 @@ class BenefitHistoryControllerTest {
     CurrentUserProvider currentUser = org.mockito.Mockito.mock(CurrentUserProvider.class);
     when(currentUser.getCurrentUserId()).thenReturn("user-1");
     BenefitHistoryResponse history =
-        new BenefitHistoryResponse(List.of(), new BenefitHistoryMetaResponse(1, 20, 0, false));
+        new BenefitHistoryResponse(
+            List.of(),
+            new BenefitHistorySummaryResponse(0, 0, 0, 0, 0),
+            new BenefitHistoryMetaResponse(1, 20, 0, false));
     BenefitHistoryDetailResponse detail =
         new BenefitHistoryDetailResponse(
             "history-1",

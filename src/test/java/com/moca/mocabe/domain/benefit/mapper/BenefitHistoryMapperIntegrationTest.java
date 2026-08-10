@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryDetailRow;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
+import com.moca.mocabe.domain.benefit.model.BenefitHistorySummaryRow;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -79,13 +80,14 @@ class BenefitHistoryMapperIntegrationTest {
     jdbc.update(
         "INSERT INTO user_cards"
             + " (user_card_id,user_id,card_id,codef_account_credential_id,card_name_from_codef,"
-            + "issuer_id,codef_card_key_hash,created_at,updated_at)"
-            + " VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))",
+            + "card_no,issuer_id,codef_card_key_hash,created_at,updated_at)"
+            + " VALUES (?,?,?,?,?,?,?, ?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))",
         USER_CARD,
         USER,
         CARD,
         CREDENTIAL,
         "CODEF 카드",
+        "1234********5678",
         ISSUER,
         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");
     jdbc.update(
@@ -133,7 +135,14 @@ class BenefitHistoryMapperIntegrationTest {
         mapper.findHistory(USER, from, to, null, "DISCOUNT", "LATEST", 0, 20);
     assertEquals(1, rows.size());
     assertEquals("스타벅스", rows.get(0).getMerchantName());
+    assertEquals("테스트 카드 1234********5678", rows.get(0).getCardName());
     assertEquals(1500L, rows.get(0).getBenefitAmount());
+    BenefitHistorySummaryRow summary = mapper.summarizeHistory(USER, from, to, USER_CARD);
+    assertEquals(1500L, summary.totalBenefitAmount());
+    assertEquals(1500L, summary.discountAmount());
+    assertEquals(0L, summary.cashbackAmount());
+    assertEquals(0L, summary.pointAmount());
+    assertEquals(0L, summary.mileageAmount());
     assertEquals(1L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
     assertEquals(0L, mapper.countHistory(OTHER_USER, from, to, null, null));
     assertNull(mapper.findDetail(OTHER_USER, USAGE));

@@ -4,10 +4,12 @@ import com.moca.mocabe.domain.benefit.dto.BenefitHistoryDetailResponse;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistoryItemResponse;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistoryMetaResponse;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistoryResponse;
+import com.moca.mocabe.domain.benefit.dto.BenefitHistorySummaryResponse;
 import com.moca.mocabe.domain.benefit.dto.MonthlyLimitResponse;
 import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryDetailRow;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
+import com.moca.mocabe.domain.benefit.model.BenefitHistorySummaryRow;
 import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
 import com.moca.mocabe.global.exception.benefit.InvalidBenefitHistoryQueryException;
 import java.time.LocalDateTime;
@@ -52,16 +54,26 @@ public class BenefitHistoryQueryService {
     }
     LocalDateTime from = toUtc(month);
     LocalDateTime to = toUtc(month.plusMonths(1));
-    long total = benefitHistoryMapper.countHistory(userId, from, to, blankToNull(userCardId), type);
+    String cardId = blankToNull(userCardId);
+    long total = benefitHistoryMapper.countHistory(userId, from, to, cardId, type);
     List<BenefitHistoryItemResponse> data =
         benefitHistoryMapper
             .findHistory(
-                userId, from, to, blankToNull(userCardId), type, sort, (page - 1) * size, size)
+                userId, from, to, cardId, type, sort, (page - 1) * size, size)
             .stream()
             .map(this::toItem)
             .toList();
+    BenefitHistorySummaryRow summary =
+        benefitHistoryMapper.summarizeHistory(userId, from, to, cardId);
     return new BenefitHistoryResponse(
-        data, new BenefitHistoryMetaResponse(page, size, total, (long) page * size < total));
+        data,
+        new BenefitHistorySummaryResponse(
+            summary.totalBenefitAmount(),
+            summary.discountAmount(),
+            summary.cashbackAmount(),
+            summary.pointAmount(),
+            summary.mileageAmount()),
+        new BenefitHistoryMetaResponse(page, size, total, (long) page * size < total));
   }
 
   @Transactional(readOnly = true)
@@ -126,8 +138,9 @@ public class BenefitHistoryQueryService {
       return null;
     }
     String type = value.toUpperCase(Locale.ROOT);
-    if (!List.of("DISCOUNT", "CASHBACK", "POINT").contains(type)) {
-      throw new InvalidBenefitHistoryQueryException("type은 DISCOUNT, CASHBACK, POINT 중 하나여야 합니다.");
+    if (!List.of("DISCOUNT", "CASHBACK", "POINT", "MILEAGE").contains(type)) {
+      throw new InvalidBenefitHistoryQueryException(
+          "type은 DISCOUNT, CASHBACK, POINT, MILEAGE 중 하나여야 합니다.");
     }
     return type;
   }
