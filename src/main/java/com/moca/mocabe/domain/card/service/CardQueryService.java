@@ -48,6 +48,22 @@ public class CardQueryService {
         return new MeCardItemResponse(userCardMapper.findByUserCardId(userCardId, userId));
     }
 
+    @Transactional
+    public void disconnectCard(String userId, String userCardId) {
+        if (userCardMapper.findByUserCardId(userCardId, userId) == null) {
+            throw new UserCardNotFoundException();
+        }
+        // user_cards를 참조하는 자식 테이블부터 순차적으로 삭제해야 FK 제약을 위반하지 않는다.
+        userCardMapper.deleteBenefitCalculationOutcomesByUserCardId(userCardId);
+        userCardMapper.deleteBenefitUsagesByUserCardId(userCardId);
+        userCardMapper.deleteOptionSelectionsByUserCardId(userCardId);
+        userCardMapper.deletePerformanceSnapshotsByUserCardId(userCardId);
+        userCardMapper.deletePaymentApprovalsByUserCardId(userCardId);
+        if (userCardMapper.deleteUserCard(userCardId, userId) == 0) {
+            throw new UserCardNotFoundException();
+        }
+    }
+
     @Transactional(readOnly = true)
     public CardDetailResponse getCardDetail(String userId, String userCardId) {
         UserCardListRow cardRow = userCardMapper.findByUserCardId(userCardId, userId);

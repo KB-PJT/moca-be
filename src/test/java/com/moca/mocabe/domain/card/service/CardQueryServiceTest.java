@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.card.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -177,6 +179,47 @@ class CardQueryServiceTest {
 
         assertThrows(UserCardNotFoundException.class,
                 () -> cardQueryService.getCardDetail(USER_ID, ACTIVE_USER_CARD_ID));
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드면 자식 테이블을 먼저 지우고 user_cards를 삭제한다")
+    void disconnectsOwnedCardByDeletingChildRowsFirst() {
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID))
+                .thenReturn(userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null));
+        when(userCardMapper.deleteUserCard(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(1);
+
+        cardQueryService.disconnectCard(USER_ID, ACTIVE_USER_CARD_ID);
+
+        InOrder inOrder = inOrder(userCardMapper);
+        inOrder.verify(userCardMapper).deleteBenefitCalculationOutcomesByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deleteBenefitUsagesByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deleteOptionSelectionsByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deletePerformanceSnapshotsByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deletePaymentApprovalsByUserCardId(ACTIVE_USER_CARD_ID);
+        inOrder.verify(userCardMapper).deleteUserCard(ACTIVE_USER_CARD_ID, USER_ID);
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드가 아니면 자식 테이블을 지우지 않고 예외를 던진다")
+    void rejectsDisconnectForUnknownCard() {
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(null);
+
+        assertThrows(UserCardNotFoundException.class,
+                () -> cardQueryService.disconnectCard(USER_ID, ACTIVE_USER_CARD_ID));
+
+        verify(userCardMapper, never()).deleteBenefitCalculationOutcomesByUserCardId(ACTIVE_USER_CARD_ID);
+        verify(userCardMapper, never()).deleteUserCard(ACTIVE_USER_CARD_ID, USER_ID);
+    }
+
+    @Test
+    @DisplayName("삭제 직전 다른 요청이 먼저 카드를 지웠으면 예외를 던진다")
+    void rejectsDisconnectWhenUserCardAlreadyDeletedConcurrently() {
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID))
+                .thenReturn(userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null));
+        when(userCardMapper.deleteUserCard(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(0);
+
+        assertThrows(UserCardNotFoundException.class,
+                () -> cardQueryService.disconnectCard(USER_ID, ACTIVE_USER_CARD_ID));
     }
 
     private CardBenefitRow benefitRow(
