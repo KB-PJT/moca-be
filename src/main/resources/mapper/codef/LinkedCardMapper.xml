@@ -54,11 +54,12 @@
         <constructor>
             <arg column="user_card_id" javaType="java.lang.String"/>
             <arg column="codef_card_key_hash" javaType="java.lang.String"/>
+            <arg column="is_active" javaType="_boolean"/>
         </constructor>
     </resultMap>
 
     <select id="findLinkedCardKeysByLinkId" resultMap="linkedCardKeyRowMap">
-        SELECT user_card_id, codef_card_key_hash
+        SELECT user_card_id, codef_card_key_hash, is_active
         FROM user_cards
         WHERE codef_account_credential_id = #{linkId}
           AND user_id = #{userId}

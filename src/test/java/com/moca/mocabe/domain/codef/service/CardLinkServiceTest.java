@@ -450,7 +450,7 @@ class CardLinkServiceTest {
         when(cardCatalogMatcher.match(any(), eq("매칭 카드"))).thenReturn(matched);
         when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
         when(linkedCardMapper.findLinkedCardKeysByLinkId("link-kb", USER_ID))
-                .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key")));
+                .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key", false)));
 
         SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
 
@@ -458,6 +458,29 @@ class CardLinkServiceTest {
         CardLinkCardResponse card = response.results().get(0).cards().get(0);
         assertEquals("existing-uc-1", card.userCardId());
         assertTrue(card.matched());
+        verify(codefCredentialStore, never()).saveCard(any());
+    }
+
+    @Test
+    @DisplayName("이미 활성화된 카드는 재조회 응답에서 제외한다")
+    void excludesAlreadyActiveCardFromResyncResponse() {
+        CodefConnection kbConnection = new CodefConnection(
+                "link-kb", "cid-kb", "0301", ISSUER_ID, "KB카드", null, new byte[0], false, false);
+        when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of(kbConnection));
+        CodefIssuerPolicy policy = cardPolicy();
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(policy);
+        when(codefClient.getOwnedCards("cid-kb", "0301", null, null, null)).thenReturn(List.of(
+                new CodefOwnedCard("매칭 카드", "1111****2222", "신용", null)));
+        when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("active-key");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of());
+        when(linkedCardMapper.findLinkedCardKeysByLinkId("link-kb", USER_ID))
+                .thenReturn(List.of(new LinkedCardKeyRow("active-uc-1", "active-key", true)));
+
+        SyncOwnedCardsResponse response = cardLinkService.syncOwnedCards(USER_ID, null);
+
+        assertEquals(1, response.results().size());
+        assertTrue(response.results().get(0).success());
+        assertTrue(response.results().get(0).cards().isEmpty());
         verify(codefCredentialStore, never()).saveCard(any());
     }
 

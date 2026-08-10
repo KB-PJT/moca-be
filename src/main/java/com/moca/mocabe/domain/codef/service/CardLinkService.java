@@ -212,8 +212,8 @@ public class CardLinkService {
                                                                   String creatorCardPassword) {
         // (user_id, codef_card_key_hash)가 DB에서 UNIQUE라 이 조회 이후 실제 적재 시점 사이에 다른
         // 요청이 끼어들 수 있다(동시 재조회). 그 경우는 saveCard가 UNIQUE 충돌을 잡아 처리한다.
-        Map<String, String> existingUserCardIdByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
-                .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, LinkedCardKeyRow::userCardId));
+        Map<String, LinkedCardKeyRow> existingRowByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
+                .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, row -> row));
 
         List<CardLinkCardResponse> cards = new ArrayList<>();
         Set<String> cardKeyHashes = new HashSet<>();
@@ -229,7 +229,12 @@ public class CardLinkService {
             if (!cardKeyHashes.add(cardKeyHash)) {
                 continue;
             }
-            String userCardId = existingUserCardIdByHash.get(cardKeyHash);
+            LinkedCardKeyRow existingRow = existingRowByHash.get(cardKeyHash);
+            if (existingRow != null && existingRow.isActive()) {
+                // 이미 활성화된 카드는 재조회 응답에서 제외한다(재활성화/중복 노출 방지).
+                continue;
+            }
+            String userCardId = existingRow == null ? null : existingRow.userCardId();
             if (userCardId == null && matched != null) {
                 boolean isCreatorCard = creatorCardNo != null
                         && MaskedCardNoMatcher.matches(creatorCardNo, ownedCard.cardNumber());
