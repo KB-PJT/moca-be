@@ -107,4 +107,31 @@
         WHERE user_card_id = #{userCardId}
             AND user_id = #{userId}
     </update>
+
+    <!-- 카드 연결 해제 시 user_cards를 참조하는 자식 테이블부터 순차적으로 삭제한다. -->
+    <delete id="deleteBenefitCalculationOutcomesByUserCardId">
+        DELETE FROM user_benefit_calculation_outcomes WHERE user_card_id = #{userCardId}
+    </delete>
+
+    <delete id="deleteBenefitUsagesByUserCardId">
+        DELETE FROM user_benefit_usages WHERE user_card_id = #{userCardId}
+    </delete>
+
+    <delete id="deleteOptionSelectionsByUserCardId">
+        DELETE FROM user_card_option_selections WHERE user_card_id = #{userCardId}
+    </delete>
+
+    <delete id="deletePerformanceSnapshotsByUserCardId">
+        DELETE FROM user_card_performance_snapshots WHERE user_card_id = #{userCardId}
+    </delete>
+
+    <delete id="deletePaymentApprovalsByUserCardId">
+        DELETE FROM card_payment_approvals WHERE user_card_id = #{userCardId}
+    </delete>
+
+    <delete id="deleteUserCard">
+        DELETE FROM user_cards
+        WHERE user_card_id = #{userCardId}
+            AND user_id = #{userId}
+    </delete>
 </mapper>
