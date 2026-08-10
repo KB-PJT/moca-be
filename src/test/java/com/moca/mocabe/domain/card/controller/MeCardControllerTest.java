@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -356,6 +357,47 @@ class MeCardControllerTest {
         when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
 
         mockMvc.perform(get("/me/cards/" + ACTIVE_USER_CARD_ID))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(cardQueryService);
+    }
+
+    @Test
+    @DisplayName("연결 해제 요청을 현재 사용자·userCardId 기준으로 서비스에 전달한다")
+    void disconnectsCard() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+
+        String response = mockMvc.perform(delete("/me/cards/" + ACTIVE_USER_CARD_ID))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode root = new ObjectMapper().readTree(response);
+        assertTrue(root.path("success").asBoolean());
+        assertTrue(root.path("data").path("success").asBoolean());
+        verify(cardQueryService).disconnectCard(USER_ID, ACTIVE_USER_CARD_ID);
+    }
+
+    @Test
+    @DisplayName("본인 소유 카드가 아니면 연결 해제도 404를 반환한다")
+    void rejectsUnknownCardForDisconnect() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        org.mockito.Mockito.doThrow(new UserCardNotFoundException())
+                .when(cardQueryService).disconnectCard(USER_ID, ACTIVE_USER_CARD_ID);
+
+        String response = mockMvc.perform(delete("/me/cards/" + ACTIVE_USER_CARD_ID))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("USER_CARD_NOT_FOUND",
+                new ObjectMapper().readTree(response).path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("인증 정보가 없으면 연결 해제 서비스를 호출하지 않고 401을 반환한다")
+    void rejectsUnauthenticatedDisconnectRequest() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
+
+        mockMvc.perform(delete("/me/cards/" + ACTIVE_USER_CARD_ID))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(cardQueryService);

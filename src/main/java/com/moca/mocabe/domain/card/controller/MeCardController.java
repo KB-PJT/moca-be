@@ -7,6 +7,7 @@ import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.card.dto.UpdateMemoRequest;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
+import com.moca.mocabe.domain.user.dto.SuccessResponse;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.response.ApiResponse;
 import java.time.LocalDate;
@@ -14,6 +15,7 @@ import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -63,6 +65,14 @@ public class MeCardController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+
+    @DeleteMapping("/{userCardId}")
+    public ResponseEntity<ApiResponse<SuccessResponse>> disconnectCard(
+            @PathVariable String userCardId
+    ) {
+        cardQueryService.disconnectCard(currentUserProvider.getCurrentUserId(), userCardId);
+        return ResponseEntity.ok(ApiResponse.success(new SuccessResponse(true)));
+    }
 
     @PostMapping("/sync")
     public ResponseEntity<ApiResponse<SyncMyCardsResponse>> sync(
