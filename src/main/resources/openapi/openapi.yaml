@@ -1071,6 +1071,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /me/cards/order:
+    patch:
+      tags: [Card]
+      summary: 보유 카드 순서 변경
+      description: |
+        인증 사용자의 활성 보유 카드 표시 순서를 변경합니다.
+        userCardIds는 사용자가 보유한 활성 카드 전체를 원하는 순서대로 중복 없이 포함해야 하며,
+        목록 내 위치가 곧 새 display_order가 됩니다.
+        누락되거나 중복되거나 본인 소유가 아닌 카드가 포함되면 400을 반환합니다.
+      operationId: reorderMyCards
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        description: 활성 보유 카드의 새 순서입니다.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderMyCardsRequest'
+      responses:
+        '200':
+          description: 순서 변경 성공(갱신된 카드 목록 반환)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeCardsApiResponse'
+        '400':
+          description: 요청값 검증 실패(code=VALIDATION_FAILED) 또는 활성 카드 전체와 불일치(code=INVALID_CARD_ORDER)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
   /me/card-sort-mode:
     patch:
       tags: [User]
@@ -2358,6 +2392,21 @@ components:
         data:
           description: 'API의 실제 처리 결과입니다.'
           $ref: '#/components/schemas/MeCardItemResponse'
+    ReorderMyCardsRequest:
+      description: '보유 카드의 새 표시 순서입니다.'
+      type: object
+      required: [userCardIds]
+      properties:
+        userCardIds:
+          description: '활성 보유 카드 전체를 원하는 순서대로 중복 없이 나열한 목록입니다.'
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+          example:
+            - 01980d6a-5c0c-7aaf-9b85-010203040531
+            - 01980d6a-5c0c-7aaf-9b85-010203040532
     UpdateMemoRequest:
       description: '보유 카드에 저장할 새 메모입니다.'
       type: object
