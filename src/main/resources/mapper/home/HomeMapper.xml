@@ -17,8 +17,100 @@
         <result property="displayOrder" column="display_order"/>
     </resultMap>
 
-    <!-- 최신 카드 콘텐츠 하나만 사용하고, 월 한도는 정책별 최고 구간을 합산한다. -->
+    <!--
+      최신 카드 콘텐츠 하나만 사용한다. 월 최대 혜택은 전월 실적에 맞는 월 한도만 선택하고,
+      원화 금액 한도와 정액 혜택의 횟수 한도를 원화로 합산한다. 같은 shared_group_key는 한 번만 센다.
+    -->
     <select id="findHomeCards" resultMap="homeCardRowMap">
+        WITH eligible_monthly_limits AS (
+            SELECT limit_card.user_card_id,
+                   limit_content.content_version_id,
+                   COALESCE(limit_policy.shared_group_key, limit_policy.limit_policy_id)
+                       AS limit_group_key,
+                   CASE
+                       WHEN limit_policy.limit_type = 'reward_amount'
+                            AND limit_policy.limit_unit = 'KRW'
+                           THEN limit_tier.limit_value
+                       WHEN limit_policy.limit_type = 'usage_count'
+                            AND limit_policy.limit_unit = 'count'
+                            AND offer.value_type = 'fixed_amount'
+                            AND offer.reward_type IN ('discount', 'cashback')
+                           THEN limit_tier.limit_value * COALESCE((
+                               SELECT MAX(rule.reward_value)
+                               FROM benefit_rules rule
+                               WHERE rule.offer_id = offer.offer_id
+                                 AND rule.rule_effect = 'grant'
+                                 AND rule.reward_unit = 'KRW'
+                                 AND rule.current_spend_min_krw IS NULL
+                                 AND (rule.previous_spend_min_krw IS NULL
+                                      OR rule.previous_spend_min_krw &lt;=
+                                         COALESCE(previous_performance.current_spend_amount, 0))
+                                 AND (rule.valid_from IS NULL
+                                      OR rule.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
+                                 AND (rule.valid_to IS NULL
+                                      OR rule.valid_to &gt;= CONCAT(#{yearMonth}, '-01'))
+                           ), 0)
+                       ELSE 0
+                   END AS maximum_reward
+            FROM user_cards limit_card
+            INNER JOIN cards limit_card_catalog
+                ON limit_card_catalog.card_id = limit_card.card_id
+            INNER JOIN card_content_versions limit_content
+                ON limit_content.card_id = limit_card_catalog.card_id
+            INNER JOIN card_benefits benefit
+                ON benefit.content_version_id = limit_content.content_version_id
+            INNER JOIN benefit_offers offer ON offer.benefit_id = benefit.benefit_id
+            INNER JOIN benefit_limit_policies limit_policy
+                ON limit_policy.offer_id = offer.offer_id
+            INNER JOIN benefit_limit_tiers limit_tier
+                ON limit_tier.limit_policy_id = limit_policy.limit_policy_id
+            LEFT JOIN user_card_performance_snapshots previous_performance
+                ON previous_performance.user_card_id = limit_card.user_card_id
+               AND previous_performance.performance_month =
+                   DATE_FORMAT(
+                       DATE_SUB(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH),
+                       '%Y-%m')
+            WHERE limit_policy.limit_period = 'monthly'
+              AND (limit_policy.valid_from IS NULL
+                   OR limit_policy.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
+              AND (limit_policy.valid_to IS NULL
+                   OR limit_policy.valid_to &gt;= CONCAT(#{yearMonth}, '-01'))
+              AND limit_tier.current_spend_min_krw IS NULL
+              AND (limit_tier.previous_spend_min_krw IS NULL
+                   OR limit_tier.previous_spend_min_krw &lt;=
+                      COALESCE(previous_performance.current_spend_amount, 0))
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM benefit_limit_tiers higher_tier
+                  WHERE higher_tier.limit_policy_id = limit_tier.limit_policy_id
+                    AND higher_tier.current_spend_min_krw IS NULL
+                    AND (higher_tier.previous_spend_min_krw IS NULL
+                         OR higher_tier.previous_spend_min_krw &lt;=
+                            COALESCE(previous_performance.current_spend_amount, 0))
+                    AND (
+                        COALESCE(higher_tier.previous_spend_min_krw, 0)
+                            &gt; COALESCE(limit_tier.previous_spend_min_krw, 0)
+                        OR (
+                            COALESCE(higher_tier.previous_spend_min_krw, 0)
+                                = COALESCE(limit_tier.previous_spend_min_krw, 0)
+                            AND higher_tier.position &gt; limit_tier.position
+                        )
+                    )
+              )
+        ), monthly_limit_groups AS (
+            SELECT user_card_id,
+                   content_version_id,
+                   limit_group_key,
+                   MAX(maximum_reward) AS maximum_reward
+            FROM eligible_monthly_limits
+            GROUP BY user_card_id, content_version_id, limit_group_key
+        ), monthly_card_limits AS (
+            SELECT user_card_id,
+                   content_version_id,
+                   SUM(maximum_reward) AS maximum_monthly_benefit_amount
+            FROM monthly_limit_groups
+            GROUP BY user_card_id, content_version_id
+        )
         SELECT uc.user_card_id,
                COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
                uc.memo AS alias,
@@ -31,22 +123,8 @@
                    ORDER BY cb.position ASC
                    LIMIT 1
                ) AS highlight_benefit_title,
-               COALESCE((
-                   SELECT SUM(policy_limit.maximum_reward)
-                   FROM (
-                       SELECT cb2.content_version_id, blp.limit_policy_id,
-                              MAX(blt.limit_value) AS maximum_reward
-                       FROM card_benefits cb2
-                       INNER JOIN benefit_offers bo ON bo.benefit_id = cb2.benefit_id
-                       INNER JOIN benefit_limit_policies blp ON blp.offer_id = bo.offer_id
-                       INNER JOIN benefit_limit_tiers blt ON blt.limit_policy_id = blp.limit_policy_id
-                       WHERE blp.limit_period = 'monthly'
-                         AND blp.limit_type = 'reward_amount'
-                         AND blp.limit_unit = 'KRW'
-                       GROUP BY cb2.content_version_id, blp.limit_policy_id
-                   ) policy_limit
-                   WHERE policy_limit.content_version_id = cv.content_version_id
-               ), 0) AS maximum_monthly_benefit_amount,
+               COALESCE(card_limit.maximum_monthly_benefit_amount, 0)
+                   AS maximum_monthly_benefit_amount,
                COALESCE(benefit_usage.received_benefit_amount, 0) AS received_benefit_amount,
                COALESCE(performance.current_spend_amount, 0) AS performance_current_amount,
                <!-- 실적 구간 원문이 없는 카드는 기존 대표 실적을 목표로 사용한다. -->
@@ -81,6 +159,9 @@
               AND usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
             GROUP BY user_card_id
         ) benefit_usage ON benefit_usage.user_card_id = uc.user_card_id
+        LEFT JOIN monthly_card_limits card_limit
+            ON card_limit.user_card_id = uc.user_card_id
+           AND card_limit.content_version_id = cv.content_version_id
         LEFT JOIN user_card_performance_snapshots performance
             ON performance.user_card_id = uc.user_card_id
            AND performance.performance_month = #{yearMonth}

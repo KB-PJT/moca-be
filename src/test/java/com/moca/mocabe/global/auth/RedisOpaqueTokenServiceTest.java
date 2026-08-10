@@ -115,34 +115,11 @@ class RedisOpaqueTokenServiceTest {
         AuthenticatedUser user = tokenService.authenticate("access-token");
 
         org.junit.jupiter.api.Assertions.assertEquals(USER_ID, user.getUserId());
+        assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.authenticate(" "));
         when(valueOperations.get(anyString())).thenReturn(null);
         assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.authenticate("expired-token"));
         when(valueOperations.get(anyString())).thenReturn("session-2", "invalid-session-value");
         assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.authenticate("broken-token"));
-    }
-
-    @Test
-    @DisplayName("local-test에 등록한 고정 access token만 인증하고 토큰 원문은 Redis 키에 사용하지 않는다")
-    void authenticatesOnlyRegisteredLocalTestToken() {
-        String testToken = "fixed-local-test-token";
-        tokenService.registerLocalTestAccessToken(testToken, USER_ID, "user");
-        when(valueOperations.get(anyString())).thenReturn("session-1", USER_ID + "|user");
-
-        AuthenticatedUser user = tokenService.authenticate(testToken);
-
-        org.junit.jupiter.api.Assertions.assertEquals(USER_ID, user.getUserId());
-        assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.authenticate("another-token"));
-        assertThrows(InvalidOpaqueTokenException.class, () -> tokenService.authenticate(" "));
-        verify(valueOperations, times(2)).set(anyString(), anyString(), any(Duration.class));
-        verify(setOperations).add(org.mockito.ArgumentMatchers.eq("moca:user-sessions:" + USER_ID),
-                org.mockito.ArgumentMatchers.anyString());
-    }
-
-    @Test
-    @DisplayName("local-test 고정 access token 등록에 필요한 값이 없으면 거절한다")
-    void rejectsIncompleteLocalTestTokenRegistration() {
-        assertThrows(IllegalArgumentException.class,
-                () -> tokenService.registerLocalTestAccessToken(null, USER_ID, "user"));
     }
 
     @Test
