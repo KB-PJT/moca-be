@@ -440,13 +440,16 @@ paths:
       tags: [CardLink]
       summary: CODEF 카드 연동(Connected ID) 생성
       description: |
-        카드사 자격정보로 CODEF Connected ID를 생성하고 보유카드를 조회합니다.
+        카드사 자격정보로 CODEF Connected ID를 생성합니다.
         비밀번호는 CODEF 공개키로 RSA 암호화해 전송하며, 저장 시 자격정보는 AES로 암호화합니다.
-        반환된 카드는 후보이며 아직 user_cards에 적재되지 않습니다. matched=false 카드는 추천에서 제외됩니다.
-        옵션 그룹은 파서 검증이 완료된 항목만 반환하며, 선택 카드 확정 시 그룹마다 하나를 골라야 합니다.
-        connectedId 발급 이후 자격정보는 먼저 저장되므로, 뒤이은 보유카드 조회가 실패해도 연동 생성
-        자체는 201로 성공하고 cards는 빈 배열로 내려갑니다. 이 경우 POST /card-links/cards/sync로
-        보유카드만 다시 조회할 수 있습니다.
+        카드번호가 필요 없는 카드사는 이 호출에서 보유카드까지 바로 조회해 cards로 내려줍니다.
+        카드번호가 필요한 카드사(policy.requiresCardNo)는 이 호출에서 보유카드 조회를 하지 않고
+        cards를 항상 빈 배열로 내려줍니다 — 방금 입력한 cardNo/cardPassword는 서버가 암호화해
+        잠깐 보관해두고, 클라이언트가 로딩 UX 등을 이유로 보유카드 조회를 별도 타이밍에 하고 싶을 때
+        POST /card-links/{linkId}/cards/discover를 호출하면 그 값을 재사용해 조회합니다(카드번호를
+        다시 입력받지 않아도 됩니다). connectedId 발급 이후 자격정보는 먼저 저장되므로, 카드번호가
+        필요 없는 카드사에서 뒤이은 보유카드 조회가 실패해도 연동 생성 자체는 201로 성공하고 cards는
+        빈 배열로 내려갑니다. 이 경우 POST /card-links/cards/sync로 보유카드만 다시 조회할 수 있습니다.
       operationId: createCardLink
       security:
         - MocaBearerAuth: []
@@ -516,6 +519,56 @@ paths:
           description: >-
             카드사 비밀번호 오류 횟수 초과로 계정이 잠김(code=CODEF_ACCOUNT_LOCKED). 재시도 안내가 아니라
             카드사를 통한 잠금 해제가 필요하다는 뜻입니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/CodefUnavailableError'
+  /card-links/{linkId}/cards/discover:
+    post:
+      tags: [CardLink]
+      summary: 카드번호 필요 카드사의 보유카드 조회(2단계)
+      description: |
+        카드번호가 필요한 카드사에서, POST /card-links(1단계)가 잠깐 보관해둔 cardNo/cardPassword를
+        재사용해 보유카드를 조회·매칭·적재합니다. 요청 본문은 없습니다. 성공하면 보관해둔 값은
+        즉시 지워지므로 한 연동당 한 번만 성공적으로 호출할 수 있고, 이후 보유카드를 다시 조회하려면
+        POST /card-links/cards/sync를 써야 합니다. CODEF 호출이 실패하면 보관해둔 값은 지워지지
+        않으므로 이 API를 다시 호출해 재시도할 수 있습니다.
+      operationId: discoverCardLinkOwnedCards
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - name: linkId
+          in: path
+          required: true
+          description: POST /card-links 응답의 linkId(codef_account_credential_id)입니다.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 보유카드 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardLinkApiResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '400':
+          description: 카드번호 입력이 필요하지 않은 카드사의 연동(code=INVALID_CARD_SELECTION)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 본인 소유의 연동을 찾을 수 없음(code=CARD_LINK_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 이미 보유카드 조회를 완료해 재사용할 값이 없음(code=CARD_LINK_ALREADY_DISCOVERED)
           content:
             application/json:
               schema:

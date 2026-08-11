@@ -27,6 +27,12 @@ public class CodefCredentialStore {
         insertCredential(credential);
     }
 
+    /** discoverOwnedCards(2단계)가 pending 카드번호/비밀번호를 소비한 뒤 지우는 별도 트랜잭션이다. */
+    @Transactional
+    public void clearPendingCardCredentials(String linkId, String userId) {
+        codefCredentialMapper.clearPendingCardCredentials(linkId, userId);
+    }
+
     /**
      * 매칭된 보유카드 한 건을 자격정보와 별도 트랜잭션으로 적재하고 최종 user_card_id를 반환한다.
      * 동시에 같은 카드를 재조회하는 다른 요청이 먼저 적재했다면((user_id, codef_card_key_hash)

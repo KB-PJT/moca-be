@@ -2,6 +2,7 @@ package com.moca.mocabe.domain.codef.mapper;
 
 import com.moca.mocabe.domain.codef.model.CodefAccountCredential;
 import com.moca.mocabe.domain.codef.model.CodefConnection;
+import com.moca.mocabe.domain.codef.model.PendingCardDiscoveryTarget;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -22,4 +23,11 @@ public interface CodefCredentialMapper {
 
     /** 승인내역 조회에 사용할 사용자의 활성 연동 목록을 카드사 기관코드와 함께 조회한다. */
     List<CodefConnection> findActiveConnectionsByUserId(@Param("userId") String userId);
+
+    /** POST /card-links/{linkId}/cards/discover 대상 연동을 조회한다(본인 소유 연동만). */
+    PendingCardDiscoveryTarget findPendingDiscoveryTarget(
+            @Param("linkId") String linkId, @Param("userId") String userId);
+
+    /** 2단계 보유카드 조회 소비 후 pending 카드번호/비밀번호를 지운다. */
+    void clearPendingCardCredentials(@Param("linkId") String linkId, @Param("userId") String userId);
 }

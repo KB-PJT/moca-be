@@ -29,6 +29,7 @@ import com.moca.mocabe.domain.codef.dto.SubmitCardCredentialsRequest;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
 import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
@@ -58,6 +59,7 @@ import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import com.moca.mocabe.domain.codef.model.LinkedCardInsert;
 import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
+import com.moca.mocabe.domain.codef.model.PendingCardDiscoveryTarget;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -118,13 +120,12 @@ class CardLinkServiceTest {
     }
 
     @Test
-    @DisplayName("issuerId로 기관코드를 조회해 연동하고 connectedId·암호화 자격정보를 저장한다")
+    @DisplayName("카드번호가 필요한 카드사는 connectedId·자격정보만 저장하고, 카드번호는 pending으로 "
+            + "암호화해 보관한 채 보유카드 조회는 하지 않는다(discoverOwnedCards가 2단계로 처리)")
     void createsLinkAndStoresCredential() {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
         when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
-        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
-                .thenReturn(List.of());
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 
         CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
@@ -132,16 +133,20 @@ class CardLinkServiceTest {
         assertNotNull(response.getLinkId());
         assertEquals(INSTITUTION_CODE, response.getInstitutionCode());
         assertEquals("PENDING_CARD_ACTIVATION", response.getStatus());
+        assertTrue(response.cards().isEmpty());
 
         ArgumentCaptor<CodefAccountCredential> credentialCaptor =
                 ArgumentCaptor.forClass(CodefAccountCredential.class);
         verify(codefCredentialStore).saveCredential(credentialCaptor.capture());
         verify(codefCredentialStore, never()).saveCard(any());
+        verify(codefClient, never()).getOwnedCards(any(), any(), any(), any(), any());
         CodefAccountCredential credential = credentialCaptor.getValue();
         assertEquals(response.getLinkId(), credential.getCodefAccountCredentialId());
         assertEquals("hash-1", credential.getCredentialIdentityHash());
         assertEquals("active", credential.getStatus());
         assertNotNull(credential.getAccountPasswordEnc());
+        assertNotNull(credential.getPendingCardNumberEnc());
+        assertNotNull(credential.getPendingCardPasswordEnc());
     }
 
     @Test
@@ -308,16 +313,17 @@ class CardLinkServiceTest {
     }
 
     @Test
-    @DisplayName("보유카드 조회가 실패해도 connectedId·자격정보 저장은 유지하고 연동 생성은 성공한다")
+    @DisplayName("카드번호가 필요 없는 카드사는 보유카드 조회가 실패해도 connectedId·자격정보 저장은 "
+            + "유지하고 연동 생성은 성공한다")
     void keepsCredentialWhenOwnedCardFetchFails() {
-        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
-        when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
+        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(accountPolicy());
+        when(credentialHasher.generate("ACCOUNT_ID", "tester")).thenReturn("cred-hash");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
-        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
+        when(codefClient.getOwnedCards("cid-1", "0301", null, null, null))
                 .thenThrow(new CodefUnavailableException("upstream timeout"));
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 
-        CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
+        CardLinkResponse response = cardLinkService.createLink(USER_ID, accountRequest());
 
         assertNotNull(response.getLinkId());
         assertEquals("PENDING_CARD_ACTIVATION", response.getStatus());
@@ -325,6 +331,96 @@ class CardLinkServiceTest {
         verify(codefCredentialStore).saveCredential(any(CodefAccountCredential.class));
         verify(codefCredentialStore, never()).saveCard(any());
         verifyNoInteractions(cardCatalogMapper);
+    }
+
+    @Test
+    @DisplayName("discover(2단계)는 카드번호가 실제로 카드에 저장됐을 때만 pending 값을 지운다")
+    void discoversOwnedCardsUsingPendingCredentialsAndClearsPendingWhenCardIsStored() {
+        String linkId = "link-1";
+        byte[] pendingCardNoEnc = {7, 7};
+        byte[] pendingCardPasswordEnc = {6, 6};
+        byte[] birthDateEnc = {5, 5};
+        PendingCardDiscoveryTarget target = new PendingCardDiscoveryTarget(
+                linkId, "cid-1", "0301", birthDateEnc, true, pendingCardNoEnc, pendingCardPasswordEnc);
+        when(codefCredentialMapper.findPendingDiscoveryTarget(linkId, USER_ID)).thenReturn(target);
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
+        when(encryptor.decrypt(birthDateEnc)).thenReturn("900101");
+        when(encryptor.decrypt(pendingCardNoEnc)).thenReturn("1234567890123456");
+        when(encryptor.decrypt(pendingCardPasswordEnc)).thenReturn("1234");
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of());
+        // 카탈로그 매칭에 성공해 카드번호가 실제로 어느 카드에 저장된 상태를 가정한다.
+        when(linkedCardMapper.findAnyCardCredentialByLinkId(linkId))
+                .thenReturn(new ActiveCardCredential("uc-1", new byte[] {1}, new byte[] {2}));
+
+        CardLinkResponse response = cardLinkService.discoverOwnedCards(USER_ID, linkId);
+
+        assertEquals(linkId, response.getLinkId());
+        assertEquals("0301", response.getInstitutionCode());
+        assertTrue(response.cards().isEmpty());
+        verify(codefCredentialStore).clearPendingCardCredentials(linkId, USER_ID);
+    }
+
+    @Test
+    @DisplayName("discover가 CODEF 조회는 성공했지만 카드번호를 옮겨 저장할 카드가 없으면 "
+            + "pending 값을 지우지 않는다(카탈로그 매칭 실패 등으로 재시도가 필요한 상황)")
+    void keepsPendingCredentialsWhenNoCardStoresTheCreatorCardNumber() {
+        String linkId = "link-1";
+        byte[] pendingCardNoEnc = {7, 7};
+        byte[] pendingCardPasswordEnc = {6, 6};
+        byte[] birthDateEnc = {5, 5};
+        PendingCardDiscoveryTarget target = new PendingCardDiscoveryTarget(
+                linkId, "cid-1", "0301", birthDateEnc, true, pendingCardNoEnc, pendingCardPasswordEnc);
+        when(codefCredentialMapper.findPendingDiscoveryTarget(linkId, USER_ID)).thenReturn(target);
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
+        when(encryptor.decrypt(birthDateEnc)).thenReturn("900101");
+        when(encryptor.decrypt(pendingCardNoEnc)).thenReturn("1234567890123456");
+        when(encryptor.decrypt(pendingCardPasswordEnc)).thenReturn("1234");
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of());
+        // 아직 카드번호가 저장된 카드가 이 연동에 하나도 없는 상태(카탈로그 매칭 실패 등)를 가정한다.
+        when(linkedCardMapper.findAnyCardCredentialByLinkId(linkId)).thenReturn(null);
+
+        cardLinkService.discoverOwnedCards(USER_ID, linkId);
+
+        verify(codefCredentialStore, never()).clearPendingCardCredentials(any(), any());
+    }
+
+    @Test
+    @DisplayName("이미 pending 값을 소비한 연동에 discover를 다시 요청하면 거부한다")
+    void rejectsDiscoverWhenPendingCredentialsAlreadyConsumed() {
+        String linkId = "link-1";
+        PendingCardDiscoveryTarget target = new PendingCardDiscoveryTarget(
+                linkId, "cid-1", "0301", new byte[0], true, null, null);
+        when(codefCredentialMapper.findPendingDiscoveryTarget(linkId, USER_ID)).thenReturn(target);
+
+        assertThrows(CardLinkAlreadyDiscoveredException.class,
+                () -> cardLinkService.discoverOwnedCards(USER_ID, linkId));
+        verifyNoInteractions(codefClient);
+        verify(codefCredentialStore, never()).clearPendingCardCredentials(any(), any());
+    }
+
+    @Test
+    @DisplayName("카드번호가 필요하지 않은 카드사의 연동이면 discover를 거부한다")
+    void rejectsDiscoverWhenCardNoNotRequired() {
+        String linkId = "link-1";
+        PendingCardDiscoveryTarget target = new PendingCardDiscoveryTarget(
+                linkId, "cid-1", "0301", new byte[0], false, null, null);
+        when(codefCredentialMapper.findPendingDiscoveryTarget(linkId, USER_ID)).thenReturn(target);
+
+        assertThrows(InvalidCardSelectionException.class,
+                () -> cardLinkService.discoverOwnedCards(USER_ID, linkId));
+        verifyNoInteractions(codefClient);
+    }
+
+    @Test
+    @DisplayName("본인 소유 연동이 아니면 discover를 거부한다")
+    void rejectsDiscoverForUnknownLink() {
+        when(codefCredentialMapper.findPendingDiscoveryTarget("missing", USER_ID)).thenReturn(null);
+
+        assertThrows(CardLinkNotFoundException.class,
+                () -> cardLinkService.discoverOwnedCards(USER_ID, "missing"));
+        verifyNoInteractions(codefClient);
     }
 
     @Test
