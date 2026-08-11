@@ -27,6 +27,8 @@ tags:
     description: 인증 사용자의 혜택·실적 월간 리포트 조회
   - name: Merchant
     description: 가맹점 카테고리 조회
+  - name: Support
+    description: 인증 사용자의 문의 등록
   - name: Health
     description: 서버 상태 확인
 paths:
@@ -1256,6 +1258,40 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
+  /support/inquiries:
+    post:
+      tags: [Support]
+      summary: 문의 등록
+      description: |
+        인증 사용자가 운영팀에 보낼 문의를 등록합니다. inquiryType, title, content, replyEmail은 모두 필수입니다.
+        등록된 문의는 status=received 상태로 저장됩니다.
+      operationId: createInquiry
+      security:
+        - MocaBearerAuth: []
+      requestBody:
+        description: 등록할 문의의 유형·제목·내용·답변받을 이메일입니다.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInquiryRequest'
+      responses:
+        '201':
+          description: 문의 등록 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InquiryApiResponse'
+        '400':
+          description: >-
+            요청값 검증 실패(code=VALIDATION_FAILED) —
+            inquiryType/title/content/replyEmail이 비어 있거나 형식·길이 제한을 위반함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
 components:
   securitySchemes:
     MocaBearerAuth:
@@ -2430,6 +2466,76 @@ components:
           nullable: true
           maxLength: 500
           example: 카페 전용 카드
+    CreateInquiryRequest:
+      description: '등록할 문의의 유형·제목·내용·답변받을 이메일입니다.'
+      type: object
+      required: [inquiryType, title, content, replyEmail]
+      properties:
+        inquiryType:
+          description: '문의 유형입니다.'
+          type: string
+          enum: [card_link, performance_benefit, map_merchant, account_login, bug, etc]
+          example: card_link
+        title:
+          description: '문의 제목입니다.'
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: 카드 연동이 안 돼요
+        content:
+          description: '문의 내용입니다.'
+          type: string
+          minLength: 1
+          maxLength: 2000
+          example: CODEF 연동 시 인증번호 입력 화면에서 계속 실패합니다.
+        replyEmail:
+          description: '답변을 받을 이메일입니다.'
+          type: string
+          format: email
+          maxLength: 255
+          example: kakao_jimin@kakao.com
+    InquiryResponse:
+      description: '등록된 문의 정보입니다.'
+      type: object
+      properties:
+        inquiryId:
+          description: '등록된 문의(support_inquiries)의 식별자입니다.'
+          type: string
+          format: uuid
+        inquiryType:
+          description: '문의 유형입니다.'
+          type: string
+          enum: [card_link, performance_benefit, map_merchant, account_login, bug, etc]
+        title:
+          description: '문의 제목입니다.'
+          type: string
+        content:
+          description: '문의 내용입니다.'
+          type: string
+        replyEmail:
+          description: '답변을 받을 이메일입니다.'
+          type: string
+          format: email
+        status:
+          description: '문의 처리 상태입니다.'
+          type: string
+          enum: [received, answered, closed]
+          example: received
+        createdAt:
+          description: '문의가 등록된 시각(UTC)입니다.'
+          type: string
+          format: date-time
+    InquiryApiResponse:
+      description: 'Inquiry API의 공통 성공 응답입니다.'
+      type: object
+      properties:
+        success:
+          description: '요청 처리 성공 여부입니다.'
+          type: boolean
+          example: true
+        data:
+          description: 'API의 실제 처리 결과입니다.'
+          $ref: '#/components/schemas/InquiryResponse'
     UpdateNicknameRequest:
       description: '인증 사용자의 새 닉네임 입력입니다.'
       type: object
