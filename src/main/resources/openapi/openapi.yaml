@@ -1303,6 +1303,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/AuthorizationError'
 components:
   securitySchemes:
     MocaBearerAuth:
@@ -1327,12 +1329,26 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            data: null
+            error:
+              code: AUTHENTICATION_REQUIRED
+              message: 인증이 필요합니다.
+              fields: {}
     AuthorizationError:
       description: 인증은 완료됐지만 해당 리소스 권한이 없음
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            data: null
+            error:
+              code: ACCESS_DENIED
+              message: 접근 권한이 없습니다.
+              fields: {}
     ValidationError:
       description: 요청값 검증 실패
       content:
