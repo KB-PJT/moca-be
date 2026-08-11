@@ -28,6 +28,18 @@ public class CodefCredentialStore {
     }
 
     /**
+     * discoverOwnedCards(2단계)가 claim(짧은 트랜잭션에서 pending을 읽고 바로 지움) 이후 CODEF 호출
+     * 실패나 카탈로그 매칭 실패로 카드번호를 어느 카드에도 저장하지 못했을 때, claim 시점에 읽어둔
+     * 값 그대로 pending을 되돌려 사용자가 다시 discover를 호출할 수 있게 하는 별도 트랜잭션이다.
+     */
+    @Transactional
+    public void restorePendingCardCredentials(String linkId, String userId,
+                                              byte[] pendingCardNumberEnc, byte[] pendingCardPasswordEnc) {
+        codefCredentialMapper.restorePendingCardCredentials(
+                linkId, userId, pendingCardNumberEnc, pendingCardPasswordEnc);
+    }
+
+    /**
      * 매칭된 보유카드 한 건을 자격정보와 별도 트랜잭션으로 적재하고 최종 user_card_id를 반환한다.
      * 동시에 같은 카드를 재조회하는 다른 요청이 먼저 적재했다면((user_id, codef_card_key_hash)
      * UNIQUE 위반) 새로 적재하지 않고 그 요청이 이미 적재한 user_card_id를 그대로 돌려준다.

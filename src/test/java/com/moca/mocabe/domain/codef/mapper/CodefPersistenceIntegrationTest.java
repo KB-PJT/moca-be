@@ -5,9 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsRequest;
@@ -130,6 +133,123 @@ class CodefPersistenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("discoverOwnedCards가 카드번호를 실제로 카드에 저장하면 pending을 지우고, "
+            + "이후 재요청은 409로 거부된다")
+    void discoverConsumesPendingCredentialsOnceCardIsStored() {
+        jdbcTemplate.update("INSERT INTO cards "
+                        + "(card_id, issuer_id, card_type, first_seen_at, last_seen_at) "
+                        + "VALUES (?, ?, 'check', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                CARD_ID, ISSUER_ID);
+        jdbcTemplate.update("INSERT INTO card_content_versions "
+                        + "(content_version_id, card_id, content_sha256, name, image_url, "
+                        + "first_seen_at, last_seen_at) "
+                        + "VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                CONTENT_VERSION_ID, CARD_ID,
+                "0000000000000000000000000000000000000000000000000000000000000000",
+                "노리2 체크카드(KB Pay)", "https://gorilla/card.png");
+        // 계정 생성 카드번호(요청)와 마스킹 카드번호(응답)의 앞뒤 자리가 일치해 카드번호가 이 카드에 저장된다.
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of(
+                        new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "123456******3456", "체크/본인", "")));
+
+        CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_number_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_password_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+
+        cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
+
+        assertNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_number_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+        assertNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_password_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+        assertThrows(com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException.class,
+                () -> cardLinkService.discoverOwnedCards(USER_ID, link.linkId()));
+    }
+
+    @Test
+    @DisplayName("동시에 두 discover 요청이 들어오면 하나만 CODEF를 호출해 성공하고, "
+            + "다른 하나는 CODEF를 호출하지 않은 채 409로 즉시 끝난다")
+    void concurrentDiscoverRequestsOnlyOneCallsCodef() throws Exception {
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of());
+        CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+            Callable<CardLinkResponse> discover = () -> {
+                ready.countDown();
+                start.await();
+                return cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
+            };
+            Future<CardLinkResponse> first = executor.submit(discover);
+            Future<CardLinkResponse> second = executor.submit(discover);
+            ready.await();
+            start.countDown();
+
+            int successCount = 0;
+            int alreadyDiscoveredCount = 0;
+            for (Future<CardLinkResponse> future : List.of(first, second)) {
+                try {
+                    future.get(10, TimeUnit.SECONDS);
+                    successCount++;
+                } catch (java.util.concurrent.ExecutionException exception) {
+                    if (exception.getCause()
+                            instanceof com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException) {
+                        alreadyDiscoveredCount++;
+                    } else {
+                        throw exception;
+                    }
+                }
+            }
+
+            // 두 번째 요청은 첫 번째의 claim(SELECT ... FOR UPDATE + 즉시 삭제) 트랜잭션이 커밋된
+            // 뒤에야 잠금이 풀려 pending이 이미 비어 있음을 보고, CODEF를 호출하지 않고 곧바로
+            // CardLinkAlreadyDiscoveredException으로 끝나야 한다.
+            assertEquals(1, successCount);
+            assertEquals(1, alreadyDiscoveredCount);
+            verify(codefClient, times(1)).getOwnedCards(
+                    CONNECTED_ID, "0301", "900101", "1234567890123456", "1234");
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("카탈로그 매칭에 실패해 카드번호를 저장할 카드가 없으면 discoverOwnedCards가 pending을 "
+            + "지우지 않고, 다시 호출할 수 있다")
+    void discoverKeepsPendingWhenNoCardStoresTheCardNumber() {
+        // 카탈로그에 매칭되는 카드가 없어(cards/card_content_versions 미등록) 보유카드는 응답에만 노출되고
+        // user_cards에는 적재되지 않는다.
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of(
+                        new CodefOwnedCard("카탈로그에 없는 카드", "123456******3456", "체크/본인", "")));
+
+        CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
+
+        CardLinkResponse first = cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
+        assertEquals(1, first.cards().size());
+        assertFalse(first.cards().get(0).matched());
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_number_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_password_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+
+        // pending이 남아 있으므로 재시도가 거부되지 않고 다시 호출할 수 있다.
+        CardLinkResponse second = cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
+        assertEquals(1, second.cards().size());
+    }
+
+    @Test
     @DisplayName("동일 사용자의 같은 카드번호 중복 연동을 차단한다")
     void rejectsDuplicatedCredential() {
         cardLinkService.createLink(USER_ID, request());
@@ -171,7 +291,11 @@ class CodefPersistenceIntegrationTest {
         CreateCardLinkRequest request = request();
         request.setCardNo("9436461234561069");
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request);
-        String userCardId = link.cards().get(0).userCardId();
+        // 카드번호가 필요한 카드사라 createLink(1단계)는 보유카드를 조회하지 않고 cards가 비어 있다.
+        // discoverOwnedCards(2단계)가 pending으로 저장해둔 카드번호를 재사용해 조회·매칭한다.
+        assertTrue(link.cards().isEmpty());
+        CardLinkResponse discovered = cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
+        String userCardId = discovered.cards().get(0).userCardId();
         assertNotNull(userCardId);
         // 적재 직후에는 여전히 비활성 상태이지만, 카드번호/비밀번호는 이미 암호화 저장돼 있다.
         assertEquals(Boolean.FALSE, jdbcTemplate.queryForObject(
@@ -224,7 +348,9 @@ class CodefPersistenceIntegrationTest {
         CreateCardLinkRequest request = request();
         request.setCardNo("9436461234561069");
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request);
-        String userCardId = link.cards().get(0).userCardId();
+        assertTrue(link.cards().isEmpty());
+        CardLinkResponse discovered = cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
+        String userCardId = discovered.cards().get(0).userCardId();
         assertNotNull(userCardId);
         assertEquals(Boolean.FALSE, jdbcTemplate.queryForObject(
                 "SELECT is_active FROM user_cards WHERE user_card_id = ?", Boolean.class, userCardId));
