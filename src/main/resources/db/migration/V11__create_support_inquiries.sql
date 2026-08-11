@@ -4,7 +4,7 @@ CREATE TABLE support_inquiries (
     inquiry_type VARCHAR(30) NOT NULL,
     title VARCHAR(100) NOT NULL,
     content TEXT NOT NULL,
-    reply_email VARCHAR(255) NULL,
+    reply_email VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'received',
     created_at DATETIME(6) NOT NULL,
     answered_at DATETIME(6) NULL,
