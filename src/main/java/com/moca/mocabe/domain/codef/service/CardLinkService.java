@@ -13,6 +13,7 @@ import com.moca.mocabe.domain.codef.dto.SubmitCardCredentialsRequest;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
 import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
@@ -41,6 +42,7 @@ import com.moca.mocabe.domain.codef.model.CodefOwnedCard;
 import com.moca.mocabe.domain.codef.model.LinkedCardInsert;
 import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
+import com.moca.mocabe.domain.codef.model.PendingCardDiscoveryTarget;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -119,25 +121,101 @@ public class CardLinkService {
         // connectedId 발급 직후 자격정보부터 커밋한다. 뒤이은 보유카드 조회가 실패해도
         // 이미 발급받은 connectedId는 버려지지 않고, 사용자는 자격정보 재입력 없이
         // POST /card-links/cards/sync로 보유카드만 다시 조회할 수 있다.
+        // 카드번호가 필요한 카드사는 이 단계에서 방금 입력받은 카드번호/비밀번호를 pending 컬럼에
+        // 암호화해 같이 저장한다 — 프론트가 UX상 보유카드 조회를 별도 API(discoverOwnedCards)로
+        // 나눠 호출할 때, 카드번호를 다시 입력받지 않고도 그 값을 쓸 수 있게 하기 위함이다.
         String linkId = UUID.randomUUID().toString();
         codefCredentialStore.saveCredential(buildCredential(
-                userId, request, policy.getIssuerId(), connectedId, linkId, credentialIdentityHash));
+                userId, request, policy, connectedId, linkId, credentialIdentityHash));
 
+        // 카드번호가 필요 없는 카드사는 추가로 입력받을 값이 없어 나눌 이유가 없으므로 지금 바로
+        // 보유카드까지 조회한다(기존 동작 유지). 카드번호가 필요한 카드사는 discoverOwnedCards
+        // (POST /card-links/{linkId}/cards/discover)를 통해 별도로 조회해야 한다.
         List<CardLinkCardResponse> cards = List.of();
-        try {
-            // 카드번호가 필요한 카드사면 방금 입력받아 계정 생성에도 쓴 카드번호를 CODEF 조회에도
-            // 그대로 전달한다(계정 식별용). 매칭은 별도로, 응답 카드번호와 로컬에서 비교해 판단한다.
-            String creatorCardNo = policy.isRequiresCardNo() ? request.getCardNo() : null;
-            String creatorCardPassword = policy.isRequiresCardNo() ? request.getCardPassword() : null;
-            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
-                    connectedId, policy.getInstitutionCode(), request.getBirthDate(),
-                    creatorCardNo, creatorCardPassword);
-            cards = matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, creatorCardNo, creatorCardPassword);
-        } catch (RuntimeException exception) {
-            LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
-                    + describeException(exception));
+        if (!policy.isRequiresCardNo()) {
+            try {
+                List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                        connectedId, policy.getInstitutionCode(), request.getBirthDate(), null, null);
+                cards = matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, null, null).cards();
+            } catch (RuntimeException exception) {
+                LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
+                        + describeException(exception));
+            }
         }
         return new CardLinkResponse(linkId, policy.getInstitutionCode(), STATUS_PENDING, cards);
+    }
+
+    /**
+     * 카드번호가 필요한 카드사에서, createLink(1단계)가 pending 컬럼에 잠깐 저장해둔 카드번호/
+     * 비밀번호를 소비해 보유카드를 조회·매칭·적재한다(2단계). pending은 CODEF 호출이 성공했다는
+     * 이유만으로 지우지 않고, 그 카드번호가 실제로 어느 보유카드에 옮겨 저장됐을 때만(=카탈로그
+     * 매칭까지 성공해 user_cards에 카드번호/비밀번호가 채워졌을 때만) 지운다. 카탈로그 매칭이
+     * 안 되면 카드번호를 저장할 곳이 없으므로 — pending을 지워버리면 그 계정은 카드번호를 다시 얻을
+     * 방법이 없어진다(재연동은 중복 계정으로 거부되고, 재조회(sync)는 저장된 카드번호가 있어야
+     * 동작하기 때문). pending을 남겨두면 카탈로그가 나중에 채워진 뒤 discover를 다시 호출해
+     * 재시도할 수 있다. CODEF 호출 자체가 실패해도 마찬가지로 pending은 그대로 남는다.
+     *
+     * 동시에 두 요청이 들어와도 같은 pending 값으로 CODEF를 중복 호출하지 않도록, pending을
+     * "읽고 바로 지우는(claim)" 것 자체를 짧은 트랜잭션(SELECT ... FOR UPDATE) 안에서 원자적으로
+     * 한다. 두 번째 요청은 첫 번째가 커밋할 때까지 이 짧은 트랜잭션에서만 대기하고(CODEF 호출 동안은
+     * 잠그지 않음), 커밋 후엔 pending이 이미 비어 있어 CardLinkAlreadyDiscoveredException으로
+     * 곧바로 끝난다. claim 이후 CODEF 호출이나 매칭이 실패하면(카드에 크리덴셜이 실제로 저장되지
+     * 않으면) claim 시점에 읽어둔 값 그대로 pending을 복구해 재시도할 수 있게 한다.
+     */
+    public CardLinkResponse discoverOwnedCards(String userId, String linkId) {
+        PendingCardDiscoveryTarget claimed = claimPendingCardDiscovery(userId, linkId);
+        String institutionCode = claimed.institutionCode();
+        String birthDate = encryptor.decrypt(claimed.birthDateEnc());
+        String cardNo = encryptor.decrypt(claimed.pendingCardNumberEnc());
+        String cardPassword = claimed.pendingCardPasswordEnc() == null
+                ? null : encryptor.decrypt(claimed.pendingCardPasswordEnc());
+        try {
+            CodefIssuerPolicy policy = issuerMapper.findCodefPolicyByInstitutionCode(institutionCode);
+            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                    claimed.connectedId(), institutionCode, birthDate, cardNo, cardPassword);
+            MatchAndPersistResult result =
+                    matchAndPersistOwnedCardsForSync(userId, linkId, policy, ownedCards, cardNo, cardPassword);
+            if (!result.creatorCardPersisted()) {
+                // 계정 생성 카드가 이번 조회로도 저장되지 않았다(카탈로그 매칭 실패 등) — claim 시점에
+                // 읽어둔 pending 값을 그대로 복구해 재시도할 수 있게 한다. linkId만 로그로 남긴다.
+                codefCredentialStore.restorePendingCardCredentials(
+                        linkId, userId, claimed.pendingCardNumberEnc(), claimed.pendingCardPasswordEnc());
+                LOGGER.log(Level.WARNING, "보유카드 조회는 성공했지만 카드번호를 옮겨 저장할 카드가 없어 "
+                        + "pending 값을 복구합니다. linkId=" + linkId);
+            }
+            return new CardLinkResponse(linkId, institutionCode, STATUS_PENDING, result.cards());
+        } catch (RuntimeException exception) {
+            // CODEF 호출 실패 등 어떤 이유로든 이번 시도가 실패하면, claim으로 지워둔 pending을
+            // 그대로 복구해 사용자가 다시 discover를 호출할 수 있게 한다.
+            codefCredentialStore.restorePendingCardCredentials(
+                    linkId, userId, claimed.pendingCardNumberEnc(), claimed.pendingCardPasswordEnc());
+            throw exception;
+        }
+    }
+
+    /**
+     * pending 카드번호/비밀번호를 "읽고 즉시 지우는" 것을 하나의 짧은 트랜잭션으로 묶어 동시 요청을
+     * 막는다(SELECT ... FOR UPDATE로 같은 연동 행을 잠근 채 확인·삭제까지 끝냄). CODEF 외부 호출은
+     * 이 트랜잭션 밖에서 이뤄지므로, 두 번째 요청은 CODEF 응답을 기다리지 않고 이 트랜잭션이 끝나는
+     * 즉시(수 ms) 통과해 pending이 이미 비어 있음을 확인하고 CardLinkAlreadyDiscoveredException으로
+     * 끝난다. 반환값은 DB에서 막 지워지기 직전의 값을 담고 있어(자바 객체는 그대로), 실패 시 복구에 쓴다.
+     */
+    private PendingCardDiscoveryTarget claimPendingCardDiscovery(String userId, String linkId) {
+        return transactionTemplate.execute(status -> {
+            PendingCardDiscoveryTarget target = codefCredentialMapper.findPendingDiscoveryTarget(linkId, userId);
+            if (target == null) {
+                throw new CardLinkNotFoundException();
+            }
+            if (!target.requiresCardNo()) {
+                throw new InvalidCardSelectionException(
+                        "이 카드사는 카드번호 입력이 필요하지 않아 연동 생성 시 보유카드 조회가 이미 완료됩니다.");
+            }
+            if (target.pendingCardNumberEnc() == null) {
+                throw new CardLinkAlreadyDiscoveredException();
+            }
+            codefCredentialMapper.clearPendingCardCredentials(linkId, userId);
+            return target;
+        });
     }
 
     /**
@@ -186,7 +264,7 @@ public class CardLinkService {
                     connection.connectedId(), connection.institutionCode(), birthDate, cardNo, cardPassword);
             // 재조회 시점엔 새로 입력된 카드번호가 없으므로 매칭 카드는 항상 비활성+크리덴셜 null로 적재한다.
             List<CardLinkCardResponse> cards = matchAndPersistOwnedCardsForSync(
-                    userId, connection.codefAccountCredentialId(), policy, ownedCards);
+                    userId, connection.codefAccountCredentialId(), policy, ownedCards, null, null).cards();
             return new SyncOwnedCardsResult(
                     connection.codefAccountCredentialId(), connection.institutionCode(), true, cards);
         } catch (RuntimeException exception) {
@@ -204,12 +282,14 @@ public class CardLinkService {
      * 재조회 응답에 다시 노출될 수 있다. 연동 생성(createLink)은 아직 활성 카드가 없는 새 연동이라
      * 이 잠금이 필요 없으므로 matchAndPersistOwnedCards를 잠금 없이 직접 호출한다.
      */
-    private List<CardLinkCardResponse> matchAndPersistOwnedCardsForSync(String userId, String linkId,
-                                                                         CodefIssuerPolicy policy,
-                                                                         List<CodefOwnedCard> ownedCards) {
+    private MatchAndPersistResult matchAndPersistOwnedCardsForSync(String userId, String linkId,
+                                                                    CodefIssuerPolicy policy,
+                                                                    List<CodefOwnedCard> ownedCards,
+                                                                    String creatorCardNo,
+                                                                    String creatorCardPassword) {
         return transactionTemplate.execute(status -> {
             codefCredentialMapper.lockOwnedLink(linkId, userId);
-            return matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, null, null);
+            return matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, creatorCardNo, creatorCardPassword);
         });
     }
 
@@ -225,17 +305,20 @@ public class CardLinkService {
      * 직접 활성화하지는 않는다). 크리덴셜이 채워지지 않은 나머지 보유카드는 사용자가 추가로 카드번호를
      * 입력해야 활성화할 수 있다.
      */
-    private List<CardLinkCardResponse> matchAndPersistOwnedCards(String userId, String linkId,
-                                                                  CodefIssuerPolicy policy,
-                                                                  List<CodefOwnedCard> ownedCards,
-                                                                  String creatorCardNo,
-                                                                  String creatorCardPassword) {
+    private MatchAndPersistResult matchAndPersistOwnedCards(String userId, String linkId,
+                                                             CodefIssuerPolicy policy,
+                                                             List<CodefOwnedCard> ownedCards,
+                                                             String creatorCardNo,
+                                                             String creatorCardPassword) {
         // (user_id, codef_card_key_hash)가 DB에서 UNIQUE라 이 조회 이후 실제 적재 시점 사이에 다른
         // 요청이 끼어들 수 있다(동시 재조회). 그 경우는 saveCard가 UNIQUE 충돌을 잡아 처리한다.
         Map<String, LinkedCardKeyRow> existingRowByHash = linkedCardMapper.findLinkedCardKeysByLinkId(linkId, userId)
                 .stream().collect(Collectors.toMap(LinkedCardKeyRow::codefCardKeyHash, row -> row));
 
         List<CardLinkCardResponse> cards = new ArrayList<>();
+        // creatorCardNo(계정 생성 시 입력한 카드번호)와 일치하는 카드가 이번 호출에서 실제로 크리덴셜을
+        // 갖게 됐는지를 별도로 추적한다. discoverOwnedCards가 이 값으로 pending 복구 여부를 판단한다.
+        boolean creatorCardPersisted = false;
         Set<String> cardKeyHashes = new HashSet<>();
         int displayOrder = linkedCardMapper.findNextDisplayOrder(userId);
         // issuerId는 루프 내내 동일하므로 카탈로그는 한 번만 조회해 재사용한다(카드 수만큼 반복 조회하지 않도록).
@@ -255,9 +338,9 @@ public class CardLinkService {
                 continue;
             }
             String userCardId = existingRow == null ? null : existingRow.userCardId();
+            boolean isCreatorCard = creatorCardNo != null
+                    && MaskedCardNoMatcher.matches(creatorCardNo, ownedCard.cardNumber());
             if (userCardId == null && matched != null) {
-                boolean isCreatorCard = creatorCardNo != null
-                        && MaskedCardNoMatcher.matches(creatorCardNo, ownedCard.cardNumber());
                 byte[] cardNumberEnc = isCreatorCard ? encryptor.encrypt(creatorCardNo) : null;
                 byte[] cardPasswordEnc = isCreatorCard && policy.isRequiresCardPassword()
                         ? encryptor.encrypt(creatorCardPassword) : null;
@@ -270,11 +353,27 @@ public class CardLinkService {
                         cardNumberEnc, cardPasswordEnc, false);
                 // 동시 재조회로 다른 요청이 먼저 적재했다면 새로 만든 ID 대신 그 요청의 user_card_id를 받는다.
                 userCardId = codefCredentialStore.saveCard(insert);
+                if (isCreatorCard) {
+                    creatorCardPersisted = true;
+                }
+            } else if (userCardId != null && isCreatorCard) {
+                // 이전 시도(discover 재시도 등)에서 크리덴셜 없이 이미 적재된 카드가, 이번 조회에서
+                // 계정 생성 카드로 확인되면 크리덴셜을 채워 넣는다. 그렇지 않으면 카탈로그 매칭 지연
+                // 등으로 최초 적재 시 크리덴셜이 못 채워진 카드는 재시도해도 영영 채워지지 않는다.
+                byte[] cardNumberEnc = encryptor.encrypt(creatorCardNo);
+                byte[] cardPasswordEnc = policy.isRequiresCardPassword()
+                        ? encryptor.encrypt(creatorCardPassword) : null;
+                linkedCardMapper.updateCardCredentials(userCardId, userId, cardNumberEnc, cardPasswordEnc);
+                creatorCardPersisted = true;
             }
             cards.add(toResponse(userCardId, matched, ownedCard, policy));
         }
 
-        return cards;
+        return new MatchAndPersistResult(cards, creatorCardPersisted);
+    }
+
+    /** creatorCardPersisted는 이번 호출에서 계정 생성 카드(creatorCardNo)가 실제로 크리덴셜을 갖고 저장됐는지다. */
+    private record MatchAndPersistResult(List<CardLinkCardResponse> cards, boolean creatorCardPersisted) {
     }
 
     /** 로그에 안전하게 남길 수 있는 예외 요약이다(CWE-532). 메시지 원문 대신 클래스명만 남긴다. */
@@ -472,16 +571,22 @@ public class CardLinkService {
     }
 
     private CodefAccountCredential buildCredential(String userId, CreateCardLinkRequest request,
-                                                    String issuerId, String connectedId, String credentialId,
-                                                    String credentialIdentityHash) {
+                                                    CodefIssuerPolicy policy, String connectedId,
+                                                    String credentialId, String credentialIdentityHash) {
         CodefAccountCredential credential = new CodefAccountCredential();
         credential.setCodefAccountCredentialId(credentialId);
         credential.setUserId(userId);
-        credential.setIssuerId(issuerId);
+        credential.setIssuerId(policy.getIssuerId());
         credential.setConnectedId(connectedId);
         credential.setAccountIdEnc(encryptor.encrypt(request.getId()));
         credential.setAccountPasswordEnc(encryptor.encrypt(request.getPassword()));
         credential.setBirthDateEnc(encryptor.encrypt(request.getBirthDate()));
+        if (policy.isRequiresCardNo()) {
+            credential.setPendingCardNumberEnc(encryptor.encrypt(request.getCardNo()));
+            if (policy.isRequiresCardPassword()) {
+                credential.setPendingCardPasswordEnc(encryptor.encrypt(request.getCardPassword()));
+            }
+        }
         credential.setCredentialIdentityHash(credentialIdentityHash);
         credential.setStatus("active");
         return credential;

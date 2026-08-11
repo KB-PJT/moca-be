@@ -10,6 +10,8 @@ public class CodefAccountCredential {
     private byte[] accountIdEnc;
     private byte[] accountPasswordEnc;
     private byte[] birthDateEnc;
+    private byte[] pendingCardNumberEnc;
+    private byte[] pendingCardPasswordEnc;
     private String credentialIdentityHash;
     private String status;
 
@@ -67,6 +69,22 @@ public class CodefAccountCredential {
 
     public void setBirthDateEnc(byte[] birthDateEnc) {
         this.birthDateEnc = birthDateEnc;
+    }
+
+    public byte[] getPendingCardNumberEnc() {
+        return pendingCardNumberEnc;
+    }
+
+    public void setPendingCardNumberEnc(byte[] pendingCardNumberEnc) {
+        this.pendingCardNumberEnc = pendingCardNumberEnc;
+    }
+
+    public byte[] getPendingCardPasswordEnc() {
+        return pendingCardPasswordEnc;
+    }
+
+    public void setPendingCardPasswordEnc(byte[] pendingCardPasswordEnc) {
+        this.pendingCardPasswordEnc = pendingCardPasswordEnc;
     }
 
     public String getCredentialIdentityHash() {

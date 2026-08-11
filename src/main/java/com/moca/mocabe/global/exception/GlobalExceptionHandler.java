@@ -3,6 +3,7 @@ package com.moca.mocabe.global.exception;
 import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
+import com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException;
 import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
@@ -238,6 +239,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CardAlreadyLinkedException.class)
     public ResponseEntity<ApiErrorResponse> handleCardAlreadyLinked(CardAlreadyLinkedException exception) {
         return error(HttpStatus.CONFLICT, "CARD_ALREADY_LINKED", exception.getMessage());
+    }
+
+    @ExceptionHandler(CardLinkAlreadyDiscoveredException.class)
+    public ResponseEntity<ApiErrorResponse> handleCardLinkAlreadyDiscovered(
+            CardLinkAlreadyDiscoveredException exception) {
+        return error(HttpStatus.CONFLICT, "CARD_LINK_ALREADY_DISCOVERED", exception.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

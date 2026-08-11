@@ -48,6 +48,19 @@ class CodefCredentialStoreTest {
     }
 
     @Test
+    @DisplayName("pending 카드번호/비밀번호 복구를 매퍼에 위임한다")
+    void restoresPendingCardCredentials() {
+        byte[] pendingCardNumberEnc = {1, 2};
+        byte[] pendingCardPasswordEnc = {3, 4};
+
+        store.restorePendingCardCredentials("link-1", "user-1", pendingCardNumberEnc, pendingCardPasswordEnc);
+
+        verify(mapper).restorePendingCardCredentials(
+                "link-1", "user-1", pendingCardNumberEnc, pendingCardPasswordEnc);
+        verifyNoInteractions(linkedCardMapper);
+    }
+
+    @Test
     @DisplayName("자격정보 UNIQUE 충돌은 계정 중복 오류로 변환하고 원인 예외를 보존한다")
     void convertsCredentialDuplicateKeyException() {
         CodefAccountCredential credential = new CodefAccountCredential();
