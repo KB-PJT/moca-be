@@ -1458,6 +1458,11 @@ components:
           description: '검색 중심점에서 가맹점까지의 거리입니다. 단위는 미터이며 계산할 수 없으면 null입니다.'
           type: integer
           nullable: true
+        address:
+          description: '도로명 주소가 있으면 그 값, 없으면 지번 주소입니다. 카카오맵이 주소를 못 준 경우 null입니다.'
+          type: string
+          nullable: true
+          example: 서울 강남구 테헤란로 123
     HomeGreetingApiResponse:
       description: '홈 인사와 미사용 월 혜택 한도 조회의 공통 응답입니다.'
       type: object

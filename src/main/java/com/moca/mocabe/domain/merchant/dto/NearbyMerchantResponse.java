@@ -5,6 +5,7 @@ public record NearbyMerchantResponse(
         String name,
         double latitude,
         double longitude,
-        Integer distanceMeters
+        Integer distanceMeters,
+        String address
 ) {
 }

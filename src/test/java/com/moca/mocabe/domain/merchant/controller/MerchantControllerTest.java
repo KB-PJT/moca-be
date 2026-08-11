@@ -113,7 +113,7 @@ class MerchantControllerTest {
     @DisplayName("근처 가맹점 API는 쿼리값을 서비스에 전달하고 결과를 반환한다")
     void returnsNearbyMerchants() throws Exception {
         when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500, null)).thenReturn(List.of(
-                new NearbyMerchantResponse("m-1", "스타벅스", 37.501, 127.001, 120)));
+                new NearbyMerchantResponse("m-1", "스타벅스", 37.501, 127.001, 120, "서울 강남구 테헤란로 1")));
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode response = objectMapper.readTree(mockMvc.perform(get("/merchants/nearby")
@@ -126,6 +126,7 @@ class MerchantControllerTest {
         assertTrue(response.path("success").asBoolean());
         assertEquals("스타벅스", response.path("data").get(0).path("name").asText());
         assertEquals(120, response.path("data").get(0).path("distanceMeters").asInt());
+        assertEquals("서울 강남구 테헤란로 1", response.path("data").get(0).path("address").asText());
     }
 
     @Test
@@ -171,7 +172,8 @@ class MerchantControllerTest {
     @DisplayName("근처 가맹점 API는 merchantId를 서비스에 전달한다")
     void passesMerchantIdForNearbyMerchants() throws Exception {
         when(merchantNearbyQueryService.getNearbyMerchants("cat-cafe", 37.5, 127.0, 500, "m-starbucks"))
-                .thenReturn(List.of(new NearbyMerchantResponse("m-starbucks", "스타벅스 강남점", 37.501, 127.001, 120)));
+                .thenReturn(List.of(new NearbyMerchantResponse(
+                        "m-starbucks", "스타벅스 강남점", 37.501, 127.001, 120, "서울 강남구 테헤란로 1")));
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode response = objectMapper.readTree(mockMvc.perform(get("/merchants/nearby")

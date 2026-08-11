@@ -68,9 +68,19 @@ public class KakaoLocalClient {
                     document.path("place_name").asText(),
                     Double.parseDouble(document.path("y").asText()),
                     Double.parseDouble(document.path("x").asText()),
-                    parseDistance(document.path("distance"))));
+                    parseDistance(document.path("distance")),
+                    parseAddress(document)));
         }
         return places;
+    }
+
+    /** 도로명 주소가 있으면 그 값, 없으면 지번 주소를 쓴다(카카오 응답은 도로명 주소가 없으면 빈 문자열을 준다). */
+    private String parseAddress(JsonNode document) {
+        String roadAddress = document.path("road_address_name").asText("");
+        if (!roadAddress.isBlank()) {
+            return roadAddress;
+        }
+        return document.path("address_name").asText(null);
     }
 
     private Integer parseDistance(JsonNode distanceNode) {
