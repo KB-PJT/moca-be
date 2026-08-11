@@ -38,6 +38,7 @@ import com.moca.mocabe.domain.codef.mapper.CardCatalogMapper;
 import com.moca.mocabe.domain.codef.mapper.LinkedCardMapper;
 import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
+import com.moca.mocabe.domain.user.mapper.WithdrawalRequestMapper;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
@@ -124,8 +125,12 @@ public class AppConfig {
     @Bean
     public UserApplicationService userApplicationService(UserDomainService userDomainService,
                                                          OpaqueTokenService opaqueTokenService,
-                                                         CardQueryService cardQueryService) {
-        return new UserApplicationService(userDomainService, opaqueTokenService, cardQueryService);
+                                                         CardQueryService cardQueryService,
+                                                         CodefCredentialStore codefCredentialStore,
+                                                         SupportInquiryService supportInquiryService,
+                                                         WithdrawalRequestMapper withdrawalRequestMapper) {
+        return new UserApplicationService(userDomainService, opaqueTokenService, cardQueryService,
+                codefCredentialStore, supportInquiryService, withdrawalRequestMapper);
     }
 
     @Bean

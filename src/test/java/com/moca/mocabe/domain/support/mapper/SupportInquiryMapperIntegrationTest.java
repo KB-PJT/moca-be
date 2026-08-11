@@ -79,6 +79,21 @@ class SupportInquiryMapperIntegrationTest {
         assertNull(row);
     }
 
+    @Test
+    @DisplayName("회원 탈퇴 시 해당 사용자의 문의만 지우고 다른 사용자의 문의는 남긴다")
+    void deletesOnlyOwnInquiriesByUserId() {
+        supportInquiryMapper.insertInquiry(INQUIRY_ID, USER_ID, "card_link", "제목", "내용",
+                "kakao_jimin@kakao.com");
+        String otherInquiryId = "01980d6a-5c0c-7aaf-9b85-010203040532";
+        supportInquiryMapper.insertInquiry(otherInquiryId, OTHER_USER_ID, "bug", "제목2", "내용2",
+                "other@kakao.com");
+
+        assertEquals(1, supportInquiryMapper.deleteByUserId(USER_ID));
+
+        assertNull(supportInquiryMapper.findByInquiryId(INQUIRY_ID, USER_ID));
+        assertNotNull(supportInquiryMapper.findByInquiryId(otherInquiryId, OTHER_USER_ID));
+    }
+
     private void insertUser(String userId, String googleSubject) {
         jdbcTemplate.update("INSERT INTO users "
                         + "(user_id, google_subject, nickname, email, user_type, created_at, updated_at) "

@@ -8,6 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.card.service.CardQueryService;
+import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
+import com.moca.mocabe.domain.support.service.SupportInquiryService;
+import com.moca.mocabe.domain.user.mapper.WithdrawalRequestMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsRequest;
@@ -39,6 +42,15 @@ class UserApplicationServiceTest {
 
     @Mock
     private CardQueryService cardQueryService;
+
+    @Mock
+    private CodefCredentialStore codefCredentialStore;
+
+    @Mock
+    private SupportInquiryService supportInquiryService;
+
+    @Mock
+    private WithdrawalRequestMapper withdrawalRequestMapper;
 
     @InjectMocks
     private UserApplicationService userApplicationService;
@@ -154,17 +166,26 @@ class UserApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("탈퇴 시 사용자 설정을 지운 뒤 계정을 물리 삭제한다")
+    @DisplayName("탈퇴 시 탈퇴 사유를 남기고 연관 데이터를 모두 지운 뒤 계정을 물리 삭제한다")
     void permanentlyDeletesUserData() {
         when(userDomainService.requireUser(USER_ID)).thenReturn(user());
         when(userDomainService.deleteUser(USER_ID)).thenReturn(true);
         WithdrawUserRequest request = new WithdrawUserRequest();
         request.setReason("not_needed");
+        request.setReasonDetail("설명");
         request.setConfirmed(true);
 
         assertTrue(userApplicationService.withdraw(USER_ID, request));
-        InOrder inOrder = org.mockito.Mockito.inOrder(opaqueTokenService, userDomainService);
+
+        verify(withdrawalRequestMapper).insertWithdrawalRequest("not_needed", "설명", true);
+        InOrder inOrder = org.mockito.Mockito.inOrder(
+                withdrawalRequestMapper, opaqueTokenService, cardQueryService,
+                codefCredentialStore, supportInquiryService, userDomainService);
+        inOrder.verify(withdrawalRequestMapper).insertWithdrawalRequest("not_needed", "설명", true);
         inOrder.verify(opaqueTokenService).revokeAll(USER_ID);
+        inOrder.verify(cardQueryService).deleteAllByUserId(USER_ID);
+        inOrder.verify(codefCredentialStore).deleteAllByUserId(USER_ID);
+        inOrder.verify(supportInquiryService).deleteAllByUserId(USER_ID);
         inOrder.verify(userDomainService).deleteUser(USER_ID);
     }
 

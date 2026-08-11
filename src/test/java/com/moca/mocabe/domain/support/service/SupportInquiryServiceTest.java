@@ -61,4 +61,12 @@ class SupportInquiryServiceTest {
         assertEquals("kakao_jimin@kakao.com", response.getReplyEmail());
         assertEquals("received", response.getStatus());
     }
+
+    @Test
+    @DisplayName("회원 탈퇴 시 해당 사용자의 문의 삭제를 매퍼에 위임한다")
+    void deletesAllByUserId() {
+        supportInquiryService.deleteAllByUserId(USER_ID);
+
+        verify(supportInquiryMapper).deleteByUserId(USER_ID);
+    }
 }

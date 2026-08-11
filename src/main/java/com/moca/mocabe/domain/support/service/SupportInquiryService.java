@@ -23,4 +23,10 @@ public class SupportInquiryService {
         InquiryRow row = supportInquiryMapper.findByInquiryId(inquiryId, userId);
         return new InquiryResponse(row);
     }
+
+    /** 회원 탈퇴 시 해당 사용자의 문의 내역을 정리한다. */
+    @Transactional
+    public void deleteAllByUserId(String userId) {
+        supportInquiryMapper.deleteByUserId(userId);
+    }
 }

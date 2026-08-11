@@ -42,4 +42,8 @@
         FROM support_inquiries
         WHERE inquiry_id = #{inquiryId} AND user_id = #{userId}
     </select>
+
+    <delete id="deleteByUserId">
+        DELETE FROM support_inquiries WHERE user_id = #{userId}
+    </delete>
 </mapper>

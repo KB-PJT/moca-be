@@ -471,6 +471,18 @@ class CodefPersistenceIntegrationTest {
         }
     }
 
+    @Test
+    @DisplayName("회원 탈퇴 시 해당 사용자의 자격정보만 지운다")
+    void deletesOnlyOwnCredentialsByUserId() {
+        insertCredential("01980d6a-5c0c-7aaf-9b85-0102030405c1", CONNECTED_ID, "active",
+                "2000000000000000000000000000000000000000000000000000000000000001",
+                encryptor.encrypt("900101"));
+
+        assertEquals(1, codefCredentialMapper.deleteAccountCredentialsByUserId(USER_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM codef_account_credentials WHERE user_id = ?", Integer.class, USER_ID));
+    }
+
     private void insertCredential(String credentialId, String connectedId, String status,
                                   String identityHash, byte[] birthDateEnc) {
         jdbcTemplate.update("INSERT INTO codef_account_credentials "
