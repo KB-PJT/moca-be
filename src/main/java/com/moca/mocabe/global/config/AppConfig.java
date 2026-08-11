@@ -44,6 +44,8 @@ import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.domain.home.mapper.HomeMapper;
 import com.moca.mocabe.domain.report.mapper.ReportMapper;
 import com.moca.mocabe.domain.report.service.ReportQueryService;
+import com.moca.mocabe.domain.support.mapper.SupportInquiryMapper;
+import com.moca.mocabe.domain.support.service.SupportInquiryService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
@@ -96,6 +98,11 @@ public class AppConfig {
     @Bean
     public ReportQueryService reportQueryService(UserMapper userMapper, ReportMapper reportMapper) {
         return new ReportQueryService(userMapper, reportMapper);
+    }
+
+    @Bean
+    public SupportInquiryService supportInquiryService(SupportInquiryMapper supportInquiryMapper) {
+        return new SupportInquiryService(supportInquiryMapper);
     }
 
     @Bean
