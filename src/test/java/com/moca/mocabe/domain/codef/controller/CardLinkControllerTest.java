@@ -21,7 +21,6 @@ import com.moca.mocabe.domain.codef.dto.CreateCardLinkRequest;
 import com.moca.mocabe.domain.codef.dto.SubmitCardCredentialsRequest;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResponse;
 import com.moca.mocabe.domain.codef.dto.SyncOwnedCardsResult;
-import com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException;
 import com.moca.mocabe.domain.codef.exception.CardLinkNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
@@ -255,64 +254,6 @@ class CardLinkControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertEquals("CODEF_CONNECTION_NOT_FOUND",
-                new ObjectMapper().readTree(response).path("error").path("code").asText());
-    }
-
-    @Test
-    @DisplayName("discover 요청을 현재 사용자·linkId 기준으로 서비스에 전달한다")
-    void discoversOwnedCards() throws Exception {
-        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardLinkService.discoverOwnedCards(USER_ID, "link-1"))
-                .thenReturn(new CardLinkResponse("link-1", INSTITUTION_CODE, "PENDING_CARD_ACTIVATION"));
-
-        String response = mockMvc.perform(post("/card-links/link-1/cards/discover"))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        JsonNode root = new ObjectMapper().readTree(response);
-        assertEquals("link-1", root.path("data").path("linkId").asText());
-        verify(cardLinkService).discoverOwnedCards(USER_ID, "link-1");
-    }
-
-    @Test
-    @DisplayName("인증 정보가 없으면 서비스를 호출하지 않고 401을 반환한다")
-    void rejectsUnauthenticatedDiscoverRequest() throws Exception {
-        when(currentUserProvider.getCurrentUserId()).thenThrow(new AuthenticationRequiredException());
-
-        mockMvc.perform(post("/card-links/link-1/cards/discover"))
-                .andExpect(status().isUnauthorized());
-
-        verifyNoInteractions(cardLinkService);
-    }
-
-    @Test
-    @DisplayName("본인 소유의 연동을 찾을 수 없으면 404를 반환한다")
-    void rejectsDiscoverForUnknownLink() throws Exception {
-        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardLinkService.discoverOwnedCards(USER_ID, "link-1"))
-                .thenThrow(new CardLinkNotFoundException());
-
-        String response = mockMvc.perform(post("/card-links/link-1/cards/discover"))
-                .andExpect(status().isNotFound())
-                .andReturn().getResponse().getContentAsString();
-
-        assertEquals("CARD_LINK_NOT_FOUND",
-                new ObjectMapper().readTree(response).path("error").path("code").asText());
-        verify(cardLinkService).discoverOwnedCards(USER_ID, "link-1");
-    }
-
-    @Test
-    @DisplayName("이미 discover를 소비한 연동에 다시 요청하면 409를 반환한다")
-    void rejectsAlreadyDiscoveredLink() throws Exception {
-        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardLinkService.discoverOwnedCards(USER_ID, "link-1"))
-                .thenThrow(new CardLinkAlreadyDiscoveredException());
-
-        String response = mockMvc.perform(post("/card-links/link-1/cards/discover"))
-                .andExpect(status().isConflict())
-                .andReturn().getResponse().getContentAsString();
-
-        assertEquals("CARD_LINK_ALREADY_DISCOVERED",
                 new ObjectMapper().readTree(response).path("error").path("code").asText());
     }
 

@@ -446,10 +446,11 @@ paths:
         카드번호가 필요한 카드사(policy.requiresCardNo)는 이 호출에서 보유카드 조회를 하지 않고
         cards를 항상 빈 배열로 내려줍니다 — 방금 입력한 cardNo/cardPassword는 서버가 암호화해
         잠깐 보관해두고, 클라이언트가 로딩 UX 등을 이유로 보유카드 조회를 별도 타이밍에 하고 싶을 때
-        POST /card-links/{linkId}/cards/discover를 호출하면 그 값을 재사용해 조회합니다(카드번호를
-        다시 입력받지 않아도 됩니다). connectedId 발급 이후 자격정보는 먼저 저장되므로, 카드번호가
-        필요 없는 카드사에서 뒤이은 보유카드 조회가 실패해도 연동 생성 자체는 201로 성공하고 cards는
-        빈 배열로 내려갑니다. 이 경우 POST /card-links/cards/sync로 보유카드만 다시 조회할 수 있습니다.
+        POST /card-links/cards/sync(보유카드 재조회)를 호출하면 그 값을 이어받아 조회합니다
+        (카드번호를 다시 입력받지 않아도 됩니다). connectedId 발급 이후 자격정보는 먼저 저장되므로,
+        카드번호가 필요 없는 카드사에서 뒤이은 보유카드 조회가 실패해도 연동 생성 자체는 201로
+        성공하고 cards는 빈 배열로 내려갑니다. 이 경우에도 POST /card-links/cards/sync로 보유카드만
+        다시 조회할 수 있습니다.
       operationId: createCardLink
       security:
         - MocaBearerAuth: []
@@ -525,59 +526,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/CodefUnavailableError'
-  /card-links/{linkId}/cards/discover:
-    post:
-      tags: [CardLink]
-      summary: 카드번호 필요 카드사의 보유카드 조회(2단계)
-      description: |
-        카드번호가 필요한 카드사에서, POST /card-links(1단계)가 잠깐 보관해둔 cardNo/cardPassword를
-        재사용해 보유카드를 조회·매칭·적재합니다. 요청 본문은 없습니다. 보관해둔 값은 CODEF 호출이
-        성공했다는 이유만으로 지워지지 않고, 그 카드번호가 실제로 어느 보유카드에 저장됐을 때만
-        삭제됩니다 — 카탈로그에 매칭되는 카드가 없는 등 카드번호를 저장할 곳이 없으면, 응답은 200으로
-        정상 반환되더라도 보관해둔 값은 그대로 유지되어 이 API를 다시 호출해 재시도할 수 있습니다.
-        CODEF 호출 자체가 실패해도 마찬가지로 보관해둔 값은 유지됩니다. 보관해둔 값이 실제로 삭제된
-        뒤(=카드에 정상적으로 저장된 뒤)에만 CARD_LINK_ALREADY_DISCOVERED(409)가 재요청을 거부하며,
-        그 이후 보유카드를 다시 조회하려면 POST /card-links/cards/sync를 써야 합니다.
-      operationId: discoverCardLinkOwnedCards
-      security:
-        - MocaBearerAuth: []
-      parameters:
-        - name: linkId
-          in: path
-          required: true
-          description: POST /card-links 응답의 linkId(codef_account_credential_id)입니다.
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: 보유카드 조회 성공
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CardLinkApiResponse'
-        '401':
-          $ref: '#/components/responses/AuthenticationError'
-        '400':
-          description: 카드번호 입력이 필요하지 않은 카드사의 연동(code=INVALID_CARD_SELECTION)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: 본인 소유의 연동을 찾을 수 없음(code=CARD_LINK_NOT_FOUND)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: 이미 보유카드 조회를 완료해 재사용할 값이 없음(code=CARD_LINK_ALREADY_DISCOVERED)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/CodefUnavailableError'
   /card-links/{linkId}/cards:
     patch:
       tags: [CardLink]
@@ -638,6 +586,13 @@ paths:
         사용자의 활성 CODEF 연동(카드사 계정)별로 보유카드를 다시 조회해 새로 매칭된 카드만 추가로
         적재합니다. institutionCode를 주면 그 카드사 연동만, 생략하면 모든 활성 연동을 대상으로 합니다.
         이미 적재된 카드는 다시 적재하지 않고 기존 카드를 그대로 응답합니다.
+        카드번호가 필요한 카드사에서 아직 크리덴셜을 가진 카드가 하나도 없다면(=POST /card-links로
+        연동을 만든 뒤 처음 하는 재조회), 그때 입력받아 서버가 잠깐 보관해둔 카드번호/비밀번호를 이
+        호출이 이어받아 씁니다 — 별도의 "보유카드 조회 2단계" API 없이 이 재조회 API 하나로 최초
+        조회부터 이후 재조회까지 처리합니다. 보관해둔 값은 그 카드번호가 실제로 어느 보유카드에
+        저장됐을 때만 삭제되고, 카탈로그 매칭 실패 등으로 저장되지 않으면(성공 응답이더라도) 다음
+        재조회에서 다시 시도할 수 있도록 그대로 남습니다. 이미 크리덴셜을 가진 카드가 있으면 그
+        카드번호를 그대로 재사용하는 기존 동작 그대로입니다.
         연동 하나가 CODEF 조회 자체에 실패하면 그 연동만 success=false로 응답하고 다른 연동에는
         영향을 주지 않습니다(전체 요청은 200). 정상 조회했지만 매칭된 카드가 0건인 경우는 실패가
         아니라 success=true에 cards가 빈 배열로 내려갑니다.
