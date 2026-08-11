@@ -48,6 +48,15 @@ class CodefCredentialStoreTest {
     }
 
     @Test
+    @DisplayName("pending 카드번호/비밀번호 삭제를 매퍼에 위임한다")
+    void clearsPendingCardCredentials() {
+        store.clearPendingCardCredentials("link-1", "user-1");
+
+        verify(mapper).clearPendingCardCredentials("link-1", "user-1");
+        verifyNoInteractions(linkedCardMapper);
+    }
+
+    @Test
     @DisplayName("자격정보 UNIQUE 충돌은 계정 중복 오류로 변환하고 원인 예외를 보존한다")
     void convertsCredentialDuplicateKeyException() {
         CodefAccountCredential credential = new CodefAccountCredential();
