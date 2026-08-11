@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.moca.mocabe.domain.support.model.InquiryRow;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -33,10 +34,19 @@ class SupportInquiryMapperIntegrationTest {
 
     @BeforeEach
     void setUpDatabase() {
-        jdbcTemplate.update("DELETE FROM support_inquiries");
-        jdbcTemplate.update("DELETE FROM users");
+        deleteTestData();
         insertUser(USER_ID, "google-subject-1");
         insertUser(OTHER_USER_ID, "google-subject-2");
+    }
+
+    @AfterEach
+    void tearDownDatabase() {
+        deleteTestData();
+    }
+
+    private void deleteTestData() {
+        jdbcTemplate.update("DELETE FROM support_inquiries");
+        jdbcTemplate.update("DELETE FROM users");
     }
 
     @Test
