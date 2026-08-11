@@ -233,7 +233,26 @@ class UserCardSchemaIntegrationTest {
     void deletesAllUserCardsAndChildRowsByUserIdWithoutForeignKeyViolation() {
         insertUserCard(USER_CARD_ID, CARD_KEY_HASH, true, 1);
         insertUserCard(ANOTHER_USER_CARD_ID, ANOTHER_CARD_KEY_HASH, false, 2);
+        String optionGroupId = "01980d6a-5c0c-7aaf-9b85-010203040801";
+        String optionChoiceId = "01980d6a-5c0c-7aaf-9b85-010203040802";
         String approvalId = "01980d6a-5c0c-7aaf-9b85-010203040703";
+        String benefitId = "01980d6a-5c0c-7aaf-9b85-010203040805";
+        String offerId = "01980d6a-5c0c-7aaf-9b85-010203040806";
+        String ruleId = "01980d6a-5c0c-7aaf-9b85-010203040807";
+        jdbcTemplate.update("INSERT INTO card_option_groups "
+                        + "(option_group_id, card_id, group_key, group_name, "
+                        + "selection_required, created_at, updated_at) "
+                        + "VALUES (?, ?, 'brand', '브랜드', FALSE, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                optionGroupId, CARD_ID);
+        jdbcTemplate.update("INSERT INTO card_option_choices "
+                        + "(option_choice_id, option_group_id, choice_key, choice_name, "
+                        + "created_at, updated_at) "
+                        + "VALUES (?, ?, 'visa', 'VISA', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                optionChoiceId, optionGroupId);
+        jdbcTemplate.update("INSERT INTO user_card_option_selections "
+                        + "(user_card_id, option_group_id, card_id, option_choice_id, selected_at) "
+                        + "VALUES (?, ?, ?, ?, UTC_TIMESTAMP(6))",
+                USER_CARD_ID, optionGroupId, CARD_ID, optionChoiceId);
         jdbcTemplate.update("INSERT INTO user_card_performance_snapshots "
                         + "(performance_snapshot_id, user_card_id, performance_month, current_spend_amount, "
                         + "updated_at, created_at) "
@@ -245,9 +264,49 @@ class UserCardSchemaIntegrationTest {
                         + "VALUES (?, ?, ?, 'A-1', UTC_TIMESTAMP(6), '테스트가맹점', 10000, 'approved', "
                         + "JSON_OBJECT(), UTC_TIMESTAMP(6))",
                 approvalId, USER_ID, USER_CARD_ID);
+        jdbcTemplate.update("INSERT INTO card_benefits "
+                        + "(benefit_id, content_version_id, position, record_type, title, "
+                        + "created_at, updated_at) "
+                        + "VALUES (?, ?, 1, 'benefit', '카페 10% 할인', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                benefitId, CONTENT_VERSION_ID);
+        jdbcTemplate.update("INSERT INTO benefit_offers "
+                        + "(offer_id, benefit_id, offer_name, position, reward_type, value_type, "
+                        + "calculation_mode, calculation_basis, stacking_mode, valuation_scope, "
+                        + "valuation_method, created_at, updated_at) "
+                        + "VALUES (?, ?, '카페 할인', 1, 'cashback', 'percentage', 'flat', "
+                        + "'transaction_amount', 'standalone', 'transaction', 'direct', "
+                        + "UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                offerId, benefitId);
+        jdbcTemplate.update("INSERT INTO benefit_rules "
+                        + "(rule_id, offer_id, position, rule_effect, stacking_mode, "
+                        + "created_at, updated_at) "
+                        + "VALUES (?, ?, 1, 'grant', 'standalone', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                ruleId, offerId);
+        jdbcTemplate.update("INSERT INTO user_benefit_usages "
+                        + "(usage_id, user_card_id, offer_id, rule_id, approval_id, usage_date, "
+                        + "eligible_amount_krw, reward_amount_krw, usage_status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, CURRENT_DATE(), 10000, 1000, 'confirmed', "
+                        + "UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                "01980d6a-5c0c-7aaf-9b85-010203040808", USER_CARD_ID, offerId, ruleId, approvalId);
+        jdbcTemplate.update("INSERT INTO user_benefit_calculation_outcomes "
+                        + "(outcome_id, user_card_id, approval_id, offer_id, rule_id, usage_date, "
+                        + "reward_unit, expected_reward_value, applied_reward_value, missed_reward_value, "
+                        + "outcome_status, rejection_reason, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, CURRENT_DATE(), 'KRW', 1000, 1000, 0, "
+                        + "'applied', 'none', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                "01980d6a-5c0c-7aaf-9b85-010203040809", USER_CARD_ID, approvalId, offerId, ruleId);
 
         cardQueryService.deleteAllByUserId(USER_ID);
 
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_benefit_calculation_outcomes WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_benefit_usages WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_card_option_selections WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM user_card_performance_snapshots WHERE user_card_id = ?",
                 Integer.class, USER_CARD_ID));
@@ -261,6 +320,10 @@ class UserCardSchemaIntegrationTest {
         // 이뤄졌다면 이 시점에는 이미 참조가 끊겨 있어 FK 위반 없이 지울 수 있어야 한다.
         assertEquals(1, jdbcTemplate.update(
                 "DELETE FROM codef_account_credentials WHERE user_id = ?", USER_ID));
+
+        jdbcTemplate.update("DELETE FROM benefit_rules WHERE rule_id = ?", ruleId);
+        jdbcTemplate.update("DELETE FROM benefit_offers WHERE offer_id = ?", offerId);
+        jdbcTemplate.update("DELETE FROM card_benefits WHERE benefit_id = ?", benefitId);
     }
 
     @Test
