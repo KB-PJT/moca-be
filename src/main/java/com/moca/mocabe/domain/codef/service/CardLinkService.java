@@ -304,9 +304,9 @@ public class CardLinkService {
                 continue;
             }
             String userCardId = existingRow == null ? null : existingRow.userCardId();
+            boolean isCreatorCard = creatorCardNo != null
+                    && MaskedCardNoMatcher.matches(creatorCardNo, ownedCard.cardNumber());
             if (userCardId == null && matched != null) {
-                boolean isCreatorCard = creatorCardNo != null
-                        && MaskedCardNoMatcher.matches(creatorCardNo, ownedCard.cardNumber());
                 byte[] cardNumberEnc = isCreatorCard ? encryptor.encrypt(creatorCardNo) : null;
                 byte[] cardPasswordEnc = isCreatorCard && policy.isRequiresCardPassword()
                         ? encryptor.encrypt(creatorCardPassword) : null;
@@ -319,6 +319,14 @@ public class CardLinkService {
                         cardNumberEnc, cardPasswordEnc, false);
                 // 동시 재조회로 다른 요청이 먼저 적재했다면 새로 만든 ID 대신 그 요청의 user_card_id를 받는다.
                 userCardId = codefCredentialStore.saveCard(insert);
+            } else if (userCardId != null && isCreatorCard) {
+                // 이전 시도(discover 재시도 등)에서 크리덴셜 없이 이미 적재된 카드가, 이번 조회에서
+                // 계정 생성 카드로 확인되면 크리덴셜을 채워 넣는다. 그렇지 않으면 카탈로그 매칭 지연
+                // 등으로 최초 적재 시 크리덴셜이 못 채워진 카드는 재시도해도 영영 채워지지 않는다.
+                byte[] cardNumberEnc = encryptor.encrypt(creatorCardNo);
+                byte[] cardPasswordEnc = policy.isRequiresCardPassword()
+                        ? encryptor.encrypt(creatorCardPassword) : null;
+                linkedCardMapper.updateCardCredentials(userCardId, userId, cardNumberEnc, cardPasswordEnc);
             }
             cards.add(toResponse(userCardId, matched, ownedCard, policy));
         }

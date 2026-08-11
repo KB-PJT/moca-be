@@ -362,6 +362,48 @@ class CardLinkServiceTest {
     }
 
     @Test
+    @DisplayName("discover 재시도 시, 이전 시도에서 크리덴셜 없이 이미 적재된 계정 생성 카드에 "
+            + "크리덴셜을 채워 넣는다")
+    void backfillsCredentialsOnRetryForAlreadyPersistedCreatorCard() {
+        String linkId = "link-1";
+        byte[] pendingCardNoEnc = {7, 7};
+        byte[] pendingCardPasswordEnc = {6, 6};
+        byte[] birthDateEnc = {5, 5};
+        PendingCardDiscoveryTarget target = new PendingCardDiscoveryTarget(
+                linkId, "cid-1", "0301", birthDateEnc, true, pendingCardNoEnc, pendingCardPasswordEnc);
+        when(codefCredentialMapper.findPendingDiscoveryTarget(linkId, USER_ID)).thenReturn(target);
+        CodefIssuerPolicy policy = cardPolicy();
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(policy);
+        when(encryptor.decrypt(birthDateEnc)).thenReturn("900101");
+        when(encryptor.decrypt(pendingCardNoEnc)).thenReturn("1234567890123456");
+        when(encryptor.decrypt(pendingCardPasswordEnc)).thenReturn("1234");
+        // 계정 생성 카드번호와 마스킹이 일치하는 보유카드 한 장을 CODEF가 돌려준다.
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of(new CodefOwnedCard("노리2 체크카드", "123456******3456", "체크/본인", "")));
+        when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("existing-key");
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("노리2 체크카드"))).thenReturn(matched);
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        // 이전 discover 시도에서 크리덴셜 없이 이미 적재된 카드(재시도 상황)를 가정한다.
+        when(linkedCardMapper.findLinkedCardKeysByLinkId(linkId, USER_ID))
+                .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key", false)));
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {9});
+        when(linkedCardMapper.findAnyCardCredentialByLinkId(linkId))
+                .thenReturn(new ActiveCardCredential("existing-uc-1", new byte[] {9}, new byte[] {9}));
+
+        CardLinkResponse response = cardLinkService.discoverOwnedCards(USER_ID, linkId);
+
+        assertEquals(1, response.cards().size());
+        assertEquals("existing-uc-1", response.cards().get(0).userCardId());
+        verify(linkedCardMapper).updateCardCredentials(
+                eq("existing-uc-1"), eq(USER_ID), any(byte[].class), any(byte[].class));
+        verify(codefCredentialStore, never()).saveCard(any());
+        verify(codefCredentialStore).clearPendingCardCredentials(linkId, USER_ID);
+    }
+
+    @Test
     @DisplayName("discover가 CODEF 조회는 성공했지만 카드번호를 옮겨 저장할 카드가 없으면 "
             + "pending 값을 지우지 않는다(카탈로그 매칭 실패 등으로 재시도가 필요한 상황)")
     void keepsPendingCredentialsWhenNoCardStoresTheCreatorCardNumber() {
