@@ -1,6 +1,9 @@
 package com.moca.mocabe.domain.user.service;
 
 import com.moca.mocabe.domain.card.service.CardQueryService;
+import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
+import com.moca.mocabe.domain.support.service.SupportInquiryService;
+import com.moca.mocabe.domain.user.mapper.WithdrawalRequestMapper;
 import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.model.NotificationSettings;
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
@@ -21,12 +24,20 @@ public class UserApplicationService {
     private final UserDomainService userDomainService;
     private final OpaqueTokenService opaqueTokenService;
     private final CardQueryService cardQueryService;
+    private final CodefCredentialStore codefCredentialStore;
+    private final SupportInquiryService supportInquiryService;
+    private final WithdrawalRequestMapper withdrawalRequestMapper;
 
     public UserApplicationService(UserDomainService userDomainService, OpaqueTokenService opaqueTokenService,
-                                  CardQueryService cardQueryService) {
+                                  CardQueryService cardQueryService, CodefCredentialStore codefCredentialStore,
+                                  SupportInquiryService supportInquiryService,
+                                  WithdrawalRequestMapper withdrawalRequestMapper) {
         this.userDomainService = userDomainService;
         this.opaqueTokenService = opaqueTokenService;
         this.cardQueryService = cardQueryService;
+        this.codefCredentialStore = codefCredentialStore;
+        this.supportInquiryService = supportInquiryService;
+        this.withdrawalRequestMapper = withdrawalRequestMapper;
     }
 
     @Transactional(readOnly = true)
@@ -87,7 +98,14 @@ public class UserApplicationService {
     @Transactional
     public boolean withdraw(String userId, WithdrawUserRequest request) {
         userDomainService.requireUser(userId);
+        withdrawalRequestMapper.insertWithdrawalRequest(
+                request.getReason(), request.getReasonDetail(), request.isConfirmed());
         opaqueTokenService.revokeAll(userId);
+        // user_cards, codef_account_credentials, support_inquiries가 users를 참조하므로
+        // 자식 데이터부터 정리한 뒤 마지막에 users를 삭제한다.
+        cardQueryService.deleteAllByUserId(userId);
+        codefCredentialStore.deleteAllByUserId(userId);
+        supportInquiryService.deleteAllByUserId(userId);
         return userDomainService.deleteUser(userId);
     }
 }

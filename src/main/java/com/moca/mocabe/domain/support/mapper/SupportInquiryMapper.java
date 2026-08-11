@@ -15,4 +15,6 @@ public interface SupportInquiryMapper {
                       @Param("replyEmail") String replyEmail);
 
     InquiryRow findByInquiryId(@Param("inquiryId") String inquiryId, @Param("userId") String userId);
+
+    int deleteByUserId(@Param("userId") String userId);
 }

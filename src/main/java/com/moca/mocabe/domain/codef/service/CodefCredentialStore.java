@@ -64,6 +64,12 @@ public class CodefCredentialStore {
         }
     }
 
+    /** 회원 탈퇴 시 codef_account_credentials를 정리한다. user_cards가 이를 참조하므로 그 뒤에 호출해야 한다. */
+    @Transactional
+    public void deleteAllByUserId(String userId) {
+        codefCredentialMapper.deleteAccountCredentialsByUserId(userId);
+    }
+
     private void insertCredential(CodefAccountCredential credential) {
         try {
             codefCredentialMapper.insertAccountCredential(credential);

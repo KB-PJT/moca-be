@@ -39,4 +39,6 @@ public interface CodefCredentialMapper {
     void restorePendingCardCredentials(@Param("linkId") String linkId, @Param("userId") String userId,
                                        @Param("pendingCardNumberEnc") byte[] pendingCardNumberEnc,
                                        @Param("pendingCardPasswordEnc") byte[] pendingCardPasswordEnc);
+
+    int deleteAccountCredentialsByUserId(@Param("userId") String userId);
 }

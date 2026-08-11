@@ -229,6 +229,41 @@ class UserCardSchemaIntegrationTest {
     }
 
     @Test
+    @DisplayName("회원 탈퇴 시 사용자의 모든 보유 카드와 자식 테이블을 FK 위반 없이 지운다")
+    void deletesAllUserCardsAndChildRowsByUserIdWithoutForeignKeyViolation() {
+        insertUserCard(USER_CARD_ID, CARD_KEY_HASH, true, 1);
+        insertUserCard(ANOTHER_USER_CARD_ID, ANOTHER_CARD_KEY_HASH, false, 2);
+        String approvalId = "01980d6a-5c0c-7aaf-9b85-010203040703";
+        jdbcTemplate.update("INSERT INTO user_card_performance_snapshots "
+                        + "(performance_snapshot_id, user_card_id, performance_month, current_spend_amount, "
+                        + "updated_at, created_at) "
+                        + "VALUES (?, ?, '2026-08', 100000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+                "01980d6a-5c0c-7aaf-9b85-010203040704", USER_CARD_ID);
+        jdbcTemplate.update("INSERT INTO card_payment_approvals "
+                        + "(approval_id, user_id, user_card_id, approval_number, approved_at, "
+                        + "merchant_name, amount, approval_status, source_payload, created_at) "
+                        + "VALUES (?, ?, ?, 'A-1', UTC_TIMESTAMP(6), '테스트가맹점', 10000, 'approved', "
+                        + "JSON_OBJECT(), UTC_TIMESTAMP(6))",
+                approvalId, USER_ID, USER_CARD_ID);
+
+        cardQueryService.deleteAllByUserId(USER_ID);
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_card_performance_snapshots WHERE user_card_id = ?",
+                Integer.class, USER_CARD_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM card_payment_approvals WHERE user_id = ?",
+                Integer.class, USER_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_cards WHERE user_id = ?",
+                Integer.class, USER_ID));
+        // codef_account_credentials는 user_cards가 참조하고 있었으므로, 위 삭제가 순서대로
+        // 이뤄졌다면 이 시점에는 이미 참조가 끊겨 있어 FK 위반 없이 지울 수 있어야 한다.
+        assertEquals(1, jdbcTemplate.update(
+                "DELETE FROM codef_account_credentials WHERE user_id = ?", USER_ID));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 보유 카드를 연결 해제하려 하면 예외를 던진다")
     void disconnectingMissingUserCardThrows() {
         assertThrows(UserCardNotFoundException.class,

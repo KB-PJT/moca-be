@@ -37,6 +37,18 @@ public interface UserCardMapper {
 
     int deleteUserCard(@Param("userCardId") String userCardId, @Param("userId") String userId);
 
+    int deleteBenefitCalculationOutcomesByUserId(@Param("userId") String userId);
+
+    int deleteBenefitUsagesByUserId(@Param("userId") String userId);
+
+    int deleteOptionSelectionsByUserId(@Param("userId") String userId);
+
+    int deletePerformanceSnapshotsByUserId(@Param("userId") String userId);
+
+    int deletePaymentApprovalsByUserId(@Param("userId") String userId);
+
+    int deleteUserCardsByUserId(@Param("userId") String userId);
+
     int deactivateUserCard(@Param("userCardId") String userCardId, @Param("userId") String userId);
 
     int updateDisplayOrders(@Param("userId") String userId,

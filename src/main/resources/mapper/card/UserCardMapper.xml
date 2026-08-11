@@ -135,6 +135,35 @@
             AND user_id = #{userId}
     </delete>
 
+    <!-- 회원 탈퇴 시 user_cards를 참조하는 자식 테이블부터 순차적으로 삭제해야 FK 제약을 위반하지 않는다. -->
+    <delete id="deleteBenefitCalculationOutcomesByUserId">
+        DELETE FROM user_benefit_calculation_outcomes
+        WHERE user_card_id IN (SELECT user_card_id FROM user_cards WHERE user_id = #{userId})
+    </delete>
+
+    <delete id="deleteBenefitUsagesByUserId">
+        DELETE FROM user_benefit_usages
+        WHERE user_card_id IN (SELECT user_card_id FROM user_cards WHERE user_id = #{userId})
+    </delete>
+
+    <delete id="deleteOptionSelectionsByUserId">
+        DELETE FROM user_card_option_selections
+        WHERE user_card_id IN (SELECT user_card_id FROM user_cards WHERE user_id = #{userId})
+    </delete>
+
+    <delete id="deletePerformanceSnapshotsByUserId">
+        DELETE FROM user_card_performance_snapshots
+        WHERE user_card_id IN (SELECT user_card_id FROM user_cards WHERE user_id = #{userId})
+    </delete>
+
+    <delete id="deletePaymentApprovalsByUserId">
+        DELETE FROM card_payment_approvals WHERE user_id = #{userId}
+    </delete>
+
+    <delete id="deleteUserCardsByUserId">
+        DELETE FROM user_cards WHERE user_id = #{userId}
+    </delete>
+
     <update id="deactivateUserCard">
         UPDATE user_cards
         SET is_active = FALSE,

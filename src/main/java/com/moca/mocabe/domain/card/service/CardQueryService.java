@@ -91,6 +91,17 @@ public class CardQueryService {
         }
     }
 
+    /** 회원 탈퇴 시 user_cards와 그 자식 테이블을 모두 정리한다. */
+    @Transactional
+    public void deleteAllByUserId(String userId) {
+        userCardMapper.deleteBenefitCalculationOutcomesByUserId(userId);
+        userCardMapper.deleteBenefitUsagesByUserId(userId);
+        userCardMapper.deleteOptionSelectionsByUserId(userId);
+        userCardMapper.deletePerformanceSnapshotsByUserId(userId);
+        userCardMapper.deletePaymentApprovalsByUserId(userId);
+        userCardMapper.deleteUserCardsByUserId(userId);
+    }
+
     @Transactional(readOnly = true)
     public CardDetailResponse getCardDetail(String userId, String userCardId) {
         UserCardListRow cardRow = userCardMapper.findByUserCardId(userCardId, userId);

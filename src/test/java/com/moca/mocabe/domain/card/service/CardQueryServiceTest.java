@@ -270,6 +270,20 @@ class CardQueryServiceTest {
     }
 
     @Test
+    @DisplayName("회원 탈퇴 시 user_id 기준으로 자식 테이블을 먼저 지우고 user_cards를 삭제한다")
+    void deletesAllCardDataByUserIdInOrder() {
+        cardQueryService.deleteAllByUserId(USER_ID);
+
+        InOrder inOrder = inOrder(userCardMapper);
+        inOrder.verify(userCardMapper).deleteBenefitCalculationOutcomesByUserId(USER_ID);
+        inOrder.verify(userCardMapper).deleteBenefitUsagesByUserId(USER_ID);
+        inOrder.verify(userCardMapper).deleteOptionSelectionsByUserId(USER_ID);
+        inOrder.verify(userCardMapper).deletePerformanceSnapshotsByUserId(USER_ID);
+        inOrder.verify(userCardMapper).deletePaymentApprovalsByUserId(USER_ID);
+        inOrder.verify(userCardMapper).deleteUserCardsByUserId(USER_ID);
+    }
+
+    @Test
     @DisplayName("본인 소유 카드가 아니면 자식 테이블을 지우지 않고 예외를 던진다")
     void rejectsDisconnectForUnknownCard() {
         when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(null);

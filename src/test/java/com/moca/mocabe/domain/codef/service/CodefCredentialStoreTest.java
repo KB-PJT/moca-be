@@ -126,6 +126,15 @@ class CodefCredentialStoreTest {
     }
 
     @Test
+    @DisplayName("회원 탈퇴 시 자격정보 삭제를 매퍼에 위임한다")
+    void deletesAllByUserId() {
+        store.deleteAllByUserId("user-1");
+
+        verify(mapper).deleteAccountCredentialsByUserId("user-1");
+        verifyNoInteractions(linkedCardMapper);
+    }
+
+    @Test
     @DisplayName("외부 연동은 트랜잭션 밖에서 수행하고 저장 메서드만 트랜잭션을 선언한다")
     void declaresTransactionOnlyOnStore() throws NoSuchMethodException {
         Method createLink = CardLinkService.class.getMethod(
