@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.user.mapper.WithdrawalRequestMapper">
+
+    <insert id="insertWithdrawalRequest">
+        INSERT INTO withdrawal_requests (
+            reason_code,
+            reason_text,
+            confirmed,
+            created_at
+        ) VALUES (
+            #{reasonCode},
+            #{reasonText},
+            #{confirmed},
+            UTC_TIMESTAMP(6)
+        )
+    </insert>
+</mapper>
