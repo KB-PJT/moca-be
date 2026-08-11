@@ -334,8 +334,9 @@ class CardLinkServiceTest {
     }
 
     @Test
-    @DisplayName("discover(2단계)는 카드번호가 실제로 카드에 저장됐을 때만 pending 값을 지운다")
-    void discoversOwnedCardsUsingPendingCredentialsAndClearsPendingWhenCardIsStored() {
+    @DisplayName("discover(2단계)는 claim으로 pending을 먼저 지우고, 카드번호가 실제로 카드에 "
+            + "저장되면 복구하지 않는다")
+    void discoversOwnedCardsUsingPendingCredentialsAndKeepsPendingClearedWhenCardIsStored() {
         String linkId = "link-1";
         byte[] pendingCardNoEnc = {7, 7};
         byte[] pendingCardPasswordEnc = {6, 6};
@@ -347,18 +348,25 @@ class CardLinkServiceTest {
         when(encryptor.decrypt(birthDateEnc)).thenReturn("900101");
         when(encryptor.decrypt(pendingCardNoEnc)).thenReturn("1234567890123456");
         when(encryptor.decrypt(pendingCardPasswordEnc)).thenReturn("1234");
+        // 계정 생성 카드번호와 마스킹이 일치하는 보유카드 한 장을 CODEF가 돌려주고, 카탈로그에도 매칭된다.
         when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
-                .thenReturn(List.of());
-        // 카탈로그 매칭에 성공해 카드번호가 실제로 어느 카드에 저장된 상태를 가정한다.
-        when(linkedCardMapper.findAnyCardCredentialByLinkId(linkId))
-                .thenReturn(new ActiveCardCredential("uc-1", new byte[] {1}, new byte[] {2}));
+                .thenReturn(List.of(new CodefOwnedCard("노리2 체크카드", "123456******3456", "체크/본인", "")));
+        when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("new-key");
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("노리2 체크카드"))).thenReturn(matched);
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {9});
 
         CardLinkResponse response = cardLinkService.discoverOwnedCards(USER_ID, linkId);
 
         assertEquals(linkId, response.getLinkId());
         assertEquals("0301", response.getInstitutionCode());
-        assertTrue(response.cards().isEmpty());
-        verify(codefCredentialStore).clearPendingCardCredentials(linkId, USER_ID);
+        assertEquals(1, response.cards().size());
+        // claim이 이미 pending을 지웠고, 계정 생성 카드가 실제로 저장됐으니 복구할 필요가 없다.
+        verify(codefCredentialMapper).clearPendingCardCredentials(linkId, USER_ID);
+        verify(codefCredentialStore, never()).restorePendingCardCredentials(any(), any(), any(), any());
     }
 
     @Test
@@ -390,8 +398,6 @@ class CardLinkServiceTest {
         when(linkedCardMapper.findLinkedCardKeysByLinkId(linkId, USER_ID))
                 .thenReturn(List.of(new LinkedCardKeyRow("existing-uc-1", "existing-key", false)));
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {9});
-        when(linkedCardMapper.findAnyCardCredentialByLinkId(linkId))
-                .thenReturn(new ActiveCardCredential("existing-uc-1", new byte[] {9}, new byte[] {9}));
 
         CardLinkResponse response = cardLinkService.discoverOwnedCards(USER_ID, linkId);
 
@@ -400,13 +406,14 @@ class CardLinkServiceTest {
         verify(linkedCardMapper).updateCardCredentials(
                 eq("existing-uc-1"), eq(USER_ID), any(byte[].class), any(byte[].class));
         verify(codefCredentialStore, never()).saveCard(any());
-        verify(codefCredentialStore).clearPendingCardCredentials(linkId, USER_ID);
+        verify(codefCredentialMapper).clearPendingCardCredentials(linkId, USER_ID);
+        verify(codefCredentialStore, never()).restorePendingCardCredentials(any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("discover가 CODEF 조회는 성공했지만 카드번호를 옮겨 저장할 카드가 없으면 "
-            + "pending 값을 지우지 않는다(카탈로그 매칭 실패 등으로 재시도가 필요한 상황)")
-    void keepsPendingCredentialsWhenNoCardStoresTheCreatorCardNumber() {
+            + "claim으로 지운 pending을 그대로 복구한다(카탈로그 매칭 실패 등으로 재시도가 필요한 상황)")
+    void restoresPendingCredentialsWhenNoCardStoresTheCreatorCardNumber() {
         String linkId = "link-1";
         byte[] pendingCardNoEnc = {7, 7};
         byte[] pendingCardPasswordEnc = {6, 6};
@@ -420,16 +427,43 @@ class CardLinkServiceTest {
         when(encryptor.decrypt(pendingCardPasswordEnc)).thenReturn("1234");
         when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
                 .thenReturn(List.of());
-        // 아직 카드번호가 저장된 카드가 이 연동에 하나도 없는 상태(카탈로그 매칭 실패 등)를 가정한다.
-        when(linkedCardMapper.findAnyCardCredentialByLinkId(linkId)).thenReturn(null);
 
-        cardLinkService.discoverOwnedCards(USER_ID, linkId);
+        CardLinkResponse response = cardLinkService.discoverOwnedCards(USER_ID, linkId);
 
-        verify(codefCredentialStore, never()).clearPendingCardCredentials(any(), any());
+        assertTrue(response.cards().isEmpty());
+        verify(codefCredentialMapper).clearPendingCardCredentials(linkId, USER_ID);
+        // claim이 읽어둔 pending 값 그대로(재암호화하지 않고) 복구한다.
+        verify(codefCredentialStore).restorePendingCardCredentials(
+                linkId, USER_ID, pendingCardNoEnc, pendingCardPasswordEnc);
     }
 
     @Test
-    @DisplayName("이미 pending 값을 소비한 연동에 discover를 다시 요청하면 거부한다")
+    @DisplayName("discover 도중 CODEF 호출이 실패하면 claim으로 지운 pending을 복구하고 예외를 그대로 던진다")
+    void restoresPendingCredentialsWhenCodefCallFails() {
+        String linkId = "link-1";
+        byte[] pendingCardNoEnc = {7, 7};
+        byte[] pendingCardPasswordEnc = {6, 6};
+        byte[] birthDateEnc = {5, 5};
+        PendingCardDiscoveryTarget target = new PendingCardDiscoveryTarget(
+                linkId, "cid-1", "0301", birthDateEnc, true, pendingCardNoEnc, pendingCardPasswordEnc);
+        when(codefCredentialMapper.findPendingDiscoveryTarget(linkId, USER_ID)).thenReturn(target);
+        when(issuerMapper.findCodefPolicyByInstitutionCode("0301")).thenReturn(cardPolicy());
+        when(encryptor.decrypt(birthDateEnc)).thenReturn("900101");
+        when(encryptor.decrypt(pendingCardNoEnc)).thenReturn("1234567890123456");
+        when(encryptor.decrypt(pendingCardPasswordEnc)).thenReturn("1234");
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "1234"))
+                .thenThrow(new CodefUnavailableException("upstream timeout"));
+
+        assertThrows(CodefUnavailableException.class,
+                () -> cardLinkService.discoverOwnedCards(USER_ID, linkId));
+
+        verify(codefCredentialMapper).clearPendingCardCredentials(linkId, USER_ID);
+        verify(codefCredentialStore).restorePendingCardCredentials(
+                linkId, USER_ID, pendingCardNoEnc, pendingCardPasswordEnc);
+    }
+
+    @Test
+    @DisplayName("이미 pending 값을 소비한 연동에 discover를 다시 요청하면 CODEF·store를 건드리지 않고 거부한다")
     void rejectsDiscoverWhenPendingCredentialsAlreadyConsumed() {
         String linkId = "link-1";
         PendingCardDiscoveryTarget target = new PendingCardDiscoveryTarget(
@@ -439,7 +473,8 @@ class CardLinkServiceTest {
         assertThrows(CardLinkAlreadyDiscoveredException.class,
                 () -> cardLinkService.discoverOwnedCards(USER_ID, linkId));
         verifyNoInteractions(codefClient);
-        verify(codefCredentialStore, never()).clearPendingCardCredentials(any(), any());
+        verify(codefCredentialMapper, never()).clearPendingCardCredentials(any(), any());
+        verifyNoInteractions(codefCredentialStore);
     }
 
     @Test

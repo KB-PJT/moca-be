@@ -27,10 +27,16 @@ public class CodefCredentialStore {
         insertCredential(credential);
     }
 
-    /** discoverOwnedCards(2단계)가 pending 카드번호/비밀번호를 소비한 뒤 지우는 별도 트랜잭션이다. */
+    /**
+     * discoverOwnedCards(2단계)가 claim(짧은 트랜잭션에서 pending을 읽고 바로 지움) 이후 CODEF 호출
+     * 실패나 카탈로그 매칭 실패로 카드번호를 어느 카드에도 저장하지 못했을 때, claim 시점에 읽어둔
+     * 값 그대로 pending을 되돌려 사용자가 다시 discover를 호출할 수 있게 하는 별도 트랜잭션이다.
+     */
     @Transactional
-    public void clearPendingCardCredentials(String linkId, String userId) {
-        codefCredentialMapper.clearPendingCardCredentials(linkId, userId);
+    public void restorePendingCardCredentials(String linkId, String userId,
+                                              byte[] pendingCardNumberEnc, byte[] pendingCardPasswordEnc) {
+        codefCredentialMapper.restorePendingCardCredentials(
+                linkId, userId, pendingCardNumberEnc, pendingCardPasswordEnc);
     }
 
     /**

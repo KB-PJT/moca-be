@@ -48,11 +48,15 @@ class CodefCredentialStoreTest {
     }
 
     @Test
-    @DisplayName("pending 카드번호/비밀번호 삭제를 매퍼에 위임한다")
-    void clearsPendingCardCredentials() {
-        store.clearPendingCardCredentials("link-1", "user-1");
+    @DisplayName("pending 카드번호/비밀번호 복구를 매퍼에 위임한다")
+    void restoresPendingCardCredentials() {
+        byte[] pendingCardNumberEnc = {1, 2};
+        byte[] pendingCardPasswordEnc = {3, 4};
 
-        verify(mapper).clearPendingCardCredentials("link-1", "user-1");
+        store.restorePendingCardCredentials("link-1", "user-1", pendingCardNumberEnc, pendingCardPasswordEnc);
+
+        verify(mapper).restorePendingCardCredentials(
+                "link-1", "user-1", pendingCardNumberEnc, pendingCardPasswordEnc);
         verifyNoInteractions(linkedCardMapper);
     }
 

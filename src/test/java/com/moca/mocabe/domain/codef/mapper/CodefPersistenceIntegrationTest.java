@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.codef.dto.ActivateCardLinkCardsRequest;
@@ -154,14 +156,70 @@ class CodefPersistenceIntegrationTest {
         assertNotNull(jdbcTemplate.queryForObject(
                 "SELECT pending_card_number_enc FROM codef_account_credentials "
                         + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_password_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
 
         cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
 
         assertNull(jdbcTemplate.queryForObject(
                 "SELECT pending_card_number_enc FROM codef_account_credentials "
                         + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+        assertNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_password_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
         assertThrows(com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException.class,
                 () -> cardLinkService.discoverOwnedCards(USER_ID, link.linkId()));
+    }
+
+    @Test
+    @DisplayName("동시에 두 discover 요청이 들어오면 하나만 CODEF를 호출해 성공하고, "
+            + "다른 하나는 CODEF를 호출하지 않은 채 409로 즉시 끝난다")
+    void concurrentDiscoverRequestsOnlyOneCallsCodef() throws Exception {
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "1234"))
+                .thenReturn(List.of());
+        CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+            Callable<CardLinkResponse> discover = () -> {
+                ready.countDown();
+                start.await();
+                return cardLinkService.discoverOwnedCards(USER_ID, link.linkId());
+            };
+            Future<CardLinkResponse> first = executor.submit(discover);
+            Future<CardLinkResponse> second = executor.submit(discover);
+            ready.await();
+            start.countDown();
+
+            int successCount = 0;
+            int alreadyDiscoveredCount = 0;
+            for (Future<CardLinkResponse> future : List.of(first, second)) {
+                try {
+                    future.get(10, TimeUnit.SECONDS);
+                    successCount++;
+                } catch (java.util.concurrent.ExecutionException exception) {
+                    if (exception.getCause()
+                            instanceof com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException) {
+                        alreadyDiscoveredCount++;
+                    } else {
+                        throw exception;
+                    }
+                }
+            }
+
+            // 두 번째 요청은 첫 번째의 claim(SELECT ... FOR UPDATE + 즉시 삭제) 트랜잭션이 커밋된
+            // 뒤에야 잠금이 풀려 pending이 이미 비어 있음을 보고, CODEF를 호출하지 않고 곧바로
+            // CardLinkAlreadyDiscoveredException으로 끝나야 한다.
+            assertEquals(1, successCount);
+            assertEquals(1, alreadyDiscoveredCount);
+            verify(codefClient, times(1)).getOwnedCards(
+                    CONNECTED_ID, "0301", "900101", "1234567890123456", "1234");
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -181,6 +239,9 @@ class CodefPersistenceIntegrationTest {
         assertFalse(first.cards().get(0).matched());
         assertNotNull(jdbcTemplate.queryForObject(
                 "SELECT pending_card_number_enc FROM codef_account_credentials "
+                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT pending_card_password_enc FROM codef_account_credentials "
                         + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
 
         // pending이 남아 있으므로 재시도가 거부되지 않고 다시 호출할 수 있다.
