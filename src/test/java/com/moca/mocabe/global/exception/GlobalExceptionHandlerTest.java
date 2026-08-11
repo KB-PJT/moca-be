@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
 import com.moca.mocabe.domain.codef.exception.CardAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CardCredentialRequiredException;
-import com.moca.mocabe.domain.codef.exception.CardLinkAlreadyDiscoveredException;
 import com.moca.mocabe.domain.codef.exception.CardNumberMismatchException;
 import com.moca.mocabe.domain.codef.exception.CodefAccountAlreadyLinkedException;
 import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
@@ -253,15 +252,6 @@ class GlobalExceptionHandlerTest {
         assertEquals("카드번호는 필수입니다.", requiredResponse.getBody().getError().getFields().get("cardNo"));
         assertError(duplicateResponse, HttpStatus.CONFLICT, "CODEF_ACCOUNT_ALREADY_LINKED");
         assertError(duplicateCardResponse, HttpStatus.CONFLICT, "CARD_ALREADY_LINKED");
-    }
-
-    @Test
-    @DisplayName("이미 소비된 discover pending 값 재사용 시도는 409 오류로 변환한다")
-    void handlesCardLinkAlreadyDiscovered() {
-        ResponseEntity<ApiErrorResponse> response = handler.handleCardLinkAlreadyDiscovered(
-                new CardLinkAlreadyDiscoveredException());
-
-        assertError(response, HttpStatus.CONFLICT, "CARD_LINK_ALREADY_DISCOVERED");
     }
 
     @Test
