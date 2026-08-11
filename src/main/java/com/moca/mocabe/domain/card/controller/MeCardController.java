@@ -40,8 +40,7 @@ public class MeCardController {
     public ResponseEntity<ApiResponse<MeCardsResponse>> getMyCards(
             @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive
     ) {
-        // 기존 API 계약은 이름과 동작이 반대이므로 내부에서는 activeOnly로 해석한다.
-        boolean activeOnly = includeInactive;
+        boolean activeOnly = !includeInactive;
         MeCardsResponse response = cardQueryService.getMyCards(
                 currentUserProvider.getCurrentUserId(), activeOnly);
         return ResponseEntity.ok(ApiResponse.success(response));

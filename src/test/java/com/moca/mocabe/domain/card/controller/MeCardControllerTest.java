@@ -68,14 +68,14 @@ class MeCardControllerTest {
     }
 
     @Test
-    @DisplayName("쿼리를 생략하면 활성 카드와 비활성 카드를 data로 반환한다")
-    void returnsActiveAndInactiveCardsByDefault() throws Exception {
+    @DisplayName("쿼리를 생략하면 활성 카드만 data로 반환한다")
+    void omitsInactiveCardsByDefault() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardQueryService.getMyCards(USER_ID, false)).thenReturn(new MeCardsResponse(
+        when(cardQueryService.getMyCards(USER_ID, true)).thenReturn(new MeCardsResponse(
                 null,
                 List.of(card(ACTIVE_USER_CARD_ID, "KB My WE:SH",
                         "https://example.com/card.png", "카페 전용 카드")),
-                List.of(card(INACTIVE_USER_CARD_ID, "KB 국민 일반", null, null))
+                null
         ));
 
         String response = mockMvc.perform(get("/me/cards"))
@@ -93,16 +93,19 @@ class MeCardControllerTest {
                 root.path("data").path("activeCards").get(0).path("issuerName").asText());
         assertEquals(ISSUER_ID,
                 root.path("data").path("activeCards").get(0).path("issuerId").asText());
-        assertTrue(root.path("data").path("inactiveCards").get(0).path("cardImageUrl").isNull());
-        verify(cardQueryService).getMyCards(USER_ID, false);
+        assertFalse(root.path("data").has("inactiveCards"));
+        verify(cardQueryService).getMyCards(USER_ID, true);
     }
 
     @Test
-    @DisplayName("includeInactive이 true이면 비활성 카드 필드를 생략한다")
-    void omitsInactiveCardsWhenIncludeInactiveIsTrue() throws Exception {
+    @DisplayName("includeInactive이 true이면 활성 카드와 비활성 카드를 data로 반환한다")
+    void returnsActiveAndInactiveCardsWhenIncludeInactiveIsTrue() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardQueryService.getMyCards(USER_ID, true))
-                .thenReturn(new MeCardsResponse(null, List.of(), null));
+        when(cardQueryService.getMyCards(USER_ID, false)).thenReturn(new MeCardsResponse(
+                null,
+                List.of(),
+                List.of(card(INACTIVE_USER_CARD_ID, "KB 국민 일반", null, null))
+        ));
 
         String response = mockMvc.perform(get("/me/cards").param("includeInactive", "true"))
                 .andExpect(status().isOk())
@@ -113,8 +116,8 @@ class MeCardControllerTest {
 
         assertTrue(data.path("activeCards").isArray());
         assertTrue(data.path("activeCards").isEmpty());
-        assertFalse(data.has("inactiveCards"));
-        verify(cardQueryService).getMyCards(USER_ID, true);
+        assertTrue(data.path("inactiveCards").get(0).path("cardImageUrl").isNull());
+        verify(cardQueryService).getMyCards(USER_ID, false);
     }
 
     @Test
