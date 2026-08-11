@@ -64,6 +64,18 @@ class KakaoLocalClientTest {
     }
 
     @Test
+    @DisplayName("도로명 주소와 지번 주소가 둘 다 빈 문자열이면 null이다")
+    void returnsNullAddressWhenBothFieldsAreEmpty() {
+        String body = "{\"documents\":[{\"place_name\":\"이디야\",\"x\":\"127.0\",\"y\":\"37.5\","
+                + "\"road_address_name\":\"\",\"address_name\":\"\"}]}";
+        when(httpClient.get(anyString(), any())).thenReturn(new KakaoHttpResponse(200, body));
+
+        List<KakaoPlace> places = kakaoLocalClient.searchByKeyword("이디야", 37.5, 127.0, 500);
+
+        assertEquals(null, places.get(0).address());
+    }
+
+    @Test
     @DisplayName("키워드 검색은 Authorization 헤더에 KakaoAK 키를 담아 요청한다")
     void sendsKakaoAkAuthorizationHeader() {
         when(httpClient.get(anyString(), any())).thenReturn(new KakaoHttpResponse(200, "{\"documents\":[]}"));
