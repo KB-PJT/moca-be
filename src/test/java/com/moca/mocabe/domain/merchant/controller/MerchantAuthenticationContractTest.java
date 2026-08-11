@@ -19,6 +19,7 @@ import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.report.service.ReportQueryService;
+import com.moca.mocabe.domain.support.service.SupportInquiryService;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.AuthenticatedUser;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
@@ -164,6 +165,11 @@ class MerchantAuthenticationContractTest {
         @Bean
         public MerchantNearbyQueryService merchantNearbyQueryService() {
             return mock(MerchantNearbyQueryService.class);
+        }
+
+        @Bean
+        public SupportInquiryService supportInquiryService() {
+            return mock(SupportInquiryService.class);
         }
 
         @Bean
