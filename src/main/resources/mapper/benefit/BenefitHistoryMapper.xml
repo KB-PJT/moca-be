@@ -5,9 +5,14 @@
         ubu.usage_id AS benefit_history_id, approval.merchant_name,
         COALESCE(ubu.approved_at, approval.approved_at) AS approved_at, approval.amount AS payment_amount,
         ubu.reward_amount_krw AS benefit_amount,
-        CASE bo.reward_type WHEN 'discount' THEN 'DISCOUNT' WHEN 'cashback' THEN 'CASHBACK' WHEN 'points' THEN 'POINT' END AS benefit_type,
+        CASE WHEN ubu.reward_original_unit = 'mile' THEN 'MILEAGE'
+             WHEN ubu.reward_original_unit = 'point' THEN 'POINT'
+             WHEN bo.reward_type = 'discount' THEN 'DISCOUNT'
+             WHEN bo.reward_type = 'cashback' THEN 'CASHBACK'
+             WHEN bo.reward_type = 'points' THEN 'POINT' END AS benefit_type,
         COALESCE(bo.offer_name, cb.title) AS benefit_title, ubu.user_card_id,
-        COALESCE(cv.name, uc.card_name_from_codef) AS card_name, 'APPLIED' AS calculation_status
+        CONCAT_WS(' ', COALESCE(cv.name, uc.card_name_from_codef), NULLIF(TRIM(uc.card_no), '')) AS card_name,
+        'APPLIED' AS calculation_status
     </sql>
     <sql id="historyJoins">
         FROM user_benefit_usages ubu
@@ -24,7 +29,7 @@
           AND COALESCE(ubu.approved_at, approval.approved_at) &lt; #{toUtc}
           AND bo.reward_type IN ('discount', 'cashback', 'points')
           <if test="userCardId != null">AND ubu.user_card_id = #{userCardId}</if>
-          <if test="benefitType != null">AND CASE bo.reward_type WHEN 'discount' THEN 'DISCOUNT' WHEN 'cashback' THEN 'CASHBACK' WHEN 'points' THEN 'POINT' END = #{benefitType}</if>
+          <if test="benefitType != null">AND CASE WHEN ubu.reward_original_unit = 'mile' THEN 'MILEAGE' WHEN ubu.reward_original_unit = 'point' THEN 'POINT' WHEN bo.reward_type = 'discount' THEN 'DISCOUNT' WHEN bo.reward_type = 'cashback' THEN 'CASHBACK' WHEN bo.reward_type = 'points' THEN 'POINT' END = #{benefitType}</if>
     </sql>
     <resultMap id="historyRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryRow">
         <id property="benefitHistoryId" column="benefit_history_id"/><result property="merchantName" column="merchant_name"/><result property="approvedAt" column="approved_at"/><result property="paymentAmount" column="payment_amount"/><result property="benefitAmount" column="benefit_amount"/><result property="benefitType" column="benefit_type"/><result property="benefitTitle" column="benefit_title"/><result property="userCardId" column="user_card_id"/><result property="cardName" column="card_name"/><result property="calculationStatus" column="calculation_status"/>
@@ -35,6 +40,33 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
     <select id="countHistory" resultType="long">SELECT COUNT(*) <include refid="historyJoins"/></select>
+    <select id="summarizeHistory" resultType="com.moca.mocabe.domain.benefit.model.BenefitHistorySummaryRow">
+        SELECT CAST(COALESCE(SUM(ubu.reward_amount_krw), 0) AS SIGNED) AS total_benefit_amount,
+               CAST(COALESCE(SUM(CASE WHEN (ubu.reward_original_unit IS NULL
+                                          OR ubu.reward_original_unit NOT IN ('point', 'mile'))
+                                          AND bo.reward_type = 'discount'
+                                      THEN ubu.reward_amount_krw ELSE 0 END), 0) AS SIGNED) AS discount_amount,
+               CAST(COALESCE(SUM(CASE WHEN (ubu.reward_original_unit IS NULL
+                                          OR ubu.reward_original_unit NOT IN ('point', 'mile'))
+                                          AND bo.reward_type = 'cashback'
+                                      THEN ubu.reward_amount_krw ELSE 0 END), 0) AS SIGNED) AS cashback_amount,
+               CAST(COALESCE(SUM(CASE WHEN ubu.reward_original_unit = 'point'
+                                      THEN ubu.reward_original_value
+                                      WHEN ubu.reward_original_unit IS NULL AND bo.reward_type = 'points'
+                                      THEN ubu.reward_amount_krw ELSE 0 END), 0) AS SIGNED) AS point_amount,
+               CAST(COALESCE(SUM(CASE WHEN ubu.reward_original_unit = 'mile'
+                                      THEN ubu.reward_original_value ELSE 0 END), 0) AS SIGNED) AS mileage_amount
+        FROM user_benefit_usages ubu
+        INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
+        INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
+        INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
+        WHERE uc.user_id = #{userId}
+          AND ubu.usage_status = 'confirmed'
+          AND COALESCE(ubu.approved_at, approval.approved_at) &gt;= #{fromUtc}
+          AND COALESCE(ubu.approved_at, approval.approved_at) &lt; #{toUtc}
+          AND bo.reward_type IN ('discount', 'cashback', 'points')
+          <if test="userCardId != null">AND ubu.user_card_id = #{userCardId}</if>
+    </select>
     <resultMap id="detailRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryDetailRow" extends="historyRow">
         <result property="monthlyUsedAmount" column="monthly_used_amount"/><result property="monthlyLimitAmount" column="monthly_limit_amount"/><result property="earnedMileage" column="earned_mileage"/>
     </resultMap>
