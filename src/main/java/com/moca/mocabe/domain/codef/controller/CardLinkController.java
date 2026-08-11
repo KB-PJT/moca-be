@@ -41,12 +41,6 @@ public class CardLinkController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
-    @PostMapping("/{linkId}/cards/discover")
-    public ApiResponse<CardLinkResponse> discoverOwnedCards(@PathVariable String linkId) {
-        return ApiResponse.success(cardLinkService.discoverOwnedCards(
-                currentUserProvider.getCurrentUserId(), linkId));
-    }
-
     @PatchMapping("/{linkId}/cards")
     public ApiResponse<ActivateCardLinkCardsResponse> activateCards(
             @PathVariable String linkId,
