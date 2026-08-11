@@ -45,8 +45,8 @@ class MerchantNearbyQueryServiceTest {
                 List.of(new MerchantListRow("m-starbucks", "스타벅스")));
         when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of("CE7"));
         when(kakaoLocalClient.searchByCategory("CE7", 37.5, 127.0, 500)).thenReturn(List.of(
-                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 120),
-                new KakaoPlace("이름모를카페", 37.502, 127.002, 200)));
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 120, "서울 강남구 테헤란로 1"),
+                new KakaoPlace("이름모를카페", 37.502, 127.002, 200, "서울 강남구 테헤란로 2")));
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
@@ -56,6 +56,7 @@ class MerchantNearbyQueryServiceTest {
         assertEquals("m-starbucks", results.get(0).merchantId());
         assertEquals("스타벅스 강남점", results.get(0).name());
         assertEquals(120, results.get(0).distanceMeters());
+        assertEquals("서울 강남구 테헤란로 1", results.get(0).address());
         verify(kakaoLocalClient, never()).searchByKeyword(anyString(), anyDouble(), anyDouble(), anyInt());
     }
 
@@ -67,7 +68,7 @@ class MerchantNearbyQueryServiceTest {
                 new MerchantListRow("m-olive", "올리브영")));
         when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of());
         when(kakaoLocalClient.searchByKeyword("올리브영", 37.5, 127.0, 500)).thenReturn(List.of(
-                new KakaoPlace("올리브영 홍대점", 37.55, 127.05, 300)));
+                new KakaoPlace("올리브영 홍대점", 37.55, 127.05, 300, null)));
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-olive", "올리브영")), List.of()));
 
@@ -86,8 +87,8 @@ class MerchantNearbyQueryServiceTest {
                 new MerchantListRow("m-starbucks", "스타벅스")));
         when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of("CE7"));
         when(kakaoLocalClient.searchByCategory("CE7", 37.5, 127.0, 500)).thenReturn(List.of(
-                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 300),
-                new KakaoPlace("스타벅스 역삼점", 37.502, 127.002, 100)));
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 300, null),
+                new KakaoPlace("스타벅스 역삼점", 37.502, 127.002, 100, null)));
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
@@ -105,8 +106,8 @@ class MerchantNearbyQueryServiceTest {
                 new MerchantListRow("m-starbucks", "스타벅스")));
         when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of("CE7"));
         when(kakaoLocalClient.searchByCategory("CE7", 37.5, 127.0, 500)).thenReturn(List.of(
-                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, null),
-                new KakaoPlace("스타벅스 역삼점", 37.502, 127.002, 150)));
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, null, null),
+                new KakaoPlace("스타벅스 역삼점", 37.502, 127.002, 150, null)));
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
@@ -124,8 +125,8 @@ class MerchantNearbyQueryServiceTest {
                 new MerchantListRow("m-starbucks", "스타벅스")));
         when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of("CE7"));
         when(kakaoLocalClient.searchByCategory("CE7", 37.5, 127.0, 500)).thenReturn(List.of(
-                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, null),
-                new KakaoPlace("스타벅스 역삼점", 37.502, 127.002, null)));
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, null, null),
+                new KakaoPlace("스타벅스 역삼점", 37.502, 127.002, null, null)));
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
@@ -220,7 +221,7 @@ class MerchantNearbyQueryServiceTest {
                 new MerchantListRow("m-olive", "올리브영")));
         when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of());
         when(kakaoLocalClient.searchByKeyword("스타벅스", 37.5, 127.0, 500)).thenReturn(List.of(
-                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 120)));
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 120, null)));
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 

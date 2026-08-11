@@ -139,7 +139,7 @@ public class MerchantNearbyQueryService {
         return closestPlaceByMerchantId.entrySet().stream()
                 .map(entry -> new NearbyMerchantResponse(entry.getKey(), entry.getValue().placeName(),
                         entry.getValue().latitude(), entry.getValue().longitude(),
-                        entry.getValue().distanceMeters()))
+                        entry.getValue().distanceMeters(), entry.getValue().address()))
                 .sorted(Comparator.comparing(NearbyMerchantResponse::distanceMeters,
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();

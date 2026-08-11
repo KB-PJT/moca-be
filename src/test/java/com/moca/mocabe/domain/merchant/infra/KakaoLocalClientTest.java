@@ -26,7 +26,8 @@ class KakaoLocalClientTest {
     @DisplayName("카테고리 검색 응답의 장소 목록을 KakaoPlace로 변환한다")
     void parsesCategorySearchResponse() {
         String body = "{\"documents\":[{\"place_name\":\"스타벅스 강남점\",\"x\":\"127.028\",\"y\":\"37.498\","
-                + "\"distance\":\"120\"}]}";
+                + "\"distance\":\"120\",\"road_address_name\":\"서울 강남구 테헤란로 1\","
+                + "\"address_name\":\"서울 강남구 역삼동 1\"}]}";
         when(httpClient.get(contains("category.json"), any())).thenReturn(new KakaoHttpResponse(200, body));
 
         List<KakaoPlace> places = kakaoLocalClient.searchByCategory("CE7", 37.5, 127.03, 500);
@@ -36,6 +37,42 @@ class KakaoLocalClientTest {
         assertEquals(37.498, places.get(0).latitude());
         assertEquals(127.028, places.get(0).longitude());
         assertEquals(120, places.get(0).distanceMeters());
+        assertEquals("서울 강남구 테헤란로 1", places.get(0).address());
+    }
+
+    @Test
+    @DisplayName("도로명 주소가 없으면 지번 주소를 쓴다")
+    void fallsBackToAddressNameWhenRoadAddressMissing() {
+        String body = "{\"documents\":[{\"place_name\":\"이디야\",\"x\":\"127.0\",\"y\":\"37.5\","
+                + "\"road_address_name\":\"\",\"address_name\":\"서울 강남구 역삼동 1\"}]}";
+        when(httpClient.get(anyString(), any())).thenReturn(new KakaoHttpResponse(200, body));
+
+        List<KakaoPlace> places = kakaoLocalClient.searchByKeyword("이디야", 37.5, 127.0, 500);
+
+        assertEquals("서울 강남구 역삼동 1", places.get(0).address());
+    }
+
+    @Test
+    @DisplayName("주소 정보가 아예 없으면 null이다")
+    void returnsNullAddressWhenMissing() {
+        String body = "{\"documents\":[{\"place_name\":\"이디야\",\"x\":\"127.0\",\"y\":\"37.5\"}]}";
+        when(httpClient.get(anyString(), any())).thenReturn(new KakaoHttpResponse(200, body));
+
+        List<KakaoPlace> places = kakaoLocalClient.searchByKeyword("이디야", 37.5, 127.0, 500);
+
+        assertEquals(null, places.get(0).address());
+    }
+
+    @Test
+    @DisplayName("도로명 주소와 지번 주소가 둘 다 빈 문자열이면 null이다")
+    void returnsNullAddressWhenBothFieldsAreEmpty() {
+        String body = "{\"documents\":[{\"place_name\":\"이디야\",\"x\":\"127.0\",\"y\":\"37.5\","
+                + "\"road_address_name\":\"\",\"address_name\":\"\"}]}";
+        when(httpClient.get(anyString(), any())).thenReturn(new KakaoHttpResponse(200, body));
+
+        List<KakaoPlace> places = kakaoLocalClient.searchByKeyword("이디야", 37.5, 127.0, 500);
+
+        assertEquals(null, places.get(0).address());
     }
 
     @Test

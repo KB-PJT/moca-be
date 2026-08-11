@@ -68,9 +68,28 @@ public class KakaoLocalClient {
                     document.path("place_name").asText(),
                     Double.parseDouble(document.path("y").asText()),
                     Double.parseDouble(document.path("x").asText()),
-                    parseDistance(document.path("distance"))));
+                    parseDistance(document.path("distance")),
+                    parseAddress(document)));
         }
         return places;
+    }
+
+    /** 도로명 주소가 있으면 그 값, 없으면 지번 주소를 쓴다(카카오 응답은 도로명 주소가 없으면 빈 문자열을 준다). */
+    private String parseAddress(JsonNode document) {
+        String roadAddress = normalizeAddress(document.path("road_address_name").asText(null));
+        if (roadAddress != null) {
+            return roadAddress;
+        }
+        return normalizeAddress(document.path("address_name").asText(null));
+    }
+
+    /** 없거나 공백뿐인 주소는 null로 통일한다(필드가 있어도 빈 문자열일 수 있어 asText 기본값만으로는 못 걸러진다). */
+    private String normalizeAddress(String address) {
+        if (address == null) {
+            return null;
+        }
+        String trimmed = address.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private Integer parseDistance(JsonNode distanceNode) {
