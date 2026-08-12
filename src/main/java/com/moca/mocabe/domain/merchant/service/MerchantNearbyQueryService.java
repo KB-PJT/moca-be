@@ -84,10 +84,10 @@ public class MerchantNearbyQueryService {
         List<String> groupCodes = merchantCategoryMapper.findEnabledKakaoGroupCodes(categoryId);
         List<KakaoPlace> places = searchPlaces(groupCodes, categoryMerchants, latitude, longitude, radiusMeters);
         List<NearbyMerchantResponse> results = toNearbyMerchants(categoryMerchants, places);
-        int placesFound = places.size();
-        int matched = results.size();
-        LOGGER.info(() -> "근처 가맹점 조회 categoryId=" + categoryId + " 전략=" + (groupCodes.isEmpty() ? "2안" : "1안")
-                + " 카카오결과=" + placesFound + "건 매칭=" + matched + "건");
+        // int placesFound = places.size();
+        // int matched = results.size();
+        // LOGGER.info(() -> "근처 가맹점 조회 categoryId=" + categoryId + " 전략=" + (groupCodes.isEmpty() ? "2안" : "1안")
+        //         + " 카카오결과=" + placesFound + "건 매칭=" + matched + "건");
         return results;
     }
 
