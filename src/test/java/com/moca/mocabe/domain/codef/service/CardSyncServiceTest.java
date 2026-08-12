@@ -70,6 +70,10 @@ class CardSyncServiceTest {
     performanceSnapshotStore = mock(PerformanceSnapshotStore.class);
     encryptor = mock(Encryptor.class);
     when(merchantLookup.loadCandidates()).thenReturn(merchantCandidates);
+    // 매칭된 활성 카드가 있는 연동을 기본값으로 둔다. requiresCardNo=false 연동도 이제 활성 카드가
+    // 있어야 CODEF를 호출하므로, 개별 테스트에서 다른 credentialId를 스텁하지 않는 한 이 기본값을 쓴다.
+    when(cardApprovalMapper.findActiveCardCredentialsByCredentialId(anyString()))
+        .thenReturn(List.of(new ActiveCardCredential("uc-1", new byte[] {1}, null)));
     service =
         new CardSyncService(
             codefClient,
@@ -111,6 +115,23 @@ class CardSyncServiceTest {
   void returnsZeroApprovalsWhenNoConnections() {
     when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
     when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID)).thenReturn(List.of());
+
+    SyncMyCardsResponse response =
+        service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
+
+    assertEquals(1, response.getSyncedCardCount());
+    assertEquals(0, response.getSyncedApprovalCount());
+    verifyNoInteractions(codefClient);
+  }
+
+  @Test
+  @DisplayName("카드번호 불필요 연동이라도 매칭된 활성 카드가 없으면 CODEF를 조회하지 않는다")
+  void skipsConnectionWithoutActiveCardsEvenWhenCardNoNotRequired() {
+    when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+    when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+        .thenReturn(List.of(connection()));
+    when(cardApprovalMapper.findActiveCardCredentialsByCredentialId("link-1"))
+        .thenReturn(List.of());
 
     SyncMyCardsResponse response =
         service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
