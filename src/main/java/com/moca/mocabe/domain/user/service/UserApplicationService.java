@@ -15,6 +15,8 @@ import com.moca.mocabe.domain.user.dto.UpdateNicknameRequest;
 import com.moca.mocabe.domain.user.dto.UpdateCardSortModeRequest;
 import com.moca.mocabe.domain.user.dto.UserProfileResponse;
 import com.moca.mocabe.domain.user.dto.WithdrawUserRequest;
+import com.moca.mocabe.domain.user.dto.BenefitPreferenceRequest;
+import com.moca.mocabe.domain.user.dto.BenefitPreferenceResponse;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,6 +89,17 @@ public class UserApplicationService {
         settings.setLocationRecommendationEnabled(request.isLocationRecommendationEnabled());
         userDomainService.updateLocationRecommendationEnabled(userId, settings.isLocationRecommendationEnabled());
         return new LocationSettingsResponse(settings);
+    }
+
+    @Transactional(readOnly = true)
+    public BenefitPreferenceResponse getBenefitPreference(String userId) {
+        return new BenefitPreferenceResponse(userDomainService.findBenefitPreferenceType(userId));
+    }
+
+    @Transactional
+    public BenefitPreferenceResponse updateBenefitPreference(String userId, BenefitPreferenceRequest request) {
+        userDomainService.updateBenefitPreferenceType(userId, request.getBenefitPreferenceType());
+        return new BenefitPreferenceResponse(request.getBenefitPreferenceType());
     }
 
     @Transactional(readOnly = true)

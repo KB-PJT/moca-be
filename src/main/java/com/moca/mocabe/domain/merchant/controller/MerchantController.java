@@ -3,9 +3,13 @@ package com.moca.mocabe.domain.merchant.controller;
 import com.moca.mocabe.domain.merchant.dto.MerchantCategoryResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantResponse;
 import com.moca.mocabe.domain.merchant.dto.NearbyMerchantResponse;
+import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationResponse;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
+import com.moca.mocabe.domain.merchant.service.MerchantCardRecommendationService;
+import com.moca.mocabe.global.auth.CurrentUserProvider;
+import java.math.BigDecimal;
 import com.moca.mocabe.global.response.ApiResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +28,8 @@ public class MerchantController {
     private final MerchantCategoryQueryService merchantCategoryQueryService;
     private final MerchantQueryService merchantQueryService;
     private final MerchantNearbyQueryService merchantNearbyQueryService;
+    private final MerchantCardRecommendationService merchantCardRecommendationService;
+    private final CurrentUserProvider currentUserProvider;
 
     @GetMapping("/categories")
     public ResponseEntity<ApiResponse<List<MerchantCategoryResponse>>> getCategories() {
@@ -45,5 +51,24 @@ public class MerchantController {
             @RequestParam(name = "merchantId", required = false) String merchantId) {
         return ResponseEntity.ok(ApiResponse.success(merchantNearbyQueryService.getNearbyMerchants(
                 categoryId, latitude, longitude, radiusMeters, merchantId)));
+    }
+
+    @GetMapping("/{merchantId}/card-recommendations")
+    public ResponseEntity<ApiResponse<MerchantCardRecommendationResponse>> getCardRecommendations(
+            @org.springframework.web.bind.annotation.PathVariable String merchantId,
+            @RequestParam(name = "paymentAmount", required = false) BigDecimal paymentAmount) {
+        return ResponseEntity.ok(ApiResponse.success(merchantCardRecommendationService.recommend(
+                currentUserProvider.getCurrentUserId(), merchantId, paymentAmount)));
+    }
+
+    @GetMapping("/place-card-recommendations")
+    public ResponseEntity<ApiResponse<MerchantCardRecommendationResponse>> getPlaceCardRecommendations(
+            @RequestParam(name = "placeName") String placeName,
+            @RequestParam(name = "categoryGroupCode") String categoryGroupCode,
+            @RequestParam(name = "categoryName", required = false) String categoryName,
+            @RequestParam(name = "paymentAmount", required = false) BigDecimal paymentAmount) {
+        return ResponseEntity.ok(ApiResponse.success(merchantCardRecommendationService.recommendPlace(
+                currentUserProvider.getCurrentUserId(), placeName, categoryGroupCode,
+                categoryName, paymentAmount)));
     }
 }

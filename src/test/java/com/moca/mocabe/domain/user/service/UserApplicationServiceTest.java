@@ -12,12 +12,16 @@ import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.domain.support.service.SupportInquiryService;
 import com.moca.mocabe.domain.user.mapper.WithdrawalRequestMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
+import com.moca.mocabe.domain.user.model.NotificationSettings;
+import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.dto.LocationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.NotificationSettingsRequest;
 import com.moca.mocabe.domain.user.dto.UpdateNicknameRequest;
 import com.moca.mocabe.domain.user.dto.UpdateCardSortModeRequest;
 import com.moca.mocabe.domain.user.dto.UserProfileResponse;
 import com.moca.mocabe.domain.user.dto.WithdrawUserRequest;
+import com.moca.mocabe.domain.user.dto.BenefitPreferenceRequest;
+import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import org.junit.jupiter.api.DisplayName;
@@ -141,6 +145,20 @@ class UserApplicationServiceTest {
     }
 
     @Test
+    @DisplayName("저장된 알림과 위치 설정을 그대로 반환한다")
+    void returnsStoredSettings() {
+        NotificationSettings notifications = new NotificationSettings();
+        notifications.setNearbyBenefitEnabled(true);
+        LocationSettings location = new LocationSettings();
+        location.setLocationRecommendationEnabled(true);
+        when(userDomainService.findNotificationSettings(USER_ID)).thenReturn(notifications);
+        when(userDomainService.findLocationSettings(USER_ID)).thenReturn(location);
+
+        assertTrue(userApplicationService.getNotificationSettings(USER_ID).isNearbyBenefitEnabled());
+        assertTrue(userApplicationService.getLocationSettings(USER_ID).isLocationRecommendationEnabled());
+    }
+
+    @Test
     @DisplayName("사용자를 찾을 수 없으면 사용자 없음 예외를 반환한다")
     void rejectsMissingUser() {
         when(userDomainService.requireUser(USER_ID)).thenThrow(new UserNotFoundException());
@@ -163,6 +181,21 @@ class UserApplicationServiceTest {
         when(cardQueryService.hasAnyCard(USER_ID)).thenReturn(true);
 
         assertFalse(userApplicationService.isNewUser(USER_ID).isNewUser());
+    }
+
+    @Test
+    @DisplayName("혜택 선호를 조회하고 온보딩 선택값으로 변경한다")
+    void getsAndUpdatesBenefitPreference() {
+        when(userDomainService.findBenefitPreferenceType(USER_ID))
+                .thenReturn(BenefitPreferenceType.IMMEDIATE_SAVINGS);
+        assertEquals(BenefitPreferenceType.IMMEDIATE_SAVINGS,
+                userApplicationService.getBenefitPreference(USER_ID).benefitPreferenceType());
+
+        BenefitPreferenceRequest request = new BenefitPreferenceRequest();
+        request.setBenefitPreferenceType(BenefitPreferenceType.TRAVEL_MILEAGE);
+        assertEquals(BenefitPreferenceType.TRAVEL_MILEAGE,
+                userApplicationService.updateBenefitPreference(USER_ID, request).benefitPreferenceType());
+        verify(userDomainService).updateBenefitPreferenceType(USER_ID, BenefitPreferenceType.TRAVEL_MILEAGE);
     }
 
     @Test

@@ -122,7 +122,9 @@ public class BenefitUsageCalculationService {
                   0,
                   0,
                   true,
-                  true));
+                  true,
+                  false,
+                  targetAttributes(approval)));
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
         persist(approval, usageDate, first, monthlyLimit, result);
@@ -170,7 +172,22 @@ public class BenefitUsageCalculationService {
 
   private BenefitRuleTarget toTarget(SimpleBenefitRuleRow row) {
     return new BenefitRuleTarget(
-        row.conditionGroup(), BenefitTargetMatchMode.INCLUDE, row.targetType(), row.targetCode());
+        row.conditionGroup(), BenefitTargetMatchMode.valueOf(row.matchMode().toUpperCase(Locale.ROOT)),
+        row.targetType(), row.targetCode());
+  }
+
+  private Map<String, Set<String>> targetAttributes(BenefitApprovalRow approval) {
+    Map<String, Set<String>> attributes = new LinkedHashMap<>();
+    if (approval.merchantId() != null && !approval.merchantId().isBlank()) {
+      attributes.put("merchant", Set.of(approval.merchantId()));
+    }
+    if (approval.merchantCategoryIds() != null && !approval.merchantCategoryIds().isBlank()) {
+      attributes.put("merchant_category",
+          java.util.Arrays.stream(approval.merchantCategoryIds().split(","))
+              .map(String::trim).filter(value -> !value.isEmpty())
+              .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+    }
+    return Map.copyOf(attributes);
   }
 
   private void persist(

@@ -10,6 +10,8 @@ import com.moca.mocabe.domain.user.dto.UpdateNicknameRequest;
 import com.moca.mocabe.domain.user.dto.UpdateCardSortModeRequest;
 import com.moca.mocabe.domain.user.dto.UserProfileResponse;
 import com.moca.mocabe.domain.user.dto.WithdrawUserRequest;
+import com.moca.mocabe.domain.user.dto.BenefitPreferenceRequest;
+import com.moca.mocabe.domain.user.dto.BenefitPreferenceResponse;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.response.ApiResponse;
@@ -86,6 +88,19 @@ public class UserController {
             @RequestBody LocationSettingsRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 userApplicationService.updateLocationSettings(currentUserProvider.getCurrentUserId(), request)));
+    }
+
+    @GetMapping("/benefit-preference")
+    public ResponseEntity<ApiResponse<BenefitPreferenceResponse>> getBenefitPreference() {
+        return ResponseEntity.ok(ApiResponse.success(
+                userApplicationService.getBenefitPreference(currentUserProvider.getCurrentUserId())));
+    }
+
+    @PatchMapping("/benefit-preference")
+    public ResponseEntity<ApiResponse<BenefitPreferenceResponse>> updateBenefitPreference(
+            @Valid @RequestBody BenefitPreferenceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(userApplicationService.updateBenefitPreference(
+                currentUserProvider.getCurrentUserId(), request)));
     }
 
     @DeleteMapping

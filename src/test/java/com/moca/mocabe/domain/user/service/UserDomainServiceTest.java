@@ -13,6 +13,7 @@ import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.model.NotificationSettings;
 import com.moca.mocabe.domain.user.model.UserProfile;
+import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -127,6 +128,21 @@ class UserDomainServiceTest {
         when(userMapper.findProfileById(USER_ID)).thenReturn(user());
         when(userMapper.deleteUser(USER_ID)).thenReturn(0);
         assertThrows(UserNotFoundException.class, () -> userDomainService.deleteUser(USER_ID));
+    }
+
+    @Test
+    @DisplayName("혜택 선호가 없으면 바로 절약형을 기본값으로 사용하고 선택값을 저장한다")
+    void handlesBenefitPreference() {
+        when(userMapper.findProfileById(USER_ID)).thenReturn(user());
+        when(userMapper.findBenefitPreferenceType(USER_ID)).thenReturn(null,
+                BenefitPreferenceType.POINT_USAGE);
+
+        assertEquals(BenefitPreferenceType.IMMEDIATE_SAVINGS,
+                userDomainService.findBenefitPreferenceType(USER_ID));
+        assertEquals(BenefitPreferenceType.POINT_USAGE,
+                userDomainService.findBenefitPreferenceType(USER_ID));
+        userDomainService.updateBenefitPreferenceType(USER_ID, BenefitPreferenceType.TRAVEL_MILEAGE);
+        verify(userMapper).updateBenefitPreferenceType(USER_ID, BenefitPreferenceType.TRAVEL_MILEAGE);
     }
 
     private UserProfile user() {

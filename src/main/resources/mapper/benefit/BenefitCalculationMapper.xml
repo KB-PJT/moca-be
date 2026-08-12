@@ -8,16 +8,41 @@
             <arg column="amount" javaType="_int"/>
             <arg column="approved_at" javaType="java.time.LocalDateTime"/>
             <arg column="merchant_category_code" javaType="java.lang.String"/>
+            <arg column="merchant_id" javaType="java.lang.String"/>
+            <arg column="merchant_category_codes" javaType="java.lang.String"/>
+            <arg column="merchant_category_ids" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
     <select id="findApprovalsForCalculation" resultMap="approvalRow">
+        WITH RECURSIVE approval_categories AS (
+            SELECT a.approval_id, category.merchant_category_id, category.parent_id,
+                   category.category_code
+            FROM card_payment_approvals a
+            INNER JOIN merchants merchant ON merchant.merchant_id = a.merchant_id
+            INNER JOIN merchant_categories category
+              ON category.merchant_category_id = merchant.merchant_category_id
+            WHERE a.approval_id IN
+            <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+            UNION ALL
+            SELECT child.approval_id, parent.merchant_category_id, parent.parent_id,
+                   parent.category_code
+            FROM approval_categories child
+            INNER JOIN merchant_categories parent ON parent.merchant_category_id = child.parent_id
+        )
         SELECT a.approval_id, a.user_card_id, a.amount, a.approved_at,
-               mc.category_code AS merchant_category_code
+               mc.category_code AS merchant_category_code, m.merchant_id,
+               GROUP_CONCAT(DISTINCT lineage.category_code ORDER BY lineage.category_code)
+                 AS merchant_category_codes,
+               GROUP_CONCAT(DISTINCT lineage.merchant_category_id
+                            ORDER BY lineage.merchant_category_id) AS merchant_category_ids
         FROM card_payment_approvals a
         LEFT JOIN merchants m ON m.merchant_id = a.merchant_id AND m.status = 'active'
         LEFT JOIN merchant_categories mc ON mc.merchant_category_id = m.merchant_category_id
+        LEFT JOIN approval_categories lineage ON lineage.approval_id = a.approval_id
         WHERE a.approval_id IN
         <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+        GROUP BY a.approval_id, a.user_card_id, a.amount, a.approved_at,
+                 mc.category_code, m.merchant_id
     </select>
 
     <resultMap id="simpleRuleRow" type="com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow">
@@ -33,6 +58,7 @@
             <arg column="target_type" javaType="java.lang.String"/>
             <arg column="target_code" javaType="java.lang.String"/>
             <arg column="condition_group" javaType="_int"/>
+            <arg column="match_mode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
     <!--
@@ -43,7 +69,13 @@
     <select id="findSimpleRulesForUserCard" resultMap="simpleRuleRow">
         SELECT r.rule_id, o.offer_id, o.reward_type, r.reward_unit, r.reward_value,
                r.reward_basis_amount, r.previous_spend_min_krw, r.transaction_min_krw,
-               t.target_type, t.target_code, t.condition_group
+               t.target_type,
+               CASE t.target_type
+                   WHEN 'merchant_category' THEN t.merchant_category_id
+                   WHEN 'merchant' THEN t.merchant_id
+                   ELSE t.target_code
+               END AS target_code,
+               t.condition_group, t.match_mode
         FROM user_cards uc
         INNER JOIN card_content_versions cv ON cv.card_id = uc.card_id
           AND NOT EXISTS (
@@ -61,14 +93,13 @@
           AND r.stacking_mode = 'standalone'
           AND o.reward_type IN ('discount', 'cashback', 'points')
           AND r.reward_unit IN ('percent', 'KRW', 'point', 'mile')
-          AND t.match_mode = 'include'
-          AND t.target_type IN ('all_merchants', 'merchant_category')
+          AND t.target_type IN ('all_merchants', 'merchant_category', 'merchant')
           AND (r.valid_from IS NULL OR r.valid_from &lt;= #{usageDate})
           AND (r.valid_to IS NULL OR r.valid_to &gt;= #{usageDate})
           AND NOT EXISTS (SELECT 1 FROM benefit_rule_targets unsafe
                           WHERE unsafe.rule_id = r.rule_id
-                            AND (unsafe.match_mode &lt;&gt; 'include'
-                                 OR unsafe.target_type NOT IN ('all_merchants', 'merchant_category')))
+                            AND unsafe.target_type NOT IN (
+                                'all_merchants', 'merchant_category', 'merchant'))
           AND NOT EXISTS (SELECT 1 FROM benefit_rule_schedules s WHERE s.rule_id = r.rule_id)
           AND NOT EXISTS (SELECT 1 FROM benefit_offer_option_requirements req WHERE req.offer_id = o.offer_id)
           AND NOT EXISTS (SELECT 1 FROM benefit_limit_policies p WHERE p.offer_id = o.offer_id

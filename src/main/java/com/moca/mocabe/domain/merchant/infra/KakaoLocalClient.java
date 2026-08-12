@@ -86,7 +86,9 @@ public class KakaoLocalClient {
                     Double.parseDouble(document.path("y").asText()),
                     Double.parseDouble(document.path("x").asText()),
                     parseDistance(document.path("distance")),
-                    parseAddress(document)));
+                    parseAddress(document),
+                    normalizeAddress(document.path("category_group_code").asText(null)),
+                    normalizeAddress(document.path("category_name").asText(null))));
         }
         return places;
     }

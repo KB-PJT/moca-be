@@ -267,8 +267,8 @@ class ReportMapperIntegrationTest {
     jdbc.update("DELETE FROM benefit_rules");
     jdbc.update("DELETE FROM benefit_offers");
     jdbc.update("DELETE FROM card_benefits");
-    jdbc.update("DELETE FROM merchants");
-    jdbc.update("DELETE FROM merchant_categories");
+    jdbc.update("DELETE FROM merchants WHERE merchant_id = ?", MERCHANT);
+    jdbc.update("DELETE FROM merchant_categories WHERE merchant_category_id = ?", CATEGORY);
     jdbc.update("DELETE FROM user_cards");
     jdbc.update("DELETE FROM codef_account_credentials");
     jdbc.update("DELETE FROM card_performance_tiers");

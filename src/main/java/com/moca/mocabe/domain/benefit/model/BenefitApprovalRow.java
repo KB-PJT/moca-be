@@ -8,4 +8,14 @@ public record BenefitApprovalRow(
     String userCardId,
     int amount,
     LocalDateTime approvedAt,
-    String merchantCategoryCode) { }
+    String merchantCategoryCode,
+    String merchantId,
+    String merchantCategoryCodes,
+    String merchantCategoryIds) {
+
+  public BenefitApprovalRow(String approvalId, String userCardId, int amount,
+                            LocalDateTime approvedAt, String merchantCategoryCode) {
+    this(approvalId, userCardId, amount, approvedAt, merchantCategoryCode, null,
+        merchantCategoryCode, null);
+  }
+}

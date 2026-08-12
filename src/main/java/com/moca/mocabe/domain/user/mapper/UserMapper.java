@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.user.mapper;
 import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.model.NotificationSettings;
 import com.moca.mocabe.domain.user.model.UserProfile;
+import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -32,6 +33,11 @@ public interface UserMapper {
 
     int updateLocationRecommendationEnabled(@Param("userId") String userId,
                                             @Param("enabled") boolean enabled);
+
+    BenefitPreferenceType findBenefitPreferenceType(@Param("userId") String userId);
+
+    int updateBenefitPreferenceType(@Param("userId") String userId,
+                                    @Param("benefitPreferenceType") BenefitPreferenceType benefitPreferenceType);
 
     int deleteNotificationSettings(@Param("userId") String userId);
 

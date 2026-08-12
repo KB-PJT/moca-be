@@ -633,7 +633,13 @@ INSERT INTO merchant_categories (
 ('30000000-0000-0000-0000-000000000007', NULL, 'SIM_CINEMA',      '영화관',   7, @NOW, @NOW, TRUE),
 ('30000000-0000-0000-0000-000000000008', NULL, 'SIM_TRANSPORT',   '대중교통', 8, @NOW, @NOW, FALSE),
 ('30000000-0000-0000-0000-000000000009', NULL, 'SIM_MART',        '대형마트',  9, @NOW, @NOW, TRUE),
-('30000000-0000-0000-0000-000000000010', NULL, 'SIM_OPEN_MARKET', '오픈마켓', 10, @NOW, @NOW, FALSE);
+('30000000-0000-0000-0000-000000000010', NULL, 'SIM_OPEN_MARKET', '오픈마켓', 10, @NOW, @NOW, FALSE),
+('30000000-0000-0000-0000-000000000011', NULL, 'SIM_LIVING',      '생활',     11, @NOW, @NOW, FALSE),
+('30000000-0000-0000-0000-000000000012', NULL, 'SIM_GOLF',        '골프',     12, @NOW, @NOW, FALSE),
+('30000000-0000-0000-0000-000000000013', NULL, 'SIM_AIRLINE',     '항공',     13, @NOW, @NOW, FALSE),
+('30000000-0000-0000-0000-000000000014', NULL, 'SIM_DUTY_FREE',   '면세점',   14, @NOW, @NOW, FALSE),
+('30000000-0000-0000-0000-000000000015', NULL, 'SIM_RAIL',        '철도',     15, @NOW, @NOW, FALSE),
+('30000000-0000-0000-0000-000000000016', NULL, 'SIM_PERFORMANCE', '공연',     16, @NOW, @NOW, FALSE);
 
 -- ---------------------------------------------------------------------
 -- 9. 가맹점
@@ -727,10 +733,10 @@ INSERT INTO benefit_rules (
 
 INSERT INTO benefit_rule_targets (
     target_id, rule_id, condition_group, match_mode,
-    target_type, target_code, target_name
+    target_type, merchant_category_id, target_code, target_name
 ) VALUES
-('43000000-0000-0000-0000-000000000001','42000000-0000-0000-0000-000000000001',1,'include','merchant_category','SIM_CONVENIENCE','편의점'),
-('43000000-0000-0000-0000-000000000002','42000000-0000-0000-0000-000000000001',1,'include','merchant_category','SIM_FOOD','음식점');
+('43000000-0000-0000-0000-000000000001','42000000-0000-0000-0000-000000000001',1,'include','merchant_category','30000000-0000-0000-0000-000000000002','SIM_CONVENIENCE','편의점'),
+('43000000-0000-0000-0000-000000000002','42000000-0000-0000-0000-000000000001',1,'include','merchant_category','30000000-0000-0000-0000-000000000003','SIM_FOOD','음식점');
 
 -- 10-2. Mr.Life - 테스트용 TIME 생활영역 10%
 INSERT INTO card_benefits (
@@ -791,12 +797,12 @@ INSERT INTO benefit_rules (
 
 INSERT INTO benefit_rule_targets (
     target_id, rule_id, condition_group, match_mode,
-    target_type, target_code, target_name
+    target_type, merchant_category_id, target_code, target_name
 ) VALUES
-('43000000-0000-0000-0000-000000000011','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','SIM_CONVENIENCE','편의점'),
-('43000000-0000-0000-0000-000000000012','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','SIM_PHARMACY','약국'),
-('43000000-0000-0000-0000-000000000013','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','SIM_HOSPITAL','병원'),
-('43000000-0000-0000-0000-000000000014','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','SIM_LAUNDRY','세탁소');
+('43000000-0000-0000-0000-000000000011','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','30000000-0000-0000-0000-000000000002','SIM_CONVENIENCE','편의점'),
+('43000000-0000-0000-0000-000000000012','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','30000000-0000-0000-0000-000000000004','SIM_PHARMACY','약국'),
+('43000000-0000-0000-0000-000000000013','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','30000000-0000-0000-0000-000000000005','SIM_HOSPITAL','병원'),
+('43000000-0000-0000-0000-000000000014','42000000-0000-0000-0000-000000000002',1,'include','merchant_category','30000000-0000-0000-0000-000000000006','SIM_LAUNDRY','세탁소');
 
 -- 10-3. taptap O - 영화 5,000원 정액 할인
 INSERT INTO card_benefits (
@@ -859,10 +865,10 @@ INSERT INTO benefit_rules (
 -- CGV, 롯데시네마만 포함
 INSERT INTO benefit_rule_targets (
     target_id, rule_id, condition_group, match_mode,
-    target_type, target_code, target_name
+    target_type, merchant_id, target_code, target_name
 ) VALUES
-('43000000-0000-0000-0000-000000000021','42000000-0000-0000-0000-000000000003',1,'include','merchant','CGV','CGV'),
-('43000000-0000-0000-0000-000000000022','42000000-0000-0000-0000-000000000003',1,'include','merchant','LOTTE_CINEMA','롯데시네마');
+('43000000-0000-0000-0000-000000000021','42000000-0000-0000-0000-000000000003',1,'include','merchant','31000000-0000-0000-0000-000000000021','CGV','CGV'),
+('43000000-0000-0000-0000-000000000022','42000000-0000-0000-0000-000000000003',1,'include','merchant','31000000-0000-0000-0000-000000000022','LOTTE_CINEMA','롯데시네마');
 
 -- 일 1회 / 월 2회 / 연 12회
 INSERT INTO benefit_limit_policies (
@@ -959,11 +965,11 @@ INSERT INTO benefit_rules (
 
 INSERT INTO benefit_rule_targets (
     target_id, rule_id, condition_group, match_mode,
-    target_type, target_code, target_name
+    target_type, merchant_id, target_code, target_name
 ) VALUES (
     '43000000-0000-0000-0000-000000000031',
     '42000000-0000-0000-0000-000000000004',
-    1, 'include', 'merchant', 'STARBUCKS', '스타벅스'
+    1, 'include', 'merchant', '31000000-0000-0000-0000-000000000003', 'STARBUCKS', '스타벅스'
 );
 
 INSERT INTO benefit_limit_policies (
@@ -1046,11 +1052,12 @@ INSERT INTO benefit_rules (
 
 INSERT INTO benefit_rule_targets (
     target_id, rule_id, condition_group, match_mode,
-    target_type, target_code, target_name
+    target_type, merchant_category_id, target_code, target_name
 ) VALUES (
     '43000000-0000-0000-0000-000000000032',
     '42000000-0000-0000-0000-000000000005',
-    1, 'include', 'merchant_category', 'SIM_OPEN_MARKET', '오픈마켓'
+    1, 'include', 'merchant_category', '30000000-0000-0000-0000-000000000010',
+    'SIM_OPEN_MARKET', '오픈마켓'
 );
 
 INSERT INTO benefit_limit_policies (
@@ -1172,11 +1179,11 @@ INSERT INTO benefit_rules (
 
 INSERT INTO benefit_rule_targets (
     target_id, rule_id, condition_group, match_mode,
-    target_type, target_code, target_name
+    target_type, merchant_category_id, target_code, target_name
 ) VALUES
-('43000000-0000-0000-0000-000000000041','42000000-0000-0000-0000-000000000006',1,'include','merchant_category','SIM_HOSPITAL','병원'),
-('43000000-0000-0000-0000-000000000042','42000000-0000-0000-0000-000000000006',1,'include','merchant_category','SIM_PHARMACY','약국'),
-('43000000-0000-0000-0000-000000000043','42000000-0000-0000-0000-000000000007',1,'include','merchant_category','SIM_LIVING','보험·주유·이동통신');
+('43000000-0000-0000-0000-000000000041','42000000-0000-0000-0000-000000000006',1,'include','merchant_category','30000000-0000-0000-0000-000000000005','SIM_HOSPITAL','병원'),
+('43000000-0000-0000-0000-000000000042','42000000-0000-0000-0000-000000000006',1,'include','merchant_category','30000000-0000-0000-0000-000000000004','SIM_PHARMACY','약국'),
+('43000000-0000-0000-0000-000000000043','42000000-0000-0000-0000-000000000007',1,'include','merchant_category','30000000-0000-0000-0000-000000000011','SIM_LIVING','보험·주유·이동통신');
 
 INSERT INTO benefit_limit_policies (
     limit_policy_id, offer_id, policy_name,
@@ -1255,13 +1262,13 @@ INSERT INTO benefit_rules (
 
 INSERT INTO benefit_rule_targets (
     target_id, rule_id, condition_group, match_mode,
-    target_type, target_code, target_name
+    target_type, merchant_category_id, target_code, target_name
 ) VALUES
-('43000000-0000-0000-0000-000000000044','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_GOLF','골프'),
-('43000000-0000-0000-0000-000000000045','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_AIRLINE','항공'),
-('43000000-0000-0000-0000-000000000046','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_DUTY_FREE','면세점'),
-('43000000-0000-0000-0000-000000000047','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_RAIL','철도'),
-('43000000-0000-0000-0000-000000000048','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','SIM_PERFORMANCE','공연');
+('43000000-0000-0000-0000-000000000044','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','30000000-0000-0000-0000-000000000012','SIM_GOLF','골프'),
+('43000000-0000-0000-0000-000000000045','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','30000000-0000-0000-0000-000000000013','SIM_AIRLINE','항공'),
+('43000000-0000-0000-0000-000000000046','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','30000000-0000-0000-0000-000000000014','SIM_DUTY_FREE','면세점'),
+('43000000-0000-0000-0000-000000000047','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','30000000-0000-0000-0000-000000000015','SIM_RAIL','철도'),
+('43000000-0000-0000-0000-000000000048','42000000-0000-0000-0000-000000000008',1,'include','merchant_category','30000000-0000-0000-0000-000000000016','SIM_PERFORMANCE','공연');
 
 INSERT INTO benefit_limit_policies (
     limit_policy_id, offer_id, policy_name,
