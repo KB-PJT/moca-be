@@ -4,16 +4,22 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /** CODEF 카드명과 카드 마스터명을 완전 일치 비교하기 위한 정규화 규칙이다. */
 public class CardNameNormalizer {
+
+    // CODEF가 상품명 앞뒤에 붙이는 신용/구버전 표기. 상품명 자체에 쓰이는 괄호와 구분해 이 패턴만 제거한다.
+    private static final Pattern CODEF_TAG_PATTERN =
+            Pattern.compile("[\\(\\[](신|구|NEW)[\\)\\]]", Pattern.CASE_INSENSITIVE);
 
     /** 대소문자·공백·특수문자 차이를 없앤 비교용 문자열로 정규화한다. */
     public String normalize(String cardName) {
         if (cardName == null) {
             return "";
         }
-        return Normalizer.normalize(cardName, Normalizer.Form.NFKC)
+        String withoutCodefTag = CODEF_TAG_PATTERN.matcher(cardName).replaceAll("");
+        return Normalizer.normalize(withoutCodefTag, Normalizer.Form.NFKC)
                 .toUpperCase(Locale.ROOT)
                 .replaceAll("[^\\p{L}\\p{N}]", "");
     }
