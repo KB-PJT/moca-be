@@ -148,7 +148,8 @@ class CodefPersistenceIntegrationTest {
                 "0000000000000000000000000000000000000000000000000000000000000000",
                 "노리2 체크카드(KB Pay)", "https://gorilla/card.png");
         // 계정 생성 카드번호(요청)와 마스킹 카드번호(응답)의 앞뒤 자리가 일치해 카드번호가 이 카드에 저장된다.
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "1234"))
+        // KB카드는 카드소지확인에 카드 비밀번호 앞 2자리만 쓰므로 "1234" 입력은 "12"로 잘려 CODEF에 전달된다.
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "12"))
                 .thenReturn(List.of(
                         new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "123456******3456", "체크/본인", "")));
 
@@ -190,7 +191,7 @@ class CodefPersistenceIntegrationTest {
                 CONTENT_VERSION_ID, CARD_ID,
                 "0000000000000000000000000000000000000000000000000000000000000000",
                 "노리2 체크카드(KB Pay)", "https://gorilla/card.png");
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "1234"))
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "12"))
                 .thenReturn(List.of(
                         new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "123456******3456", "체크/본인", "")));
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
@@ -240,7 +241,7 @@ class CodefPersistenceIntegrationTest {
     void syncKeepsPendingWhenNoCardStoresTheCardNumber() {
         // 카탈로그에 매칭되는 카드가 없어(cards/card_content_versions 미등록) 보유카드는 응답에만 노출되고
         // user_cards에는 적재되지 않는다.
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "1234"))
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "1234567890123456", "12"))
                 .thenReturn(List.of(
                         new CodefOwnedCard("카탈로그에 없는 카드", "123456******3456", "체크/본인", "")));
 
@@ -298,7 +299,7 @@ class CodefPersistenceIntegrationTest {
                 OPTION_CHOICE_ID, OPTION_GROUP_ID);
         // 계정 생성 시 입력한 카드번호(요청)와 마스킹 카드번호(응답)의 앞6·뒤4자리가 일치해 카드번호/비밀번호가
         // 미리 채워지지만, 활성화 자체는 이 시점에 일어나지 않고 여전히 명시적인 활성화 요청이 필요하다.
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "9436461234561069", "1234"))
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "9436461234561069", "12"))
                 .thenReturn(List.of(
                         new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "943646******1069", "체크/본인", "")));
 
@@ -315,7 +316,7 @@ class CodefPersistenceIntegrationTest {
         assertEquals(Boolean.FALSE, jdbcTemplate.queryForObject(
                 "SELECT is_active FROM user_cards WHERE user_card_id = ?", Boolean.class, userCardId));
         assertEquals("9436461234561069", decryptUserCard("card_number_enc", userCardId));
-        assertEquals("1234", decryptUserCard("card_password_enc", userCardId));
+        assertEquals("12", decryptUserCard("card_password_enc", userCardId));
 
         ActivateCardLinkCardsRequest activateRequest = new ActivateCardLinkCardsRequest();
         activateRequest.setActiveUserCardIds(List.of(userCardId));
@@ -355,7 +356,7 @@ class CodefPersistenceIntegrationTest {
                 "0000000000000000000000000000000000000000000000000000000000000000",
                 "노리2 체크카드(KB Pay)", "https://gorilla/card.png");
         // 계정 생성 시 입력한 카드번호(9436461234561069)와 마스킹 카드번호의 앞뒤 자리가 일치하지 않는 카드다.
-        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "9436461234561069", "1234"))
+        when(codefClient.getOwnedCards(CONNECTED_ID, "0301", "900101", "9436461234561069", "12"))
                 .thenReturn(List.of(
                         new CodefOwnedCard("노리2 체크카드(KB Pay)_흑기사", "111122******3344", "체크/본인", "")));
 
@@ -376,8 +377,9 @@ class CodefPersistenceIntegrationTest {
         assertThrows(CardCredentialRequiredException.class,
                 () -> cardLinkService.activateCards(USER_ID, link.linkId(), activateRequest));
 
+        // KB카드는 카드소지확인에 카드 비밀번호 앞 2자리만 쓰므로 "5678" 입력은 "56"으로 잘려 CODEF에 전달·저장된다.
         when(codefClient.getOwnedCards(eq(CONNECTED_ID), eq("0301"), anyString(),
-                eq("1111220000003344"), eq("5678"))).thenReturn(List.of());
+                eq("1111220000003344"), eq("56"))).thenReturn(List.of());
         SubmitCardCredentialsRequest submitRequest = new SubmitCardCredentialsRequest();
         submitRequest.setCardNo("1111220000003344");
         submitRequest.setCardPassword("5678");
@@ -386,7 +388,7 @@ class CodefPersistenceIntegrationTest {
 
         // 카드정보만 저장되고, 이 시점엔 아직 활성화되지 않는다.
         assertEquals("1111220000003344", decryptUserCard("card_number_enc", userCardId));
-        assertEquals("5678", decryptUserCard("card_password_enc", userCardId));
+        assertEquals("56", decryptUserCard("card_password_enc", userCardId));
         assertEquals(Boolean.FALSE, jdbcTemplate.queryForObject(
                 "SELECT is_active FROM user_cards WHERE user_card_id = ?", Boolean.class, userCardId));
         assertEquals(userCardId, submitted.userCardId());
