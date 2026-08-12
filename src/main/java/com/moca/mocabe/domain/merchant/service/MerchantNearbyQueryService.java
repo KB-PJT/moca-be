@@ -9,10 +9,10 @@ import com.moca.mocabe.domain.merchant.model.MerchantListRow;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
 import com.moca.mocabe.global.exception.merchant.MerchantCategoryNotFoundException;
 import com.moca.mocabe.global.exception.merchant.MerchantNotFoundException;
+import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -84,10 +84,10 @@ public class MerchantNearbyQueryService {
         List<String> groupCodes = merchantCategoryMapper.findEnabledKakaoGroupCodes(categoryId);
         List<KakaoPlace> places = searchPlaces(groupCodes, categoryMerchants, latitude, longitude, radiusMeters);
         List<NearbyMerchantResponse> results = toNearbyMerchants(categoryMerchants, places);
-        // int placesFound = places.size();
-        // int matched = results.size();
-        // LOGGER.info(() -> "근처 가맹점 조회 categoryId=" + categoryId + " 전략=" + (groupCodes.isEmpty() ? "2안" : "1안")
-        //         + " 카카오결과=" + placesFound + "건 매칭=" + matched + "건");
+        int placesFound = places.size();
+        int matched = results.size();
+        LOGGER.info(() -> "근처 가맹점 조회 categoryId=" + categoryId + " 전략=" + (groupCodes.isEmpty() ? "2안" : "1안")
+                + " 카카오결과=" + placesFound + "건 매칭=" + matched + "건");
         return results;
     }
 
@@ -115,6 +115,10 @@ public class MerchantNearbyQueryService {
                 .toList();
     }
 
+    /**
+     * 매칭되는 카카오 장소를 전부 응답으로 남긴다. merchantId는 브랜드 단위 식별자라 같은 브랜드의
+     * 지점이 여러 곳이면(예: GS25 여러 지점) merchantId가 같은 응답이 여러 건 나올 수 있다.
+     */
     private List<NearbyMerchantResponse> toNearbyMerchants(List<MerchantListRow> categoryMerchants,
                                                             List<KakaoPlace> places) {
         Set<String> categoryMerchantIds = categoryMerchants.stream()
@@ -122,39 +126,29 @@ public class MerchantNearbyQueryService {
                 .collect(Collectors.toSet());
 
         MerchantCandidateSnapshot snapshot = merchantLookup.loadCandidates();
-        Map<String, KakaoPlace> closestPlaceByMerchantId = new LinkedHashMap<>();
+        List<NearbyMerchantResponse> results = new ArrayList<>();
+        // 그룹코드를 여러 개 호출하는 카테고리(예: 의료=병원+약국)에서 같은 장소가 두 그룹코드에
+        // 모두 잡히는 경우를 대비한 안전장치로만 쓴다(브랜드 단위 축소가 아니라 완전 동일 지점만 제거).
+        Set<String> seenPlaces = new HashSet<>();
         for (KakaoPlace place : places) {
             String merchantId = snapshot.resolveMerchantId(place.placeName());
             boolean isKnownCategoryMerchant = merchantId != null && categoryMerchantIds.contains(merchantId);
-            if (isKnownCategoryMerchant) {
-                KakaoPlace existing = closestPlaceByMerchantId.get(merchantId);
-                if (existing == null || compareDistance(place, existing) < 0) {
-                    closestPlaceByMerchantId.put(merchantId, place);
-                }
-            } else {
+            if (!isKnownCategoryMerchant) {
                 LOGGER.fine(() -> "매칭 실패로 제외됨: place=" + place.placeName());
+                continue;
             }
+            String placeKey = merchantId + "|" + place.placeName() + "|" + place.latitude() + "|" + place.longitude();
+            if (!seenPlaces.add(placeKey)) {
+                continue;
+            }
+            results.add(new NearbyMerchantResponse(merchantId, place.placeName(), place.latitude(),
+                    place.longitude(), place.distanceMeters(), place.address()));
         }
 
-        return closestPlaceByMerchantId.entrySet().stream()
-                .map(entry -> new NearbyMerchantResponse(entry.getKey(), entry.getValue().placeName(),
-                        entry.getValue().latitude(), entry.getValue().longitude(),
-                        entry.getValue().distanceMeters(), entry.getValue().address()))
+        return results.stream()
                 .sorted(Comparator.comparing(NearbyMerchantResponse::distanceMeters,
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
-    }
-
-    private int compareDistance(KakaoPlace place, KakaoPlace existing) {
-        Integer placeDistance = place.distanceMeters();
-        Integer existingDistance = existing.distanceMeters();
-        if (placeDistance == null) {
-            return existingDistance == null ? 0 : 1;
-        }
-        if (existingDistance == null) {
-            return -1;
-        }
-        return Integer.compare(placeDistance, existingDistance);
     }
 
     private int normalizeRadius(Integer requestedRadiusMeters) {

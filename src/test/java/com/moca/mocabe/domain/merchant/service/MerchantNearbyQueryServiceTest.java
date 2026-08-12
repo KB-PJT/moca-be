@@ -80,8 +80,8 @@ class MerchantNearbyQueryServiceTest {
     }
 
     @Test
-    @DisplayName("동일 가맹점이 여러 번 검색되면 가장 가까운 결과만 남긴다")
-    void keepsClosestDuplicate() {
+    @DisplayName("같은 브랜드의 여러 지점이 검색되면 전부 반환하고 거리순으로 정렬한다")
+    void returnsAllBranchesOfSameBrandSortedByDistance() {
         when(merchantCategoryMapper.existsMapVisibleCategory(CATEGORY_ID)).thenReturn(true);
         when(merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID)).thenReturn(List.of(
                 new MerchantListRow("m-starbucks", "스타벅스")));
@@ -94,13 +94,16 @@ class MerchantNearbyQueryServiceTest {
 
         List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
-        assertEquals(1, results.size());
+        assertEquals(2, results.size());
+        assertEquals("m-starbucks", results.get(0).merchantId());
         assertEquals(100, results.get(0).distanceMeters());
+        assertEquals("m-starbucks", results.get(1).merchantId());
+        assertEquals(300, results.get(1).distanceMeters());
     }
 
     @Test
-    @DisplayName("distance가 없는 결과보다 distance가 있는 결과를 더 가까운 것으로 취급한다")
-    void prefersPlaceWithKnownDistanceOverUnknown() {
+    @DisplayName("distance가 없는 결과는 distance가 있는 결과보다 뒤로 정렬된다")
+    void sortsNullDistanceLast() {
         when(merchantCategoryMapper.existsMapVisibleCategory(CATEGORY_ID)).thenReturn(true);
         when(merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID)).thenReturn(List.of(
                 new MerchantListRow("m-starbucks", "스타벅스")));
@@ -113,27 +116,27 @@ class MerchantNearbyQueryServiceTest {
 
         List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
-        assertEquals(1, results.size());
+        assertEquals(2, results.size());
         assertEquals(150, results.get(0).distanceMeters());
+        assertEquals(null, results.get(1).distanceMeters());
     }
 
     @Test
-    @DisplayName("두 결과 모두 distance가 없으면 먼저 찾은 결과를 유지한다")
-    void keepsFirstWhenBothDistancesUnknown() {
+    @DisplayName("완전히 동일한 장소가 중복으로 오면 한 번만 반환한다")
+    void deduplicatesExactSamePlace() {
         when(merchantCategoryMapper.existsMapVisibleCategory(CATEGORY_ID)).thenReturn(true);
         when(merchantMapper.findActiveMerchantsByCategoryId(CATEGORY_ID)).thenReturn(List.of(
                 new MerchantListRow("m-starbucks", "스타벅스")));
         when(merchantCategoryMapper.findEnabledKakaoGroupCodes(CATEGORY_ID)).thenReturn(List.of("CE7"));
         when(kakaoLocalClient.searchByCategory("CE7", 37.5, 127.0, 500)).thenReturn(List.of(
-                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, null, null),
-                new KakaoPlace("스타벅스 역삼점", 37.502, 127.002, null, null)));
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 100, null),
+                new KakaoPlace("스타벅스 강남점", 37.501, 127.001, 100, null)));
         when(merchantLookup.loadCandidates()).thenReturn(snapshot(
                 List.of(new MerchantNameCandidate("m-starbucks", "스타벅스")), List.of()));
 
         List<NearbyMerchantResponse> results = service.getNearbyMerchants(CATEGORY_ID, 37.5, 127.0, 500, null);
 
         assertEquals(1, results.size());
-        assertEquals(37.501, results.get(0).latitude());
     }
 
     @Test
