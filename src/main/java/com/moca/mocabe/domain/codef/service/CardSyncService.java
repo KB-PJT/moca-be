@@ -235,7 +235,9 @@ public class CardSyncService {
               inserts,
               performanceUpserts);
         }
-      } else {
+      } else if (!cardApprovalMapper
+          .findActiveCardCredentialsByCredentialId(connection.codefAccountCredentialId())
+          .isEmpty()) {
         fetchAndCollect(
             userId,
             userCards,
@@ -256,6 +258,11 @@ public class CardSyncService {
             stats,
             inserts,
             performanceUpserts);
+      } else {
+        // 매칭된 활성 카드가 없는 연동은 CODEF 응답을 붙일 카드가 없어 호출할 이유가 없다.
+        LOGGER.fine(
+            "매칭된 활성 카드가 없어 연동 동기화를 건너뜁니다. credentialId="
+                + connection.codefAccountCredentialId());
       }
     }
     int inserted;
