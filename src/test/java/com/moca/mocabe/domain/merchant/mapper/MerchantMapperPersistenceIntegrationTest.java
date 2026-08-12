@@ -177,10 +177,14 @@ class MerchantMapperPersistenceIntegrationTest {
     }
 
     private void deleteTestData() {
-        jdbcTemplate.update("DELETE FROM merchant_aliases");
-        jdbcTemplate.update("DELETE FROM card_payment_approvals");
-        jdbcTemplate.update("DELETE FROM merchants");
-        jdbcTemplate.update("DELETE FROM merchant_categories");
+        jdbcTemplate.update("DELETE FROM merchant_aliases WHERE merchant_id IN (?, ?, ?, ?)",
+                MEGA_ID, MEGA_COFFEE_ID, INACTIVE_ID, OTHER_CATEGORY_MERCHANT_ID);
+        jdbcTemplate.update("DELETE FROM card_payment_approvals WHERE merchant_id IN (?, ?, ?, ?)",
+                MEGA_ID, MEGA_COFFEE_ID, INACTIVE_ID, OTHER_CATEGORY_MERCHANT_ID);
+        jdbcTemplate.update("DELETE FROM merchants WHERE merchant_id IN (?, ?, ?, ?)",
+                MEGA_ID, MEGA_COFFEE_ID, INACTIVE_ID, OTHER_CATEGORY_MERCHANT_ID);
+        jdbcTemplate.update("DELETE FROM merchant_categories WHERE merchant_category_id IN (?, ?)",
+                CATEGORY_ID, OTHER_CATEGORY_ID);
     }
 
     @Configuration

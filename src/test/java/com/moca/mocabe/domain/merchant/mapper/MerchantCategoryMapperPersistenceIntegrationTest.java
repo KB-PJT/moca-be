@@ -54,20 +54,25 @@ class MerchantCategoryMapperPersistenceIntegrationTest {
         insertCategory(SIMPLEPAY_ID, "SIMPLEPAY", "간편결제", 3, false);
 
         List<MerchantCategoryRow> rows = merchantCategoryMapper.findAllOrderedByDisplayOrder();
+        List<MerchantCategoryRow> testRows = rows.stream()
+                .filter(row -> List.of(MART_ID, CAFE_ID, SIMPLEPAY_ID).contains(row.merchantCategoryId()))
+                .toList();
 
-        assertEquals(2, rows.size());
-        assertEquals(MART_ID, rows.get(0).merchantCategoryId());
-        assertEquals("MART", rows.get(0).categoryCode());
-        assertEquals("대형마트", rows.get(0).categoryName());
-        assertEquals(1, rows.get(0).displayOrder());
-        assertEquals(CAFE_ID, rows.get(1).merchantCategoryId());
-        assertEquals("CAFE", rows.get(1).categoryCode());
+        assertEquals(2, testRows.size());
+        assertEquals(MART_ID, testRows.get(0).merchantCategoryId());
+        assertEquals("MART", testRows.get(0).categoryCode());
+        assertEquals("대형마트", testRows.get(0).categoryName());
+        assertEquals(1, testRows.get(0).displayOrder());
+        assertEquals(CAFE_ID, testRows.get(1).merchantCategoryId());
+        assertEquals("CAFE", testRows.get(1).categoryCode());
     }
 
     @Test
-    @DisplayName("카테고리가 없으면 빈 목록을 반환한다")
-    void returnsEmptyListWhenNoCategories() {
-        assertEquals(0, merchantCategoryMapper.findAllOrderedByDisplayOrder().size());
+    @DisplayName("테스트 카테고리가 없으면 조회 결과에 포함하지 않는다")
+    void excludesMissingTestCategories() {
+        assertEquals(0, merchantCategoryMapper.findAllOrderedByDisplayOrder().stream()
+                .filter(row -> List.of(MART_ID, CAFE_ID, SIMPLEPAY_ID).contains(row.merchantCategoryId()))
+                .count());
     }
 
     @Test
@@ -125,11 +130,10 @@ class MerchantCategoryMapperPersistenceIntegrationTest {
     }
 
     private void deleteTestData() {
-        jdbcTemplate.update("DELETE FROM kakao_category_maps");
-        jdbcTemplate.update("DELETE FROM merchant_aliases");
-        jdbcTemplate.update("DELETE FROM card_payment_approvals");
-        jdbcTemplate.update("DELETE FROM merchants");
-        jdbcTemplate.update("DELETE FROM merchant_categories");
+        jdbcTemplate.update("DELETE FROM kakao_category_maps WHERE merchant_category_id IN (?, ?, ?)",
+                CAFE_ID, MART_ID, SIMPLEPAY_ID);
+        jdbcTemplate.update("DELETE FROM merchant_categories WHERE merchant_category_id IN (?, ?, ?)",
+                CAFE_ID, MART_ID, SIMPLEPAY_ID);
     }
 
     @Configuration
