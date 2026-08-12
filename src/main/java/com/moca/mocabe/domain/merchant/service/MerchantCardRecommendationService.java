@@ -9,6 +9,7 @@ import com.moca.mocabe.domain.merchant.model.KakaoPlace;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate;
 import com.moca.mocabe.domain.merchant.model.MerchantDetailRow;
 import com.moca.mocabe.domain.merchant.model.ResolvedKakaoCategory;
+import com.moca.mocabe.domain.merchant.recommendation.CardBenefitEligibilityEvaluator;
 import com.moca.mocabe.domain.merchant.recommendation.CardBenefitRankingStrategies;
 import com.moca.mocabe.domain.merchant.recommendation.CardBenefitRankingStrategy;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
@@ -36,6 +37,7 @@ public class MerchantCardRecommendationService {
     private final MerchantLookup merchantLookup;
     private final KakaoBenefitCategoryResolver categoryResolver;
     private final UserMapper userMapper;
+    private final CardBenefitEligibilityEvaluator eligibilityEvaluator;
     private final CardBenefitRankingStrategies rankingStrategies;
     private final Clock clock;
 
@@ -44,6 +46,7 @@ public class MerchantCardRecommendationService {
                                              MerchantLookup merchantLookup,
                                              KakaoBenefitCategoryResolver categoryResolver,
                                              UserMapper userMapper,
+                                             CardBenefitEligibilityEvaluator eligibilityEvaluator,
                                              CardBenefitRankingStrategies rankingStrategies,
                                              Clock clock) {
         this.recommendationMapper = recommendationMapper;
@@ -51,6 +54,7 @@ public class MerchantCardRecommendationService {
         this.merchantLookup = merchantLookup;
         this.categoryResolver = categoryResolver;
         this.userMapper = userMapper;
+        this.eligibilityEvaluator = eligibilityEvaluator;
         this.rankingStrategies = rankingStrategies;
         this.clock = clock;
     }
@@ -112,9 +116,13 @@ public class MerchantCardRecommendationService {
         BenefitPreferenceType preference = preference(userId);
         LocalDate today = LocalDate.now(clock);
         String performanceMonth = YearMonth.from(today).minusMonths(1).toString();
-        List<MerchantCardBenefitCandidate> candidates = recommendationMapper.findEligibleOwnedCardBenefits(
+        List<String> categoryLineageIds = recommendationMapper.findCategoryLineageIds(
+                merchant.merchantCategoryId());
+        var ruleRows = recommendationMapper.findOwnedCardBenefitRules(
                 userId, merchant.merchantId(), merchant.merchantCategoryId(), merchant.name(),
-                placeConfidence, today, performanceMonth);
+                today, performanceMonth);
+        List<MerchantCardBenefitCandidate> candidates = eligibilityEvaluator.evaluate(
+                ruleRows, merchant.merchantId(), categoryLineageIds, placeConfidence, today);
         List<RankedCardBenefitResponse> rankedCards = rank(candidates, normalizedAmount, preference);
         return new MerchantCardRecommendationResponse(
                 new MerchantSummaryResponse(merchant.merchantId(), merchant.name(), merchant.categoryCode(),

@@ -12,6 +12,7 @@ import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate;
 import com.moca.mocabe.domain.merchant.model.MerchantDetailRow;
 import com.moca.mocabe.domain.merchant.model.KakaoCategoryResolutionRule;
 import com.moca.mocabe.domain.merchant.model.MerchantNameCandidate;
+import com.moca.mocabe.domain.merchant.recommendation.CardBenefitEligibilityEvaluator;
 import com.moca.mocabe.domain.merchant.recommendation.CardBenefitRankingStrategies;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
@@ -31,12 +32,14 @@ class MerchantCardRecommendationServiceTest {
     private final MerchantCategoryMapper categoryMapper = mock(MerchantCategoryMapper.class);
     private final MerchantLookup merchantLookup = mock(MerchantLookup.class);
     private final UserMapper userMapper = mock(UserMapper.class);
+    private final CardBenefitEligibilityEvaluator eligibilityEvaluator =
+            mock(CardBenefitEligibilityEvaluator.class);
     private MerchantCardRecommendationService service;
 
     @BeforeEach
     void setUp() {
         service = new MerchantCardRecommendationService(mapper, categoryMapper, merchantLookup,
-                new KakaoBenefitCategoryResolver(), userMapper,
+                new KakaoBenefitCategoryResolver(), userMapper, eligibilityEvaluator,
                 CardBenefitRankingStrategies.defaults(),
                 Clock.fixed(Instant.parse("2026-08-10T00:00:00Z"), ZoneOffset.UTC));
     }
@@ -60,15 +63,20 @@ class MerchantCardRecommendationServiceTest {
         when(mapper.findActiveMerchant("merchant-1"))
                 .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
         when(userMapper.findBenefitPreferenceType("user-1")).thenReturn(BenefitPreferenceType.POINT_USAGE);
-        when(mapper.findEligibleOwnedCardBenefits("user-1", "merchant-1",
-                null, "이마트", null, java.time.LocalDate.of(2026, 8, 10), "2026-07"))
-                .thenReturn(List.of(
+        List<MerchantCardBenefitCandidate> candidates = List.of(
                 candidate("card-1", "할인 카드", "discount", "percent", "0.1", null, "300000", "120000", "1"),
                 candidate("card-1", "할인 카드", "discount", "KRW", "1", null, "300000", "120000", "1"),
                 candidate("card-2", "포인트 카드", "points", "point", "2", "1000", null, "0", "1.5"),
                 candidate("card-3", "마일 카드", "points", "mile", "1", null, null, "0", "2"),
                 candidate("card-4", "최소금액 카드", "discount", "percent", "50", null, null, "0", "1",
-                        "20000")));
+                        "20000"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(java.time.LocalDate.of(2026, 8, 10))))
+                .thenReturn(candidates);
 
         var response = service.recommend("user-1", "merchant-1", new BigDecimal("10000"));
 
@@ -133,9 +141,15 @@ class MerchantCardRecommendationServiceTest {
                 "user-1", "동네카페", "CE7", "음식점 > 카페", null);
 
         assertEquals("CAFE", response.merchant().categoryCode());
-        org.mockito.Mockito.verify(mapper).findEligibleOwnedCardBenefits(
-                "user-1", null, "cafe-id", "동네카페", new BigDecimal("0.990"),
+        org.mockito.Mockito.verify(mapper).findOwnedCardBenefitRules(
+                "user-1", null, "cafe-id", "동네카페",
                 java.time.LocalDate.of(2026, 8, 10), "2026-07");
+        org.mockito.Mockito.verify(eligibilityEvaluator).evaluate(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.eq(new BigDecimal("0.990")),
+                org.mockito.ArgumentMatchers.eq(java.time.LocalDate.of(2026, 8, 10)));
     }
 
     @Test

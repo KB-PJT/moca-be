@@ -26,6 +26,7 @@ import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNameNormalizer;
 import com.moca.mocabe.domain.merchant.service.MerchantCardRecommendationService;
+import com.moca.mocabe.domain.merchant.recommendation.CardBenefitEligibilityEvaluator;
 import com.moca.mocabe.domain.merchant.recommendation.CardBenefitRankingStrategies;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
@@ -273,6 +274,11 @@ public class AppConfig {
     }
 
     @Bean
+    public CardBenefitEligibilityEvaluator cardBenefitEligibilityEvaluator() {
+        return new CardBenefitEligibilityEvaluator();
+    }
+
+    @Bean
     public Clock recommendationClock() {
         return Clock.system(ZoneId.of("Asia/Seoul"));
     }
@@ -289,10 +295,11 @@ public class AppConfig {
             MerchantLookup merchantLookup,
             KakaoBenefitCategoryResolver categoryResolver,
             UserMapper userMapper,
+            CardBenefitEligibilityEvaluator eligibilityEvaluator,
             CardBenefitRankingStrategies rankingStrategies, Clock recommendationClock) {
         return new MerchantCardRecommendationService(
                 recommendationMapper, merchantCategoryMapper, merchantLookup, categoryResolver,
-                userMapper, rankingStrategies, recommendationClock);
+                userMapper, eligibilityEvaluator, rankingStrategies, recommendationClock);
     }
 
     @Bean

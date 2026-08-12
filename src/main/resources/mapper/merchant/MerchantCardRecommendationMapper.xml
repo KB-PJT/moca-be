@@ -24,7 +24,7 @@
         WHERE mc.merchant_category_id = #{merchantCategoryId}
     </select>
 
-    <resultMap id="candidateMap" type="com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate">
+    <resultMap id="ruleRowMap" type="com.moca.mocabe.domain.merchant.model.MerchantCardBenefitRuleRow">
         <constructor>
             <arg column="merchant_id" javaType="java.lang.String"/>
             <arg column="merchant_name" javaType="java.lang.String"/>
@@ -43,26 +43,35 @@
             <arg column="previous_spend_min_krw" javaType="java.math.BigDecimal"/>
             <arg column="previous_month_spend_krw" javaType="java.math.BigDecimal"/>
             <arg column="krw_per_reward_unit" javaType="java.math.BigDecimal"/>
+            <arg column="rule_id" javaType="java.lang.String"/>
+            <arg column="rule_effect" javaType="java.lang.String"/>
+            <arg column="valid_from" javaType="java.time.LocalDate"/>
+            <arg column="valid_to" javaType="java.time.LocalDate"/>
+            <arg column="match_mode" javaType="java.lang.String"/>
+            <arg column="target_type" javaType="java.lang.String"/>
+            <arg column="target_merchant_category_id" javaType="java.lang.String"/>
+            <arg column="target_merchant_id" javaType="java.lang.String"/>
+            <arg column="minimum_place_confidence" javaType="java.math.BigDecimal"/>
+            <arg column="has_schedule" javaType="boolean"/>
+            <arg column="has_option_requirement" javaType="boolean"/>
         </constructor>
     </resultMap>
 
-    <!-- 가맹점/카테고리 판정은 snapshot 문자열이 아니라 FK를 사용한다. 하위 카테고리는 상위 target을
-         상속하지만, 현재 가맹점 또는 그 카테고리 계층에 맞는 exclude가 하나라도 있으면 제외한다. -->
-    <select id="findEligibleOwnedCardBenefits" resultMap="candidateMap">
+    <select id="findCategoryLineageIds" resultType="java.lang.String">
         WITH RECURSIVE category_lineage AS (
             SELECT category.merchant_category_id, category.parent_id
             FROM merchant_categories category
-            WHERE category.merchant_category_id = COALESCE(
-                #{merchantCategoryId},
-                (SELECT selected_merchant.merchant_category_id
-                 FROM merchants selected_merchant
-                 WHERE selected_merchant.merchant_id = #{merchantId})
-            )
+            WHERE category.merchant_category_id = #{merchantCategoryId}
             UNION ALL
             SELECT parent.merchant_category_id, parent.parent_id
             FROM merchant_categories parent
             INNER JOIN category_lineage child ON child.parent_id = parent.merchant_category_id
         )
+        SELECT merchant_category_id FROM category_lineage
+    </select>
+
+    <!-- Mapper는 보유 카드의 룰과 대상 데이터를 조회만 한다. 적용 가능 여부는 도메인에서 판정한다. -->
+    <select id="findOwnedCardBenefitRules" resultMap="ruleRowMap">
         SELECT #{merchantId} AS merchant_id, #{merchantName} AS merchant_name,
                mc.category_code, mc.category_name,
                uc.user_card_id, COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
@@ -70,7 +79,15 @@
                o.offer_name, o.reward_type, r.reward_unit, r.reward_value, r.reward_basis_amount,
                r.transaction_min_krw, r.previous_spend_min_krw,
                COALESCE(ps.current_spend_amount, 0) AS previous_month_spend_krw,
-               COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) AS krw_per_reward_unit
+               COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) AS krw_per_reward_unit,
+               r.rule_id, r.rule_effect, r.valid_from, r.valid_to,
+               t.match_mode, t.target_type,
+               t.merchant_category_id AS target_merchant_category_id,
+               t.merchant_id AS target_merchant_id, t.minimum_place_confidence,
+               EXISTS (SELECT 1 FROM benefit_rule_schedules schedule
+                       WHERE schedule.rule_id = r.rule_id) AS has_schedule,
+               EXISTS (SELECT 1 FROM benefit_offer_option_requirements requirement
+                       WHERE requirement.offer_id = o.offer_id) AS has_option_requirement
         FROM merchant_categories mc
         INNER JOIN user_cards uc ON uc.user_id = #{userId} AND uc.is_active = TRUE
         INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
@@ -96,40 +113,7 @@
              FROM merchants selected_merchant
              WHERE selected_merchant.merchant_id = #{merchantId})
         )
-          AND r.rule_effect = 'grant' AND r.reward_value IS NOT NULL
-          AND o.reward_type IN ('discount', 'cashback', 'points', 'rebate')
-          AND r.reward_unit IN ('percent', 'KRW', 'point', 'mile')
-          AND t.match_mode = 'include'
-          AND ((t.target_type = 'all_merchants')
-               OR (t.target_type = 'merchant_category' AND t.merchant_category_id IN (
-                   SELECT merchant_category_id FROM category_lineage
-               ) AND (#{placeConfidence} IS NULL
-                      OR #{placeConfidence} &gt;= t.minimum_place_confidence))
-               OR (t.target_type = 'merchant' AND #{merchantId} IS NOT NULL
-                   AND t.merchant_id = #{merchantId}))
-          AND (r.valid_from IS NULL OR r.valid_from &lt;= #{usageDate})
-          AND (r.valid_to IS NULL OR r.valid_to &gt;= #{usageDate})
-          AND NOT EXISTS (SELECT 1 FROM benefit_rule_targets unsafe
-                          WHERE unsafe.rule_id = r.rule_id
-                            AND unsafe.target_type NOT IN (
-                                'all_merchants', 'merchant_category', 'merchant'
-                            ))
-          AND NOT EXISTS (
-              SELECT 1 FROM benefit_rule_targets excluded
-              WHERE excluded.rule_id = r.rule_id
-                AND excluded.match_mode = 'exclude'
-                AND ((excluded.target_type = 'all_merchants')
-                     OR (excluded.target_type = 'merchant'
-                         AND #{merchantId} IS NOT NULL
-                         AND excluded.merchant_id = #{merchantId})
-                     OR (excluded.target_type = 'merchant_category'
-                         AND excluded.merchant_category_id IN (
-                             SELECT merchant_category_id FROM category_lineage
-                         )))
-          )
-          AND NOT EXISTS (SELECT 1 FROM benefit_rule_schedules schedule WHERE schedule.rule_id = r.rule_id)
-          AND NOT EXISTS (SELECT 1 FROM benefit_offer_option_requirements requirement
-                          WHERE requirement.offer_id = o.offer_id)
-        ORDER BY uc.display_order, uc.user_card_id, r.priority DESC, r.rule_id
+        ORDER BY uc.display_order, uc.user_card_id, r.priority DESC, r.rule_id,
+                 t.condition_group, t.match_mode, t.target_id
     </select>
 </mapper>
