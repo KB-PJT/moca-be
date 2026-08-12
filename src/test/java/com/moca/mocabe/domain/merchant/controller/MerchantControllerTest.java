@@ -12,8 +12,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moca.mocabe.domain.merchant.dto.MerchantCategoryResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantResponse;
 import com.moca.mocabe.domain.merchant.dto.NearbyMerchantResponse;
+import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationResponse;
+import com.moca.mocabe.domain.merchant.dto.MerchantSummaryResponse;
+import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
+import com.moca.mocabe.domain.merchant.service.MerchantCardRecommendationService;
+import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.global.exception.GlobalExceptionHandler;
 import com.moca.mocabe.global.exception.merchant.InvalidMerchantQueryException;
@@ -33,6 +38,8 @@ class MerchantControllerTest {
     private MerchantCategoryQueryService merchantCategoryQueryService;
     private MerchantQueryService merchantQueryService;
     private MerchantNearbyQueryService merchantNearbyQueryService;
+    private MerchantCardRecommendationService merchantCardRecommendationService;
+    private CurrentUserProvider currentUserProvider;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -40,12 +47,67 @@ class MerchantControllerTest {
         merchantCategoryQueryService = mock(MerchantCategoryQueryService.class);
         merchantQueryService = mock(MerchantQueryService.class);
         merchantNearbyQueryService = mock(MerchantNearbyQueryService.class);
+        merchantCardRecommendationService = mock(MerchantCardRecommendationService.class);
+        currentUserProvider = mock(CurrentUserProvider.class);
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new MerchantController(merchantCategoryQueryService, merchantQueryService,
-                                merchantNearbyQueryService))
+                                merchantNearbyQueryService, merchantCardRecommendationService,
+                                currentUserProvider))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .defaultResponseCharacterEncoding(StandardCharsets.UTF_8)
                 .build();
+    }
+
+    @Test
+    @DisplayName("가맹점 카드 추천 API는 인증 사용자와 예상 결제금액을 서비스에 전달한다")
+    void returnsMerchantCardRecommendations() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn("user-1");
+        when(merchantCardRecommendationService.recommend(
+                "user-1", "merchant-1", new java.math.BigDecimal("25000"))).thenReturn(
+                new MerchantCardRecommendationResponse(
+                        new MerchantSummaryResponse("merchant-1", "이마트", "MART", "마트"),
+                        BenefitPreferenceType.IMMEDIATE_SAVINGS, null, List.of()));
+
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(
+                        get("/merchants/merchant-1/card-recommendations").param("paymentAmount", "25000"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("MART", response.path("data").path("merchant").path("categoryCode").asText());
+    }
+
+    @Test
+    @DisplayName("가맹점 카드 추천 API는 잘못된 결제금액 형식을 400으로 거절한다")
+    void rejectsInvalidRecommendationPaymentAmount() throws Exception {
+        mockMvc.perform(get("/merchants/merchant-1/card-recommendations")
+                        .param("paymentAmount", "invalid"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("장소 카드 추천 API는 Kakao 분류와 인증 사용자를 서비스에 전달한다")
+    void returnsPlaceCardRecommendations() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn("user-1");
+        when(merchantCardRecommendationService.recommendPlace(
+                "user-1", "동네카페", "CE7", "음식점 > 카페", null)).thenReturn(
+                new MerchantCardRecommendationResponse(
+                        new MerchantSummaryResponse(null, "동네카페", "CAFE", "카페"),
+                        BenefitPreferenceType.IMMEDIATE_SAVINGS, null, List.of()));
+
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(
+                        get("/merchants/place-card-recommendations")
+                                .param("placeName", "동네카페")
+                                .param("categoryGroupCode", "CE7")
+                                .param("categoryName", "음식점 > 카페"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("CAFE", response.path("data").path("merchant").path("categoryCode").asText());
+    }
+
+    @Test
+    @DisplayName("장소 카드 추천 API는 필수 Kakao 장소값이 없으면 400을 반환한다")
+    void rejectsMissingPlaceRecommendationParameters() throws Exception {
+        mockMvc.perform(get("/merchants/place-card-recommendations").param("placeName", "동네카페"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

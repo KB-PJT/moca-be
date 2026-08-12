@@ -35,4 +35,34 @@
             WHERE merchant_category_id = #{merchantCategoryId} AND is_map_visible = TRUE
         )
     </select>
+
+    <resultMap id="kakaoCategoryResolutionRuleMap"
+               type="com.moca.mocabe.domain.merchant.model.KakaoCategoryResolutionRule">
+        <constructor>
+            <arg column="merchant_category_id" javaType="java.lang.String"/>
+            <arg column="category_code" javaType="java.lang.String"/>
+            <arg column="kakao_category_group_code" javaType="java.lang.String"/>
+            <arg column="kakao_category_name_pattern" javaType="java.lang.String"/>
+            <arg column="match_method" javaType="java.lang.String"/>
+            <arg column="confidence_score" javaType="java.math.BigDecimal"/>
+            <arg column="benefit_match_policy" javaType="java.lang.String"/>
+            <arg column="priority" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findBenefitResolutionRules" resultMap="kakaoCategoryResolutionRuleMap">
+        SELECT mapping.merchant_category_id, category.category_code,
+               mapping.kakao_category_group_code, mapping.kakao_category_name_pattern,
+               mapping.match_method, mapping.confidence_score,
+               mapping.benefit_match_policy, mapping.priority
+        FROM kakao_category_maps mapping
+        INNER JOIN kakao_category_group_registry registry
+          ON registry.kakao_category_group_code = mapping.kakao_category_group_code
+         AND registry.benefit_mapping_supported = TRUE
+        INNER JOIN merchant_categories category
+          ON category.merchant_category_id = mapping.merchant_category_id
+        WHERE mapping.kakao_category_group_code = #{kakaoCategoryGroupCode}
+          AND mapping.enabled = TRUE
+        ORDER BY mapping.priority ASC, mapping.kakao_category_map_id ASC
+    </select>
 </mapper>

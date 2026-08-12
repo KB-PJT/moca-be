@@ -17,6 +17,7 @@ import com.moca.mocabe.domain.codef.service.CardSyncService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
+import com.moca.mocabe.domain.merchant.service.MerchantCardRecommendationService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.report.service.ReportQueryService;
 import com.moca.mocabe.domain.support.service.SupportInquiryService;
@@ -98,6 +99,28 @@ class MerchantAuthenticationContractTest {
     }
 
     @Test
+    @DisplayName("Authorization 헤더 없이 가맹점 카드 추천을 조회하면 401을 반환한다")
+    void rejectsUnauthenticatedCardRecommendationRequest() throws Exception {
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(
+                        get("/api/v1/merchants/merchant-1/card-recommendations"))
+                .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("Authorization 헤더 없이 장소 카드 추천을 조회하면 401을 반환한다")
+    void rejectsUnauthenticatedPlaceCardRecommendationRequest() throws Exception {
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(
+                        get("/api/v1/merchants/place-card-recommendations")
+                                .param("placeName", "동네카페")
+                                .param("categoryGroupCode", "CE7"))
+                .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
+    }
+
+    @Test
     @DisplayName("유효한 Bearer 토큰이면 카테고리 목록 요청이 Security 필터를 통과한다")
     void allowsAuthenticatedCategoriesRequest() throws Exception {
         when(opaqueTokenService.authenticate("valid-token"))
@@ -170,6 +193,11 @@ class MerchantAuthenticationContractTest {
         @Bean
         public SupportInquiryService supportInquiryService() {
             return mock(SupportInquiryService.class);
+        }
+
+        @Bean
+        public MerchantCardRecommendationService merchantCardRecommendationService() {
+            return mock(MerchantCardRecommendationService.class);
         }
 
         @Bean

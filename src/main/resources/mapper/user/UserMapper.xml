@@ -117,6 +117,20 @@
         WHERE user_id = #{userId}
     </update>
 
+    <select id="findBenefitPreferenceType"
+            resultType="com.moca.mocabe.domain.user.type.BenefitPreferenceType">
+        SELECT benefit_preference_type
+        FROM users
+        WHERE user_id = #{userId}
+    </select>
+
+    <update id="updateBenefitPreferenceType">
+        UPDATE users
+        SET benefit_preference_type = #{benefitPreferenceType},
+            updated_at = UTC_TIMESTAMP(6)
+        WHERE user_id = #{userId}
+    </update>
+
     <delete id="deleteNotificationSettings">
         DELETE FROM user_notification_settings
         WHERE user_id = #{userId}

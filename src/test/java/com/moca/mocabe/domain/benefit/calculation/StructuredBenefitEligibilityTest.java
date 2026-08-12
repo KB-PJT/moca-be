@@ -121,6 +121,126 @@ class StructuredBenefitEligibilityTest {
         promotionResult.rejectionReason());
   }
 
+  @Test
+  @DisplayName("병원 include보다 동물병원 exclude를 우선한다")
+  void veterinaryExclusionOverridesHospitalAncestor() {
+    Set<BenefitRuleTarget> targets =
+        Set.of(include(1, "merchant_category", "HOSPITAL"),
+            exclude(1, "merchant_category", "VETERINARY"));
+
+    BenefitCalculationResult result = calculator.calculate(
+        rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("HOSPITAL", "VETERINARY"))));
+
+    assertFalse(result.applicable());
+  }
+
+  @Test
+  @DisplayName("동물병원을 명시적으로 포함한 카드는 동물병원에 적용한다")
+  void includesVeterinaryWhenExplicit() {
+    BenefitCalculationResult result = calculator.calculate(
+        rule(Set.of(include(1, "merchant_category", "VETERINARY")), Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("HOSPITAL", "VETERINARY"))));
+
+    assertTrue(result.applicable());
+  }
+
+  @Test
+  @DisplayName("치과는 병원 상위 혜택을 상속하지만 치과 exclude가 있으면 제외한다")
+  void dentalInheritsHospitalUnlessExcluded() {
+    Map<String, Set<String>> dental =
+        Map.of("merchant_category", Set.of("HOSPITAL", "DENTAL"));
+
+    assertTrue(calculator.calculate(
+        rule(Set.of(include(1, "merchant_category", "HOSPITAL")), Set.of()),
+        context(false, "2026-08-08T12:00:00", dental)).applicable());
+    assertFalse(calculator.calculate(
+        rule(Set.of(include(1, "merchant_category", "HOSPITAL"),
+            exclude(1, "merchant_category", "DENTAL")), Set.of()),
+        context(false, "2026-08-08T12:00:00", dental)).applicable());
+  }
+
+  @Test
+  @DisplayName("요양병원과 보건소 exclude는 병원 include보다 우선한다")
+  void excludesNursingHospitalAndPublicHealthCenter() {
+    Set<BenefitRuleTarget> targets = Set.of(
+        include(1, "merchant_category", "HOSPITAL"),
+        exclude(1, "merchant_category", "NURSING_HOSPITAL"),
+        exclude(1, "merchant_category", "PUBLIC_HEALTH_CENTER"));
+
+    assertFalse(calculator.calculate(rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("HOSPITAL", "NURSING_HOSPITAL"))))
+        .applicable());
+    assertFalse(calculator.calculate(rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("HOSPITAL", "PUBLIC_HEALTH_CENTER"))))
+        .applicable());
+  }
+
+  @Test
+  @DisplayName("PUBLIC_TRANSIT 혜택은 지하철에는 적용하고 택시에는 적용하지 않는다")
+  void publicTransitDoesNotIncludeTaxi() {
+    Set<BenefitRuleTarget> targets = Set.of(include(1, "merchant_category", "PUBLIC_TRANSIT"));
+
+    assertTrue(calculator.calculate(rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("TRANSPORTATION", "PUBLIC_TRANSIT", "SUBWAY"))))
+        .applicable());
+    assertFalse(calculator.calculate(rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("TRANSPORTATION", "TAXI"))))
+        .applicable());
+  }
+
+  @Test
+  @DisplayName("버스·지하철·택시를 각각 명시한 혜택은 택시에도 적용한다")
+  void explicitTransportAlternativesIncludeTaxi() {
+    Set<BenefitRuleTarget> targets = Set.of(
+        include(1, "merchant_category", "BUS"),
+        include(2, "merchant_category", "SUBWAY"),
+        include(3, "merchant_category", "TAXI"));
+
+    assertTrue(calculator.calculate(rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("TRANSPORTATION", "TAXI"))))
+        .applicable());
+  }
+
+  @Test
+  @DisplayName("스타벅스 전용 혜택은 스타벅스에는 적용하고 이디야에는 적용하지 않는다")
+  void merchantExactDoesNotExpandToCategoryCompetitor() {
+    Set<BenefitRuleTarget> targets = Set.of(include(1, "merchant", "STARBUCKS-ID"));
+
+    assertTrue(calculator.calculate(rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant", Set.of("STARBUCKS-ID"),
+                "merchant_category", Set.of("CAFE")))).applicable());
+    assertFalse(calculator.calculate(rule(targets, Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant", Set.of("EDIYA-ID"),
+                "merchant_category", Set.of("CAFE")))).applicable());
+  }
+
+  @Test
+  @DisplayName("카페 category 혜택은 특정 브랜드가 아닌 일반 카페에도 적용한다")
+  void categoryBenefitAppliesToGenericCafe() {
+    assertTrue(calculator.calculate(
+        rule(Set.of(include(1, "merchant_category", "CAFE")), Set.of()),
+        context(false, "2026-08-08T12:00:00",
+            Map.of("merchant_category", Set.of("CAFE")))).applicable());
+  }
+
+  @Test
+  @DisplayName("전가맹점 target은 merchant master가 없어도 적용한다")
+  void allMerchantsAppliesWithoutMerchantMaster() {
+    assertTrue(calculator.calculate(
+        rule(Set.of(include(1, "all_merchants", "ALL")), Set.of()),
+        context(false, "2026-08-08T12:00:00", Map.of())).applicable());
+  }
+
   private BenefitRule rule(Set<BenefitRuleTarget> targets, Set<BenefitRuleSchedule> schedules) {
     return new BenefitRule(
         "structured-rule",

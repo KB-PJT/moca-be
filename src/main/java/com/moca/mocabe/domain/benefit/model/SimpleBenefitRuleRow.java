@@ -14,4 +14,14 @@ public record SimpleBenefitRuleRow(
     BigDecimal transactionMinKrw,
     String targetType,
     String targetCode,
-    int conditionGroup) { }
+    int conditionGroup,
+    String matchMode) {
+
+  public SimpleBenefitRuleRow(String ruleId, String offerId, String rewardType, String rewardUnit,
+                              BigDecimal rewardValue, BigDecimal rewardBasisAmount,
+                              BigDecimal previousSpendMinKrw, BigDecimal transactionMinKrw,
+                              String targetType, String targetCode, int conditionGroup) {
+    this(ruleId, offerId, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
+        previousSpendMinKrw, transactionMinKrw, targetType, targetCode, conditionGroup, "include");
+  }
+}

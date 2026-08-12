@@ -20,6 +20,8 @@ import com.moca.mocabe.domain.user.dto.NotificationSettingsResponse;
 import com.moca.mocabe.domain.user.dto.UpdateNicknameRequest;
 import com.moca.mocabe.domain.user.dto.UpdateCardSortModeRequest;
 import com.moca.mocabe.domain.user.dto.WithdrawUserRequest;
+import com.moca.mocabe.domain.user.dto.BenefitPreferenceResponse;
+import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
 import com.moca.mocabe.domain.user.model.LocationSettings;
 import com.moca.mocabe.domain.user.model.NotificationSettings;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
@@ -136,6 +138,28 @@ class UserControllerTest {
 
         assertTrue(response.contains("\"success\":true"));
         assertTrue(response.contains("\"newUser\":true"));
+    }
+
+    @Test
+    @DisplayName("인증 사용자는 혜택 선호를 조회하고 온보딩 선택값으로 변경한다")
+    void getsAndUpdatesBenefitPreference() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(userApplicationService.getBenefitPreference(USER_ID)).thenReturn(
+                new BenefitPreferenceResponse(BenefitPreferenceType.IMMEDIATE_SAVINGS));
+        when(userApplicationService.updateBenefitPreference(
+                org.mockito.ArgumentMatchers.eq(USER_ID), any())).thenReturn(
+                new BenefitPreferenceResponse(BenefitPreferenceType.TRAVEL_MILEAGE));
+
+        mockMvc.perform(get("/me/benefit-preference"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
+                        .contains("IMMEDIATE_SAVINGS")));
+        mockMvc.perform(patch("/me/benefit-preference")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"benefitPreferenceType\":\"TRAVEL_MILEAGE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
+                        .contains("TRAVEL_MILEAGE")));
     }
 
     @Test

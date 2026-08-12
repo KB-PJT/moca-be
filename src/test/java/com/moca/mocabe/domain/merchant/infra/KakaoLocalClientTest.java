@@ -29,7 +29,8 @@ class KakaoLocalClientTest {
     void parsesCategorySearchResponse() {
         String body = "{\"documents\":[{\"place_name\":\"스타벅스 강남점\",\"x\":\"127.028\",\"y\":\"37.498\","
                 + "\"distance\":\"120\",\"road_address_name\":\"서울 강남구 테헤란로 1\","
-                + "\"address_name\":\"서울 강남구 역삼동 1\"}]}";
+                + "\"address_name\":\"서울 강남구 역삼동 1\",\"category_group_code\":\"CE7\","
+                + "\"category_name\":\"음식점 > 카페 > 커피전문점\"}]}";
         when(httpClient.get(contains("category.json"), any())).thenReturn(new KakaoHttpResponse(200, body));
 
         List<KakaoPlace> places = kakaoLocalClient.searchByCategory("CE7", 37.5, 127.03, 500);
@@ -40,6 +41,8 @@ class KakaoLocalClientTest {
         assertEquals(127.028, places.get(0).longitude());
         assertEquals(120, places.get(0).distanceMeters());
         assertEquals("서울 강남구 테헤란로 1", places.get(0).address());
+        assertEquals("CE7", places.get(0).categoryGroupCode());
+        assertEquals("음식점 > 카페 > 커피전문점", places.get(0).categoryName());
     }
 
     @Test

@@ -9,6 +9,12 @@ public record KakaoPlace(
         double latitude,
         double longitude,
         Integer distanceMeters,
-        String address
+        String address,
+        String categoryGroupCode,
+        String categoryName
 ) {
+    public KakaoPlace(String placeName, double latitude, double longitude,
+                      Integer distanceMeters, String address) {
+        this(placeName, latitude, longitude, distanceMeters, address, null, null);
+    }
 }

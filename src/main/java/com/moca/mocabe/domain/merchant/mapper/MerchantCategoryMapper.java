@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.merchant.mapper;
 
+import com.moca.mocabe.domain.merchant.model.KakaoCategoryResolutionRule;
 import com.moca.mocabe.domain.merchant.model.MerchantCategoryRow;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -16,4 +17,8 @@ public interface MerchantCategoryMapper {
 
     /** 지도 대상 카테고리로 존재하는지 확인한다. */
     boolean existsMapVisibleCategory(@Param("merchantCategoryId") String merchantCategoryId);
+
+    /** 레지스트리에서 혜택 매칭을 허용한 Kakao 그룹의 판정 규칙만 조회한다. */
+    List<KakaoCategoryResolutionRule> findBenefitResolutionRules(
+            @Param("kakaoCategoryGroupCode") String kakaoCategoryGroupCode);
 }

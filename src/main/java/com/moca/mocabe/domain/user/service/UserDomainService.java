@@ -2,6 +2,7 @@ package com.moca.mocabe.domain.user.service;
 
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
+import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
@@ -56,6 +57,17 @@ public class UserDomainService {
     public void updateLocationRecommendationEnabled(String userId, boolean enabled) {
         requireUser(userId);
         userMapper.updateLocationRecommendationEnabled(userId, enabled);
+    }
+
+    public BenefitPreferenceType findBenefitPreferenceType(String userId) {
+        requireUser(userId);
+        BenefitPreferenceType preferenceType = userMapper.findBenefitPreferenceType(userId);
+        return preferenceType == null ? BenefitPreferenceType.IMMEDIATE_SAVINGS : preferenceType;
+    }
+
+    public void updateBenefitPreferenceType(String userId, BenefitPreferenceType benefitPreferenceType) {
+        requireUser(userId);
+        userMapper.updateBenefitPreferenceType(userId, benefitPreferenceType);
     }
 
     public void saveNotificationSettings(

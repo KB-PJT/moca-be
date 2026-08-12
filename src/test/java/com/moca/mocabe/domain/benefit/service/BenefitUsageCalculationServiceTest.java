@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -34,6 +35,7 @@ class BenefitUsageCalculationServiceTest {
 
     verify(mapper, never()).findApprovalsForCalculation(any());
     org.junit.jupiter.api.Assertions.assertFalse(noop.isEnabled());
+    org.junit.jupiter.api.Assertions.assertTrue(service.isEnabled());
   }
 
   @Test
@@ -75,7 +77,18 @@ class BenefitUsageCalculationServiceTest {
                         null, null, "all_merchants", "ALL", 1)),
                 BigDecimal.ZERO,
                 BigDecimal.ZERO);
+    BenefitRule mileageRule =
+        (BenefitRule)
+            toRule.invoke(
+                service,
+                List.of(
+                    new SimpleBenefitRuleRow(
+                        "mile", "offer", "points", "mile", BigDecimal.ONE, null, null, null,
+                        "all_merchants", "ALL", 1)),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
     assertEquals(com.moca.mocabe.domain.benefit.type.RewardUnit.POINT, pointRule.rewardUnit());
+    assertEquals(com.moca.mocabe.domain.benefit.type.RewardUnit.MILE, mileageRule.rewardUnit());
     assertEquals(
         com.moca.mocabe.domain.benefit.type.BenefitBasis.PER_SPEND_UNIT,
         perSpendRule.benefitBasis());
@@ -204,6 +217,29 @@ class BenefitUsageCalculationServiceTest {
             eq(BigDecimal.ZERO),
             eq("not_applied"),
             eq("TARGET_NOT_MATCHED"));
+  }
+
+  @Test
+  @DisplayName("자동 계산은 target snapshot 문자열이 아니라 category FK ID 계층을 사용한다")
+  void matchesCategoryByForeignKeyIdInsteadOfSnapshotCode() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("approval-1")))
+        .thenReturn(List.of(new BenefitApprovalRow(
+            "approval-1", "card-1", 15_000, approvedAt, "DENTAL", "merchant-id",
+            "DENTAL,HOSPITAL", "dental-id,hospital-id")));
+    when(mapper.findPreviousMonthSpend("card-1", "2026-07")).thenReturn(0);
+    when(mapper.findSimpleRulesForUserCard(eq("card-1"), any()))
+        .thenReturn(List.of(new SimpleBenefitRuleRow(
+            "rule-1", "offer-1", "discount", "percent", new BigDecimal("10"),
+            null, null, null, "merchant_category", "hospital-id", 1)));
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "approval-1", "user-1", "card-1", null, "A-1", approvedAt, "치과", 15_000, "{ }")));
+
+    verify(mapper).insertConfirmedUsage(
+        any(), eq("card-1"), eq("offer-1"), eq("rule-1"), eq(null), eq("approval-1"),
+        any(), eq(new BigDecimal("15000")), eq(new BigDecimal("1500")), eq(null), eq(null),
+        eq(approvedAt));
   }
 
   @Test

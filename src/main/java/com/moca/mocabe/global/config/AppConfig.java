@@ -18,11 +18,15 @@ import com.moca.mocabe.domain.merchant.infra.KakaoHttpClient;
 import com.moca.mocabe.domain.merchant.infra.KakaoLocalClient;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantMapper;
+import com.moca.mocabe.domain.merchant.mapper.MerchantCardRecommendationMapper;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantLookup;
+import com.moca.mocabe.domain.merchant.service.KakaoBenefitCategoryResolver;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNameNormalizer;
+import com.moca.mocabe.domain.merchant.service.MerchantCardRecommendationService;
+import com.moca.mocabe.domain.merchant.recommendation.CardBenefitRankingStrategies;
 import com.moca.mocabe.domain.codef.infra.AesGcmEncryptor;
 import com.moca.mocabe.domain.codef.infra.CodefClient;
 import com.moca.mocabe.domain.codef.infra.CodefHttpClient;
@@ -55,6 +59,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
@@ -259,6 +265,34 @@ public class AppConfig {
                                                                   KakaoLocalClient kakaoLocalClient) {
         return new MerchantNearbyQueryService(merchantCategoryMapper, merchantMapper, merchantLookup,
                 kakaoLocalClient);
+    }
+
+    @Bean
+    public CardBenefitRankingStrategies cardBenefitRankingStrategies() {
+        return CardBenefitRankingStrategies.defaults();
+    }
+
+    @Bean
+    public Clock recommendationClock() {
+        return Clock.system(ZoneId.of("Asia/Seoul"));
+    }
+
+    @Bean
+    public KakaoBenefitCategoryResolver kakaoBenefitCategoryResolver() {
+        return new KakaoBenefitCategoryResolver();
+    }
+
+    @Bean
+    public MerchantCardRecommendationService merchantCardRecommendationService(
+            MerchantCardRecommendationMapper recommendationMapper,
+            MerchantCategoryMapper merchantCategoryMapper,
+            MerchantLookup merchantLookup,
+            KakaoBenefitCategoryResolver categoryResolver,
+            UserMapper userMapper,
+            CardBenefitRankingStrategies rankingStrategies, Clock recommendationClock) {
+        return new MerchantCardRecommendationService(
+                recommendationMapper, merchantCategoryMapper, merchantLookup, categoryResolver,
+                userMapper, rankingStrategies, recommendationClock);
     }
 
     @Bean
