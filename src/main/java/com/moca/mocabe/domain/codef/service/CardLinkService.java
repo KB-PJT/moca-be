@@ -67,6 +67,7 @@ public class CardLinkService {
     private static final String HASH_TYPE_CARD_NO = "CARD_NO";
     private static final String HASH_TYPE_ACCOUNT_ID = "ACCOUNT_ID";
     private static final String HASH_TYPE_CODEF_CARD = "CODEF_CARD";
+    private static final String KB_CARD_INSTITUTION_CODE = "0301";
 
     private final CodefClient codefClient;
     private final CodefCredentialMapper codefCredentialMapper;
@@ -112,9 +113,11 @@ public class CardLinkService {
             throw new CodefAccountAlreadyLinkedException();
         }
 
+        String cardPassword = normalizeCardPassword(policy.getInstitutionCode(),
+                policy.isRequiresCardNo(), policy.isRequiresCardPassword(), request.getCardPassword());
         CodefConnectionCommand command = new CodefConnectionCommand(
                 policy.getInstitutionCode(), request.getId(), request.getPassword(),
-                request.getCardNo(), request.getCardPassword(), request.getBirthDate());
+                request.getCardNo(), cardPassword, request.getBirthDate());
         String connectedId = codefClient.createConnectedId(command);
 
         // connectedId 발급 직후 자격정보부터 커밋한다. 뒤이은 보유카드 조회가 실패해도
@@ -125,7 +128,7 @@ public class CardLinkService {
         // 나눠 호출할 때, 카드번호를 다시 입력받지 않고도 그 값을 쓸 수 있게 하기 위함이다.
         String linkId = UUID.randomUUID().toString();
         codefCredentialStore.saveCredential(buildCredential(
-                userId, request, policy, connectedId, linkId, credentialIdentityHash));
+                userId, request, cardPassword, policy, connectedId, linkId, credentialIdentityHash));
 
         // 카드번호가 필요 없는 카드사는 추가로 입력받을 값이 없어 나눌 이유가 없으므로 지금 바로
         // 보유카드까지 조회한다(기존 동작 유지). 카드번호가 필요한 카드사는 보유카드 조회를 여기서
@@ -468,13 +471,15 @@ public class CardLinkService {
         }
 
         String birthDate = encryptor.decrypt(target.birthDateEnc());
+        String cardPassword = normalizeCardPassword(target.institutionCode(),
+                target.requiresCardNo(), target.requiresCardPassword(), request.getCardPassword());
         // CODEF에 실제로 조회를 성공하면(예외 없이 응답을 받으면) 카드번호/비밀번호가 유효한 것으로 본다.
         codefClient.getOwnedCards(target.connectedId(), target.institutionCode(), birthDate,
-                request.getCardNo(), request.getCardPassword());
+                request.getCardNo(), cardPassword);
 
         byte[] cardNumberEnc = encryptor.encrypt(request.getCardNo());
         byte[] cardPasswordEnc = target.requiresCardPassword()
-                ? encryptor.encrypt(request.getCardPassword()) : null;
+                ? encryptor.encrypt(cardPassword) : null;
         linkedCardMapper.updateCardCredentials(userCardId, userId, cardNumberEnc, cardPasswordEnc);
         return buildSubmissionResponse(target);
     }
@@ -552,8 +557,9 @@ public class CardLinkService {
     }
 
     private CodefAccountCredential buildCredential(String userId, CreateCardLinkRequest request,
-                                                    CodefIssuerPolicy policy, String connectedId,
-                                                    String credentialId, String credentialIdentityHash) {
+                                                    String cardPassword, CodefIssuerPolicy policy,
+                                                    String connectedId, String credentialId,
+                                                    String credentialIdentityHash) {
         CodefAccountCredential credential = new CodefAccountCredential();
         credential.setCodefAccountCredentialId(credentialId);
         credential.setUserId(userId);
@@ -565,12 +571,26 @@ public class CardLinkService {
         if (policy.isRequiresCardNo()) {
             credential.setPendingCardNumberEnc(encryptor.encrypt(request.getCardNo()));
             if (policy.isRequiresCardPassword()) {
-                credential.setPendingCardPasswordEnc(encryptor.encrypt(request.getCardPassword()));
+                credential.setPendingCardPasswordEnc(encryptor.encrypt(cardPassword));
             }
         }
         credential.setCredentialIdentityHash(credentialIdentityHash);
         credential.setStatus("active");
         return credential;
+    }
+
+    /**
+     * KB카드는 카드소지확인에 카드 비밀번호 앞 2자리만 사용한다(카드사별 CODEF 요구 규격 차이).
+     * 카드번호·카드비밀번호를 요구하는 카드사가 아니면(정책상 애초에 카드 비밀번호를 안 쓰면) 자르지
+     * 않고 그대로 둔다.
+     */
+    private String normalizeCardPassword(String institutionCode, boolean requiresCardNo,
+                                         boolean requiresCardPassword, String cardPassword) {
+        if (requiresCardNo && requiresCardPassword && KB_CARD_INSTITUTION_CODE.equals(institutionCode)
+                && cardPassword != null && cardPassword.length() > 2) {
+            return cardPassword.substring(0, 2);
+        }
+        return cardPassword;
     }
 
     private void validateRequiredCredentials(CodefIssuerPolicy policy, CreateCardLinkRequest request) {
