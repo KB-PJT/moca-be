@@ -7,6 +7,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.merchant.model.KakaoPlace;
@@ -127,5 +129,50 @@ class KakaoLocalClientTest {
         ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
         org.mockito.Mockito.verify(httpClient).get(urlCaptor.capture(), any());
         assertTrue(urlCaptor.getValue().contains("query=%EC%8A%A4%ED%83%80%EB%B2%85%EC%8A%A4"));
+    }
+
+    @Test
+    @DisplayName("meta가 없으면 1페이지만 조회하고 끝낸다")
+    void stopsAfterFirstPageWhenMetaMissing() {
+        when(httpClient.get(anyString(), any())).thenReturn(new KakaoHttpResponse(200, "{\"documents\":[]}"));
+
+        kakaoLocalClient.searchByCategory("CS2", 37.5, 127.0, 500);
+
+        verify(httpClient, times(1)).get(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("is_end가 false면 다음 페이지를 계속 조회해 최대 3페이지(45건)까지 모은다")
+    void paginatesUntilEndOrMaxPages() {
+        String page1 = "{\"documents\":[{\"place_name\":\"GS25 1호점\",\"x\":\"127.0\",\"y\":\"37.5\"}],"
+                + "\"meta\":{\"is_end\":false}}";
+        String page2 = "{\"documents\":[{\"place_name\":\"GS25 2호점\",\"x\":\"127.0\",\"y\":\"37.5\"}],"
+                + "\"meta\":{\"is_end\":false}}";
+        String page3 = "{\"documents\":[{\"place_name\":\"GS25 3호점\",\"x\":\"127.0\",\"y\":\"37.5\"}],"
+                + "\"meta\":{\"is_end\":false}}";
+        when(httpClient.get(contains("page=1"), any())).thenReturn(new KakaoHttpResponse(200, page1));
+        when(httpClient.get(contains("page=2"), any())).thenReturn(new KakaoHttpResponse(200, page2));
+        when(httpClient.get(contains("page=3"), any())).thenReturn(new KakaoHttpResponse(200, page3));
+
+        List<KakaoPlace> places = kakaoLocalClient.searchByCategory("CS2", 37.5, 127.0, 3000);
+
+        assertEquals(3, places.size());
+        assertEquals("GS25 1호점", places.get(0).placeName());
+        assertEquals("GS25 2호점", places.get(1).placeName());
+        assertEquals("GS25 3호점", places.get(2).placeName());
+        verify(httpClient, times(3)).get(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("is_end가 true가 되면 그 페이지에서 조회를 멈춘다")
+    void stopsWhenIsEndTrue() {
+        String page1 = "{\"documents\":[{\"place_name\":\"GS25 1호점\",\"x\":\"127.0\",\"y\":\"37.5\"}],"
+                + "\"meta\":{\"is_end\":true}}";
+        when(httpClient.get(anyString(), any())).thenReturn(new KakaoHttpResponse(200, page1));
+
+        List<KakaoPlace> places = kakaoLocalClient.searchByCategory("CS2", 37.5, 127.0, 500);
+
+        assertEquals(1, places.size());
+        verify(httpClient, times(1)).get(anyString(), any());
     }
 }
