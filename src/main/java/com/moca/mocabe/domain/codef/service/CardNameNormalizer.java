@@ -9,9 +9,11 @@ import java.util.regex.Pattern;
 /** CODEF 카드명과 카드 마스터명을 완전 일치 비교하기 위한 정규화 규칙이다. */
 public class CardNameNormalizer {
 
-    // CODEF가 상품명 앞뒤에 붙이는 신용/구버전 표기. 상품명 자체에 쓰이는 괄호와 구분해 이 패턴만 제거한다.
+    // CODEF가 상품명 맨 앞/뒤에만 붙이는 신용/구버전 표기. 괄호·중괄호 짝이 맞고 문자열 시작 또는 끝에 있을 때만 제거해
+    // "카드 (NEW) 에디션"처럼 상품명 내부에 있는 표기나 짝이 안 맞는 괄호는 건드리지 않는다.
+    private static final String CODEF_TAG = "(?:\\(신\\)|\\[신\\]|\\(구\\)|\\[구\\]|\\(NEW\\)|\\[NEW\\])";
     private static final Pattern CODEF_TAG_PATTERN =
-            Pattern.compile("[\\(\\[](신|구|NEW)[\\)\\]]", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("^\\s*" + CODEF_TAG + "\\s*|\\s*" + CODEF_TAG + "\\s*$", Pattern.CASE_INSENSITIVE);
 
     /** 대소문자·공백·특수문자 차이를 없앤 비교용 문자열로 정규화한다. */
     public String normalize(String cardName) {
