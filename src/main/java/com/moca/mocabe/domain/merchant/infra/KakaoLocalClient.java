@@ -21,6 +21,7 @@ public class KakaoLocalClient {
     private static final String CATEGORY_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/category.json";
     private static final String KEYWORD_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
     private static final int PAGE_SIZE = 15;
+    private static final int MAX_PAGES = 3;
 
     private final KakaoHttpClient httpClient;
     private final String restApiKey;
@@ -31,37 +32,53 @@ public class KakaoLocalClient {
         this.restApiKey = restApiKey;
     }
 
-    /** 카카오 카테고리 그룹코드(MT1/CS2/CE7 등) 기준 반경 검색이다. */
+    /** 카카오 카테고리 그룹코드(MT1/CS2/CE7 등) 기준 반경 검색이다. size가 15로 고정돼 있어 페이지를 돌며 최대 45건을 모은다. */
     public List<KakaoPlace> searchByCategory(String categoryGroupCode, double latitude, double longitude,
                                              int radiusMeters) {
-        String url = String.format(Locale.ROOT,
+        String baseUrl = String.format(Locale.ROOT,
                 "%s?category_group_code=%s&x=%s&y=%s&radius=%d&size=%d&sort=distance",
                 CATEGORY_SEARCH_URL, encode(categoryGroupCode), encode(String.valueOf(longitude)),
                 encode(String.valueOf(latitude)), radiusMeters, PAGE_SIZE);
-        return search(url);
+        return searchAllPages(baseUrl);
     }
 
-    /** 가맹점명을 키워드로 한 반경 검색이다. */
+    /** 가맹점명을 키워드로 한 반경 검색이다. size가 15로 고정돼 있어 페이지를 돌며 최대 45건을 모은다. */
     public List<KakaoPlace> searchByKeyword(String query, double latitude, double longitude, int radiusMeters) {
-        String url = String.format(Locale.ROOT,
+        String baseUrl = String.format(Locale.ROOT,
                 "%s?query=%s&x=%s&y=%s&radius=%d&size=%d&sort=distance",
                 KEYWORD_SEARCH_URL, encode(query), encode(String.valueOf(longitude)),
                 encode(String.valueOf(latitude)), radiusMeters, PAGE_SIZE);
-        return search(url);
+        return searchAllPages(baseUrl);
     }
 
-    private List<KakaoPlace> search(String url) {
+    private List<KakaoPlace> searchAllPages(String baseUrl) {
+        List<KakaoPlace> places = new ArrayList<>();
+        for (int page = 1; page <= MAX_PAGES; page++) {
+            KakaoSearchPage result = search(baseUrl + "&page=" + page);
+            places.addAll(result.places());
+            if (result.isEnd()) {
+                break;
+            }
+        }
+        return places;
+    }
+
+    private KakaoSearchPage search(String url) {
         KakaoHttpResponse response = httpClient.get(url, Map.of("Authorization", "KakaoAK " + restApiKey));
         if (response.statusCode() != 200) {
             throw new KakaoUnavailableException("카카오맵 응답 오류(HTTP " + response.statusCode() + ")");
         }
-        List<KakaoPlace> places = parsePlaces(response.body());
+        JsonNode root = readTree(response.body());
+        List<KakaoPlace> places = parsePlaces(root);
+        boolean isEnd = root.path("meta").path("is_end").asBoolean(true);
         LOGGER.fine(() -> "카카오맵 검색 " + places.size() + "건: url=" + url);
-        return places;
+        return new KakaoSearchPage(places, isEnd);
     }
 
-    private List<KakaoPlace> parsePlaces(String body) {
-        JsonNode root = readTree(body);
+    private record KakaoSearchPage(List<KakaoPlace> places, boolean isEnd) {
+    }
+
+    private List<KakaoPlace> parsePlaces(JsonNode root) {
         List<KakaoPlace> places = new ArrayList<>();
         for (JsonNode document : root.path("documents")) {
             places.add(new KakaoPlace(
