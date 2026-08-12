@@ -872,7 +872,8 @@ class CardLinkServiceTest {
         when(linkedCardMapper.findCardForCredentialSubmission(userCardId, USER_ID)).thenReturn(target);
         when(encryptor.decrypt(target.birthDateEnc())).thenReturn("900101");
         when(encryptor.encrypt("9999888877776666")).thenReturn(new byte[] {9});
-        when(encryptor.encrypt("5678")).thenReturn(new byte[] {5});
+        // KB카드(0301)는 카드소지확인에 카드 비밀번호 앞 2자리만 쓰므로 "5678" 입력은 "56"으로 잘려 CODEF에 전달·저장된다.
+        when(encryptor.encrypt("56")).thenReturn(new byte[] {5});
         CardCatalogEntry matched = new CardCatalogEntry(
                 "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
         when(cardCatalogMapper.findCardById("card-1")).thenReturn(matched);
@@ -891,11 +892,37 @@ class CardLinkServiceTest {
         assertTrue(response.matched());
         assertEquals(1, response.optionGroups().size());
         assertEquals(1, response.optionGroups().get(0).choices().size());
-        verify(codefClient).getOwnedCards("cid-1", "0301", "900101", "9999888877776666", "5678");
+        verify(codefClient).getOwnedCards("cid-1", "0301", "900101", "9999888877776666", "56");
         verify(linkedCardMapper).updateCardCredentials(
                 userCardId, USER_ID, new byte[] {9}, new byte[] {5});
         // 옵션 검증 없이 바로 활성화하지 않는다 — 활성화는 activateCards(옵션 선택 포함)로만 한다.
         verify(linkedCardMapper, never()).activateCards(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("KB카드가 아니면 카드 비밀번호를 자르지 않고 그대로 CODEF에 전달·저장한다")
+    void doesNotTruncateCardPasswordForNonKbIssuer() {
+        String userCardId = "uc-1";
+        CardCredentialSubmissionTarget target = new CardCredentialSubmissionTarget(
+                userCardId, "link-1", "cid-1", "0302", new byte[0], true, true,
+                "card-1", "9999****6666", "현대카드");
+        when(linkedCardMapper.findCardForCredentialSubmission(userCardId, USER_ID)).thenReturn(target);
+        when(encryptor.decrypt(target.birthDateEnc())).thenReturn("900101");
+        when(encryptor.encrypt("9999888877776666")).thenReturn(new byte[] {9});
+        when(encryptor.encrypt("5678")).thenReturn(new byte[] {5});
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "credit", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardById("card-1")).thenReturn(matched);
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        SubmitCardCredentialsRequest request = new SubmitCardCredentialsRequest();
+        request.setCardNo("9999888877776666");
+        request.setCardPassword("5678");
+
+        cardLinkService.submitCardCredentials(USER_ID, userCardId, request);
+
+        verify(codefClient).getOwnedCards("cid-1", "0302", "900101", "9999888877776666", "5678");
+        verify(linkedCardMapper).updateCardCredentials(
+                userCardId, USER_ID, new byte[] {9}, new byte[] {5});
     }
 
     @Test
