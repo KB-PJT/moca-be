@@ -401,6 +401,8 @@ public class CodefClient {
         if (statusCode < 200 || statusCode >= 300) {
             // 404·401·5xx 등 CODEF가 준 비2xx 상태는 우리 쪽 500이 아니라 재시도 가능한 503으로 안내한다.
             // (URLTimeout/연결 실패는 JdkCodefHttpClient에서 이미 같은 예외로 변환한다.)
+            // TODO 임시 로그: 원인 진단 끝나면 제거. 상태코드만 남겨 민감정보 노출은 없음(CWE-532 안전).
+            LOGGER.warning("CODEF 요청 실패 url=" + url + " status=" + statusCode);
             throw new CodefUnavailableException(
                     "CODEF 요청이 실패했습니다(HTTP " + statusCode + "). 잠시 후 다시 시도해주세요.");
         }
