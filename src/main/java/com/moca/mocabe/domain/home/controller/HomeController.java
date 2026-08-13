@@ -2,7 +2,7 @@ package com.moca.mocabe.domain.home.controller;
 
 import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
-import com.moca.mocabe.domain.home.dto.RecentBenefitsResponse;
+import com.moca.mocabe.domain.home.dto.RecentHistoryResponse;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.response.ApiResponse;
@@ -37,12 +37,12 @@ public class HomeController {
         return ResponseEntity.ok(ApiResponse.success(homeQueryService.getCards(userId, yearMonth, orderMode)));
     }
 
-    @GetMapping("/recent-benefits")
-    public ResponseEntity<ApiResponse<RecentBenefitsResponse>> getRecentBenefits(
+    @GetMapping("/recent-history")
+    public ResponseEntity<ApiResponse<RecentHistoryResponse>> getRecentHistory(
             @RequestParam(name = "yearMonth", required = false) String yearMonth,
             @RequestParam(name = "limit", defaultValue = "5") int limit) {
         String userId = currentUserProvider.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
-                homeQueryService.getRecentBenefits(userId, yearMonth, limit)));
+                homeQueryService.getRecentHistory(userId, yearMonth, limit)));
     }
 }

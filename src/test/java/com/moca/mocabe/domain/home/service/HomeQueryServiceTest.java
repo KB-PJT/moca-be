@@ -7,10 +7,10 @@ import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
-import com.moca.mocabe.domain.home.dto.RecentBenefitsResponse;
+import com.moca.mocabe.domain.home.dto.RecentHistoryResponse;
 import com.moca.mocabe.domain.home.mapper.HomeMapper;
 import com.moca.mocabe.domain.home.model.HomeCardRow;
-import com.moca.mocabe.domain.home.model.RecentBenefitRow;
+import com.moca.mocabe.domain.home.model.RecentHistoryRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
@@ -116,10 +116,10 @@ class HomeQueryServiceTest {
   }
 
   @Test
-  @DisplayName("최근 혜택 내역이 없으면 빈 배열을 반환한다")
-  void returnsEmptyRecentBenefits() {
+  @DisplayName("최근 결제 내역이 없으면 빈 배열을 반환한다")
+  void returnsEmptyRecentHistory() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
-    when(homeMapper.findRecentBenefits(
+    when(homeMapper.findRecentHistory(
             org.mockito.ArgumentMatchers.eq(USER_ID),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
@@ -127,14 +127,14 @@ class HomeQueryServiceTest {
         .thenReturn(List.of());
 
     assertEquals(
-        List.of(), homeQueryService.getRecentBenefits(USER_ID, "2026-07", 5).getBenefits());
+        List.of(), homeQueryService.getRecentHistory(USER_ID, "2026-07", 5).getHistory());
   }
 
   @Test
-  @DisplayName("최근 혜택 조회 결과가 null이면 빈 배열로 처리한다")
-  void treatsNullRecentBenefitsAsEmpty() {
+  @DisplayName("최근 결제 조회 결과가 null이면 빈 배열로 처리한다")
+  void treatsNullRecentHistoryAsEmpty() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
-    when(homeMapper.findRecentBenefits(
+    when(homeMapper.findRecentHistory(
             org.mockito.ArgumentMatchers.eq(USER_ID),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
@@ -142,7 +142,7 @@ class HomeQueryServiceTest {
         .thenReturn(null);
 
     assertEquals(
-        List.of(), homeQueryService.getRecentBenefits(USER_ID, "2026-07", 5).getBenefits());
+        List.of(), homeQueryService.getRecentHistory(USER_ID, "2026-07", 5).getHistory());
   }
 
   @Test
@@ -166,17 +166,18 @@ class HomeQueryServiceTest {
         () -> homeQueryService.getCards(USER_ID, "2026-07", "RANDOM"));
     assertThrows(
         InvalidHomeQueryException.class,
-        () -> homeQueryService.getRecentBenefits(USER_ID, "2026-07", 6));
+        () -> homeQueryService.getRecentHistory(USER_ID, "2026-07", 6));
   }
 
   @Test
-  @DisplayName("카드 요약과 최근 혜택을 실제 집계값으로 변환한다")
+  @DisplayName("카드 요약과 최근 전체 결제 내역을 실제 집계값으로 변환한다")
   void mapsHomeAggregates() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
     HomeCardRow row = card("card-1", "신한 Mr.Life", 1, 30000, 21800, 382000, 500000);
     row.setHighlightBenefitTitle("스타벅스 10% 할인");
     when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of(row));
-    RecentBenefitRow recentBenefit = new RecentBenefitRow();
+    RecentHistoryRow recentBenefit = new RecentHistoryRow();
+    recentBenefit.setApprovalId("approval-1");
     recentBenefit.setBenefitHistoryId("usage-1");
     recentBenefit.setMerchantName("스타벅스");
     recentBenefit.setBenefitType("DISCOUNT");
@@ -184,8 +185,10 @@ class HomeQueryServiceTest {
     recentBenefit.setCardName("신한 Mr.Life");
     recentBenefit.setPaymentAmount(15000);
     recentBenefit.setBenefitAmount(1500);
+    recentBenefit.setMissedBenefitAmount(0);
+    recentBenefit.setCalculationStatus("APPLIED");
     recentBenefit.setOccurredAt(LocalDateTime.of(2026, 7, 27, 5, 30));
-    when(homeMapper.findRecentBenefits(
+    when(homeMapper.findRecentHistory(
             org.mockito.ArgumentMatchers.eq(USER_ID),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
@@ -193,13 +196,15 @@ class HomeQueryServiceTest {
         .thenReturn(List.of(recentBenefit));
 
     HomeCardsResponse cards = homeQueryService.getCards(USER_ID, "2026-07", "AUTO");
-    RecentBenefitsResponse benefits = homeQueryService.getRecentBenefits(USER_ID, "2026-07", 5);
+    RecentHistoryResponse history = homeQueryService.getRecentHistory(USER_ID, "2026-07", 5);
 
     assertEquals(8200, cards.getCards().get(0).getSummary().getAvailableBenefitAmount());
     assertEquals(76, cards.getCards().get(0).getSummary().getPerformanceRate());
     assertEquals(
         "월 최대 30,000원", cards.getCards().get(0).getHighlightBenefit().getMonthlyLimitText());
-    assertEquals("2026-07-27T14:30:00+09:00", benefits.getBenefits().get(0).getOccurredAt());
+    assertEquals("approval-1", history.getHistory().get(0).getApprovalId());
+    assertEquals("APPLIED", history.getHistory().get(0).getCalculationStatus());
+    assertEquals("2026-07-27T14:30:00+09:00", history.getHistory().get(0).getOccurredAt());
   }
 
   @Test

@@ -33,8 +33,11 @@ class BenefitHistoryMapperIntegrationTest {
   private static final String USER_CARD = "60000000-0000-4000-8000-000000000001";
   private static final String BENEFIT = "70000000-0000-4000-8000-000000000001";
   private static final String OFFER = "80000000-0000-4000-8000-000000000001";
+  private static final String RULE = "81000000-0000-4000-8000-000000000001";
   private static final String APPROVAL = "90000000-0000-4000-8000-000000000001";
+  private static final String MISSED_APPROVAL = "90000000-0000-4000-8000-000000000002";
   private static final String USAGE = "a0000000-0000-4000-8000-000000000001";
+  private static final String OUTCOME = "b0000000-0000-4000-8000-000000000001";
 
   @Autowired private JdbcTemplate jdbc;
   @Autowired private BenefitHistoryMapper mapper;
@@ -102,6 +105,12 @@ class BenefitHistoryMapperIntegrationTest {
         OFFER,
         BENEFIT);
     jdbc.update(
+        "INSERT INTO benefit_rules"
+            + " (rule_id,offer_id,position,rule_effect,stacking_mode,reward_value,reward_unit,"
+            + "previous_spend_min_krw) VALUES (?,?,1,'grant','standalone',10,'percent',300000)",
+        RULE,
+        OFFER);
+    jdbc.update(
         "INSERT INTO card_payment_approvals"
             + " (approval_id,user_id,user_card_id,approved_at,merchant_name,amount,approval_status,"
             + "source_payload,created_at)"
@@ -110,6 +119,31 @@ class BenefitHistoryMapperIntegrationTest {
         APPROVAL,
         USER,
         USER_CARD);
+    jdbc.update(
+        "INSERT INTO card_payment_approvals"
+            + " (approval_id,user_id,user_card_id,approved_at,merchant_name,amount,approval_status,"
+            + "source_payload,created_at) VALUES (?,?,?,'2026-07-18 05:30:00','이마트',20000,"
+            + "'approved',JSON_OBJECT(),UTC_TIMESTAMP(6))",
+        MISSED_APPROVAL,
+        USER,
+        USER_CARD);
+    jdbc.update(
+        "INSERT INTO user_card_performance_snapshots"
+            + " (performance_snapshot_id,user_card_id,performance_month,current_spend_amount,"
+            + "created_at,updated_at) VALUES (UUID(),?,'2026-06',120000,"
+            + "UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))",
+        USER_CARD);
+    jdbc.update(
+        "INSERT INTO user_benefit_calculation_outcomes"
+            + " (outcome_id,user_card_id,approval_id,offer_id,rule_id,usage_date,reward_unit,"
+            + "expected_reward_value,applied_reward_value,missed_reward_value,outcome_status,"
+            + "rejection_reason) VALUES (?,?,?,?,?,'2026-07-18','KRW',2000,0,2000,"
+            + "'not_applied','PERFORMANCE_NOT_MET')",
+        OUTCOME,
+        USER_CARD,
+        MISSED_APPROVAL,
+        OFFER,
+        RULE);
     jdbc.update(
         "INSERT INTO user_benefit_usages"
             + " (usage_id,user_card_id,offer_id,approval_id,usage_date,eligible_amount_krw,"
@@ -133,26 +167,36 @@ class BenefitHistoryMapperIntegrationTest {
     LocalDateTime to = LocalDateTime.of(2026, 7, 31, 15, 0);
     List<BenefitHistoryRow> rows =
         mapper.findHistory(USER, from, to, null, "DISCOUNT", "LATEST", 0, 20);
-    assertEquals(1, rows.size());
-    assertEquals("스타벅스", rows.get(0).getMerchantName());
-    assertEquals("테스트 카드 1234********5678", rows.get(0).getCardName());
-    assertEquals(1500L, rows.get(0).getBenefitAmount());
+    assertEquals(2, rows.size());
+    assertEquals(OUTCOME, rows.get(0).getBenefitHistoryId());
+    assertEquals("NOT_APPLIED", rows.get(0).getCalculationStatus());
+    assertEquals(2000L, rows.get(0).getMissedBenefitAmount());
+    assertEquals(300000L, rows.get(0).getRequiredPreviousSpendAmount());
+    assertEquals(120000L, rows.get(0).getPreviousMonthSpendAmount());
+    assertEquals("이마트", rows.get(0).getMerchantName());
+    assertEquals("테스트 카드 1234********5678", rows.get(1).getCardName());
+    assertEquals(1500L, rows.get(1).getBenefitAmount());
     BenefitHistorySummaryRow summary = mapper.summarizeHistory(USER, from, to, USER_CARD);
     assertEquals(1500L, summary.totalBenefitAmount());
     assertEquals(1500L, summary.discountAmount());
     assertEquals(0L, summary.cashbackAmount());
     assertEquals(0L, summary.pointAmount());
     assertEquals(0L, summary.mileageAmount());
-    assertEquals(1L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
+    assertEquals(2L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
     assertEquals(0L, mapper.countHistory(OTHER_USER, from, to, null, null));
     assertNull(mapper.findDetail(OTHER_USER, USAGE));
     BenefitHistoryDetailRow detail = mapper.findDetail(USER, USAGE);
     assertEquals("카페 할인", detail.getBenefitTitle());
     assertEquals(0L, detail.getMonthlyLimitAmount());
+    BenefitHistoryDetailRow missed = mapper.findDetail(USER, OUTCOME);
+    assertEquals("PERFORMANCE_NOT_MET", missed.getRejectionReason());
+    assertEquals(2000L, missed.getMissedBenefitAmount());
   }
 
   private void clean() {
+    jdbc.update("DELETE FROM user_benefit_calculation_outcomes");
     jdbc.update("DELETE FROM user_benefit_usages");
+    jdbc.update("DELETE FROM user_card_performance_snapshots");
     jdbc.update("DELETE FROM card_payment_approvals");
     jdbc.update("DELETE FROM benefit_rules");
     jdbc.update("DELETE FROM benefit_offers");

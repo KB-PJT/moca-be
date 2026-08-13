@@ -15,8 +15,8 @@ import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardSummaryResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
-import com.moca.mocabe.domain.home.dto.RecentBenefitItemResponse;
-import com.moca.mocabe.domain.home.dto.RecentBenefitsResponse;
+import com.moca.mocabe.domain.home.dto.RecentHistoryItemResponse;
+import com.moca.mocabe.domain.home.dto.RecentHistoryResponse;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.exception.GlobalExceptionHandler;
@@ -59,10 +59,11 @@ class HomeControllerTest {
                         new HomeCardResponse("uc-1", 1, "신한 Mr.Life", "내 카드", "https://image/card.png",
                                 null, new HomeBenefitHighlightResponse("카페 10% 할인", "월 최대 5천원"),
                                 new HomeCardSummaryResponse(21800, 8200, 30000, 382000, 500000, 76, 118000)))));
-        when(homeQueryService.getRecentBenefits(USER_ID, "2026-07", 3))
-                .thenReturn(new RecentBenefitsResponse(List.of(new RecentBenefitItemResponse(
-                        "benefit-1", "스타벅스", "DISCOUNT", "카페 10% 할인", "신한 Mr.Life",
-                        15000, 1500, "2026-07-27T14:30:00+09:00"))));
+        when(homeQueryService.getRecentHistory(USER_ID, "2026-07", 3))
+                .thenReturn(new RecentHistoryResponse(List.of(new RecentHistoryItemResponse(
+                        "approval-1", "benefit-1", "스타벅스", "DISCOUNT", "카페 10% 할인",
+                        "신한 Mr.Life", 15000, 1500, 0, "APPLIED", null,
+                        "2026-07-27T14:30:00+09:00"))));
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode greeting = objectMapper.readTree(mockMvc.perform(get("/home/greeting")
@@ -83,19 +84,21 @@ class HomeControllerTest {
         assertEquals(76, cards.path("data").path("cards").get(0).path("summary")
                 .path("performanceRate").asInt());
 
-        JsonNode benefits = objectMapper.readTree(mockMvc.perform(get("/home/recent-benefits")
+        JsonNode history = objectMapper.readTree(mockMvc.perform(get("/home/recent-history")
                         .param("yearMonth", "2026-07")
                         .param("limit", "3"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        assertTrue(benefits.path("success").asBoolean());
-        assertEquals("스타벅스", benefits.path("data").path("benefits").get(0)
+        assertTrue(history.path("success").asBoolean());
+        assertEquals("스타벅스", history.path("data").path("history").get(0)
                 .path("merchantName").asText());
-        assertEquals(1500, benefits.path("data").path("benefits").get(0)
+        assertEquals(1500, history.path("data").path("history").get(0)
                 .path("benefitAmount").asInt());
+        assertEquals("APPLIED", history.path("data").path("history").get(0)
+                .path("calculationStatus").asText());
 
         verify(homeQueryService).getGreeting(USER_ID, "2026-07");
         verify(homeQueryService).getCards(USER_ID, "2026-07", "MANUAL");
-        verify(homeQueryService).getRecentBenefits(USER_ID, "2026-07", 3);
+        verify(homeQueryService).getRecentHistory(USER_ID, "2026-07", 3);
     }
 
     @Test
@@ -111,9 +114,9 @@ class HomeControllerTest {
         JsonNode cards = objectMapper.readTree(mockMvc.perform(get("/home/cards"))
                 .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
         assertEquals("AUTHENTICATION_REQUIRED", cards.path("error").path("code").asText());
-        JsonNode benefits = objectMapper.readTree(mockMvc.perform(get("/home/recent-benefits"))
+        JsonNode history = objectMapper.readTree(mockMvc.perform(get("/home/recent-history"))
                 .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
-        assertEquals("AUTHENTICATION_REQUIRED", benefits.path("error").path("code").asText());
+        assertEquals("AUTHENTICATION_REQUIRED", history.path("error").path("code").asText());
 
         verifyNoInteractions(homeQueryService);
     }

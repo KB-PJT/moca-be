@@ -21,12 +21,12 @@ class HomeMapperIntegrationTest {
   @org.springframework.beans.factory.annotation.Autowired private HomeMapper homeMapper;
 
   @Test
-  @DisplayName("홈 카드와 최근 혜택 집계 SQL은 데이터가 없는 사용자에게 빈 목록을 반환한다")
+  @DisplayName("홈 카드와 최근 전체 내역 SQL은 데이터가 없는 사용자에게 빈 목록을 반환한다")
   void executesHomeQueriesAgainstMySql() {
     assertTrue(homeMapper.findHomeCards(UNKNOWN_USER_ID, "2026-07").isEmpty());
     assertTrue(
         homeMapper
-            .findRecentBenefits(
+            .findRecentHistory(
                 UNKNOWN_USER_ID,
                 LocalDateTime.of(2026, 6, 30, 15, 0),
                 LocalDateTime.of(2026, 7, 31, 15, 0),

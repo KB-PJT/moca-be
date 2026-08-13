@@ -38,6 +38,9 @@ class BenefitHistoryControllerTest {
             "DISCOUNT",
             "할인",
             new MonthlyLimitResponse(1, 1, 0),
+            null,
+            0,
+            null,
             null);
     when(service.getHistory("user-1", "2026-07", "card-1", "DISCOUNT", "LATEST", 1, 20))
         .thenReturn(history);

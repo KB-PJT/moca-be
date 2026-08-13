@@ -84,6 +84,29 @@ class BenefitHistoryQueryServiceTest {
   }
 
   @Test
+  void exposesMissedBenefitAndPreviousSpendShortfall() {
+    BenefitHistoryDetailRow row = new BenefitHistoryDetailRow();
+    copy(row);
+    row.setCalculationStatus("NOT_APPLIED");
+    row.setBenefitAmount(0);
+    row.setMissedBenefitAmount(1500);
+    row.setRejectionReason("PERFORMANCE_NOT_MET");
+    row.setRequiredPreviousSpendAmount(300000L);
+    row.setPreviousMonthSpendAmount(120000L);
+    when(mapper.findDetail("user-1", "outcome-1")).thenReturn(row);
+
+    BenefitHistoryDetailResponse result =
+        new BenefitHistoryQueryService(mapper).getDetail("user-1", "outcome-1");
+
+    assertEquals(0, result.getBenefitAmount());
+    assertEquals(1500, result.getMissedBenefitAmount());
+    assertEquals("PERFORMANCE_NOT_MET", result.getRejectionReason());
+    assertEquals(300000, result.getPerformanceShortfall().requiredAmount());
+    assertEquals(120000, result.getPerformanceShortfall().achievedAmount());
+    assertEquals(180000, result.getPerformanceShortfall().remainingAmount());
+  }
+
+  @Test
   void hidesAnotherUsersDetailAsNotFound() {
     when(mapper.findDetail("user-1", "usage-2")).thenReturn(null);
     assertThrows(

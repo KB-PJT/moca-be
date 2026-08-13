@@ -14,6 +14,10 @@ public class BenefitHistoryRow {
   private String userCardId;
   private String cardName;
   private String calculationStatus;
+  private long missedBenefitAmount;
+  private String rejectionReason;
+  private Long requiredPreviousSpendAmount;
+  private Long previousMonthSpendAmount;
 
   public String getBenefitHistoryId() {
     return benefitHistoryId;
@@ -93,5 +97,37 @@ public class BenefitHistoryRow {
 
   public void setCalculationStatus(String value) {
     calculationStatus = value;
+  }
+
+  public long getMissedBenefitAmount() {
+    return missedBenefitAmount;
+  }
+
+  public void setMissedBenefitAmount(long value) {
+    missedBenefitAmount = value;
+  }
+
+  public String getRejectionReason() {
+    return rejectionReason;
+  }
+
+  public void setRejectionReason(String value) {
+    rejectionReason = value;
+  }
+
+  public Long getRequiredPreviousSpendAmount() {
+    return requiredPreviousSpendAmount;
+  }
+
+  public void setRequiredPreviousSpendAmount(Long value) {
+    requiredPreviousSpendAmount = value;
+  }
+
+  public Long getPreviousMonthSpendAmount() {
+    return previousMonthSpendAmount;
+  }
+
+  public void setPreviousMonthSpendAmount(Long value) {
+    previousMonthSpendAmount = value;
   }
 }

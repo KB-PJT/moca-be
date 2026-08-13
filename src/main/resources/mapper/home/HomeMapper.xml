@@ -311,7 +311,8 @@
            AND usage_group.limit_group_key = limits.limit_group_key
     </select>
 
-    <resultMap id="recentBenefitRowMap" type="com.moca.mocabe.domain.home.model.RecentBenefitRow">
+    <resultMap id="recentHistoryRowMap" type="com.moca.mocabe.domain.home.model.RecentHistoryRow">
+        <id property="approvalId" column="approval_id"/>
         <id property="benefitHistoryId" column="benefit_history_id"/>
         <result property="merchantName" column="merchant_name"/>
         <result property="benefitType" column="benefit_type"/>
@@ -319,25 +320,91 @@
         <result property="cardName" column="card_name"/>
         <result property="paymentAmount" column="payment_amount"/>
         <result property="benefitAmount" column="benefit_amount"/>
+        <result property="missedBenefitAmount" column="missed_benefit_amount"/>
+        <result property="calculationStatus" column="calculation_status"/>
+        <result property="rejectionReason" column="rejection_reason"/>
         <result property="occurredAt" column="occurred_at"/>
     </resultMap>
 
-    <select id="findRecentBenefits" resultMap="recentBenefitRowMap">
-        SELECT ubu.usage_id AS benefit_history_id,
+    <select id="findRecentHistory" resultMap="recentHistoryRowMap">
+        WITH recent_approvals AS (
+            SELECT approval.approval_id,
+                   approval.user_card_id,
+                   approval.merchant_name,
+                   approval.amount,
+                   approval.approved_at
+            FROM card_payment_approvals approval
+            INNER JOIN user_cards owned_card ON owned_card.user_card_id = approval.user_card_id
+            WHERE owned_card.user_id = #{userId}
+              AND approval.approved_at &gt;= #{fromUtc}
+              AND approval.approved_at &lt; #{toUtc}
+            ORDER BY approval.approved_at DESC, approval.approval_id DESC
+            LIMIT #{limit}
+        ), usage_summary AS (
+            SELECT benefit_usage.approval_id,
+                   MIN(benefit_usage.usage_id) AS benefit_history_id,
+                   SUM(benefit_usage.reward_amount_krw) AS benefit_amount,
+                   CASE
+                       WHEN COUNT(DISTINCT offer.reward_type) &gt; 1 THEN 'MULTIPLE'
+                       WHEN MAX(offer.reward_type) = 'discount' THEN 'DISCOUNT'
+                       WHEN MAX(offer.reward_type) = 'cashback' THEN 'CASHBACK'
+                       WHEN MAX(offer.reward_type) = 'points' THEN 'POINT'
+                   END AS benefit_type,
+                   GROUP_CONCAT(DISTINCT COALESCE(offer.offer_name, benefit.title)
+                                ORDER BY COALESCE(offer.offer_name, benefit.title)
+                                SEPARATOR ', ') AS benefit_title
+            FROM user_benefit_usages benefit_usage
+            INNER JOIN recent_approvals recent
+                ON recent.approval_id = benefit_usage.approval_id
+            INNER JOIN benefit_offers offer ON offer.offer_id = benefit_usage.offer_id
+            INNER JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+            WHERE benefit_usage.usage_status = 'confirmed'
+            GROUP BY benefit_usage.approval_id
+        ), outcome_summary AS (
+            SELECT outcome.approval_id,
+                   MIN(outcome.outcome_id) AS benefit_history_id,
+                   SUM(CASE WHEN outcome.reward_unit = 'KRW'
+                            THEN outcome.missed_reward_value ELSE 0 END) AS missed_benefit_amount,
+                   CASE
+                       WHEN COUNT(DISTINCT offer.reward_type) &gt; 1 THEN 'MULTIPLE'
+                       WHEN MAX(offer.reward_type) = 'discount' THEN 'DISCOUNT'
+                       WHEN MAX(offer.reward_type) = 'cashback' THEN 'CASHBACK'
+                       WHEN MAX(offer.reward_type) = 'points' THEN 'POINT'
+                   END AS benefit_type,
+                   GROUP_CONCAT(DISTINCT COALESCE(offer.offer_name, benefit.title)
+                                ORDER BY COALESCE(offer.offer_name, benefit.title)
+                                SEPARATOR ', ') AS benefit_title,
+                   GROUP_CONCAT(DISTINCT outcome.rejection_reason
+                                ORDER BY outcome.rejection_reason SEPARATOR ',') AS rejection_reason
+            FROM user_benefit_calculation_outcomes outcome
+            INNER JOIN recent_approvals recent ON recent.approval_id = outcome.approval_id
+            INNER JOIN benefit_offers offer ON offer.offer_id = outcome.offer_id
+            INNER JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+            WHERE outcome.outcome_status IN ('partially_applied', 'not_applied')
+            GROUP BY outcome.approval_id
+        )
+        SELECT approval.approval_id,
+               COALESCE(benefit_usage.benefit_history_id, outcome.benefit_history_id)
+                   AS benefit_history_id,
                approval.merchant_name,
-               CASE bo.reward_type
-                   WHEN 'discount' THEN 'DISCOUNT'
-                   WHEN 'cashback' THEN 'CASHBACK'
-                   WHEN 'points' THEN 'POINT'
-               END AS benefit_type,
-               COALESCE(bo.offer_name, cb.title) AS benefit_title,
+               COALESCE(benefit_usage.benefit_type, outcome.benefit_type) AS benefit_type,
+               COALESCE(benefit_usage.benefit_title, outcome.benefit_title) AS benefit_title,
                COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
                approval.amount AS payment_amount,
-               ubu.reward_amount_krw AS benefit_amount,
-               COALESCE(ubu.approved_at, approval.approved_at) AS occurred_at
-        FROM user_benefit_usages ubu
-        INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
-        INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
+               COALESCE(benefit_usage.benefit_amount, 0) AS benefit_amount,
+               COALESCE(outcome.missed_benefit_amount, 0) AS missed_benefit_amount,
+               CASE
+                   WHEN benefit_usage.approval_id IS NOT NULL
+                        AND COALESCE(outcome.missed_benefit_amount, 0) &gt; 0
+                       THEN 'PARTIALLY_APPLIED'
+                   WHEN benefit_usage.approval_id IS NOT NULL THEN 'APPLIED'
+                   WHEN outcome.approval_id IS NOT NULL THEN 'NOT_APPLIED'
+                   ELSE 'NOT_CALCULATED'
+               END AS calculation_status,
+               outcome.rejection_reason,
+               approval.approved_at AS occurred_at
+        FROM recent_approvals approval
+        INNER JOIN user_cards uc ON uc.user_card_id = approval.user_card_id
         INNER JOIN cards c ON c.card_id = uc.card_id
         LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
             AND NOT EXISTS (
@@ -348,14 +415,9 @@
                        OR (cv2.last_seen_at = cv.last_seen_at
                            AND cv2.content_version_id &gt; cv.content_version_id))
             )
-        INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
-        INNER JOIN card_benefits cb ON cb.benefit_id = bo.benefit_id
-        WHERE uc.user_id = #{userId}
-          AND ubu.usage_status = 'confirmed'
-          AND bo.reward_type IN ('discount', 'cashback', 'points')
-          AND COALESCE(ubu.approved_at, approval.approved_at) &gt;= #{fromUtc}
-          AND COALESCE(ubu.approved_at, approval.approved_at) &lt; #{toUtc}
-        ORDER BY COALESCE(ubu.approved_at, approval.approved_at) DESC, ubu.usage_id DESC
-        LIMIT #{limit}
+        LEFT JOIN usage_summary benefit_usage
+            ON benefit_usage.approval_id = approval.approval_id
+        LEFT JOIN outcome_summary outcome ON outcome.approval_id = approval.approval_id
+        ORDER BY approval.approved_at DESC, approval.approval_id DESC
     </select>
 </mapper>

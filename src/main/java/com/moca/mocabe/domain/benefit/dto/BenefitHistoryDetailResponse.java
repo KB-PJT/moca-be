@@ -11,6 +11,9 @@ public class BenefitHistoryDetailResponse {
   private final long paymentAmount, benefitAmount;
   private final MonthlyLimitResponse monthlyLimit;
   private final Long earnedMileage;
+  private final long missedBenefitAmount;
+  private final String rejectionReason;
+  private final PerformanceShortfallResponse performanceShortfall;
 
   public BenefitHistoryDetailResponse(
       String id,
@@ -23,7 +26,10 @@ public class BenefitHistoryDetailResponse {
       String type,
       String title,
       MonthlyLimitResponse limit,
-      Long mileage) {
+      Long mileage,
+      long missedBenefit,
+      String rejectionReason,
+      PerformanceShortfallResponse performanceShortfall) {
     benefitHistoryId = id;
     calculationStatus = status;
     merchantName = merchant;
@@ -35,6 +41,9 @@ public class BenefitHistoryDetailResponse {
     benefitTitle = title;
     monthlyLimit = limit;
     earnedMileage = mileage;
+    missedBenefitAmount = missedBenefit;
+    this.rejectionReason = rejectionReason;
+    this.performanceShortfall = performanceShortfall;
   }
 
   public String getBenefitHistoryId() {
@@ -79,5 +88,17 @@ public class BenefitHistoryDetailResponse {
 
   public Long getEarnedMileage() {
     return earnedMileage;
+  }
+
+  public long getMissedBenefitAmount() {
+    return missedBenefitAmount;
+  }
+
+  public String getRejectionReason() {
+    return rejectionReason;
+  }
+
+  public PerformanceShortfallResponse getPerformanceShortfall() {
+    return performanceShortfall;
   }
 }
