@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.merchant.dto.MerchantCategoryResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantResponse;
 import com.moca.mocabe.domain.merchant.dto.NearbyMerchantResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationResponse;
+import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationBatchResponse;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
@@ -70,5 +71,14 @@ public class MerchantController {
         return ResponseEntity.ok(ApiResponse.success(merchantCardRecommendationService.recommendPlace(
                 currentUserProvider.getCurrentUserId(), placeName, categoryGroupCode,
                 categoryName, paymentAmount)));
+    }
+
+    @GetMapping("/card-recommendations")
+    public ResponseEntity<ApiResponse<MerchantCardRecommendationBatchResponse>>
+            getCardRecommendationBatch(
+                    @RequestParam(name = "merchantIds") List<String> merchantIds,
+                    @RequestParam(name = "paymentAmount", required = false) BigDecimal paymentAmount) {
+        return ResponseEntity.ok(ApiResponse.success(merchantCardRecommendationService.recommendBatch(
+                currentUserProvider.getCurrentUserId(), merchantIds, paymentAmount)));
     }
 }

@@ -109,6 +109,17 @@ class MerchantAuthenticationContractTest {
     }
 
     @Test
+    @DisplayName("Authorization 헤더 없이 목록 카드 추천을 조회하면 401을 반환한다")
+    void rejectsUnauthenticatedCardRecommendationBatchRequest() throws Exception {
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(
+                        get("/api/v1/merchants/card-recommendations")
+                                .param("merchantIds", "merchant-1"))
+                .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
+    }
+
+    @Test
     @DisplayName("Authorization 헤더 없이 장소 카드 추천을 조회하면 401을 반환한다")
     void rejectsUnauthenticatedPlaceCardRecommendationRequest() throws Exception {
         JsonNode response = new ObjectMapper().readTree(mockMvc.perform(

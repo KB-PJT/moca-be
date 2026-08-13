@@ -10,6 +10,7 @@ import com.moca.mocabe.domain.merchant.mapper.MerchantCardRecommendationMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate;
 import com.moca.mocabe.domain.merchant.model.MerchantDetailRow;
+import com.moca.mocabe.domain.merchant.model.MerchantCategoryLineageRow;
 import com.moca.mocabe.domain.merchant.model.KakaoCategoryResolutionRule;
 import com.moca.mocabe.domain.merchant.model.MerchantNameCandidate;
 import com.moca.mocabe.domain.merchant.recommendation.CardBenefitEligibilityEvaluator;
@@ -58,6 +59,44 @@ class MerchantCardRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("목록 배치는 가맹점 수와 무관하게 세 조회로 추천 가능 여부를 반환한다")
+    void recommendsMerchantBatchWithoutNPlusOne() {
+        when(mapper.findActiveMerchants(List.of("m-1", "missing"))).thenReturn(List.of(
+                new MerchantDetailRow("m-1", "이마트", "category-1", "MART", "마트")));
+        when(mapper.findCategoryLineages(List.of("m-1", "missing"))).thenReturn(List.of(
+                new MerchantCategoryLineageRow("m-1", "category-1")));
+        when(mapper.findOwnedCardBenefitRulesForMerchants(
+                "user-1", List.of("m-1", "missing"), java.time.LocalDate.of(2026, 8, 10), "2026-07"))
+                .thenReturn(List.of());
+        when(eligibilityEvaluator.evaluate(
+                List.of(), "m-1", List.of("category-1"), null,
+                java.time.LocalDate.of(2026, 8, 10))).thenReturn(List.of(candidateWithoutMonthlyLimit()));
+
+        var response = service.recommendBatch(
+                "user-1", List.of("m-1", "m-1", "missing"), null);
+
+        assertEquals(2, response.recommendations().size());
+        assertEquals("이마트", response.recommendations().get(0).merchant().name());
+        assertEquals("card-no-limit", response.recommendations().get(0).recommendedCard().userCardId());
+        assertNull(response.recommendations().get(1).recommendedCard());
+    }
+
+    @Test
+    @DisplayName("목록 배치는 빈 목록·최대 개수 초과·빈 식별자·0원 결제를 거절한다")
+    void validatesMerchantBatch() {
+        assertThrows(InvalidMerchantQueryException.class,
+                () -> service.recommendBatch("user", List.of(), null));
+        assertThrows(InvalidMerchantQueryException.class,
+                () -> service.recommendBatch("user", null, null));
+        assertThrows(InvalidMerchantQueryException.class,
+                () -> service.recommendBatch("user", java.util.Collections.nCopies(51, "m"), null));
+        assertThrows(InvalidMerchantQueryException.class,
+                () -> service.recommendBatch("user", java.util.Arrays.asList("m", null), null));
+        assertThrows(InvalidMerchantQueryException.class,
+                () -> service.recommendBatch("user", List.of("m"), BigDecimal.ZERO));
+    }
+
+    @Test
     @DisplayName("포인트 활용형은 예상 가치와 유형 가중치로 카드별 최적 혜택을 순위화한다")
     void ranksBestBenefitPerCardUsingPreference() {
         when(mapper.findActiveMerchant("merchant-1"))
@@ -68,6 +107,7 @@ class MerchantCardRecommendationServiceTest {
                 candidate("card-1", "할인 카드", "discount", "KRW", "1", null, "300000", "120000", "1"),
                 candidate("card-2", "포인트 카드", "points", "point", "2", "1000", null, "0", "1.5"),
                 candidate("card-3", "마일 카드", "points", "mile", "1", null, null, "0", "2"),
+                candidate("card-5", "캐시백 카드", "cashback", "KRW", "1", null, null, "0", "1"),
                 candidate("card-4", "최소금액 카드", "discount", "percent", "50", null, null, "0", "1",
                         "20000"));
         when(eligibilityEvaluator.evaluate(
@@ -80,7 +120,7 @@ class MerchantCardRecommendationServiceTest {
 
         var response = service.recommend("user-1", "merchant-1", new BigDecimal("10000"));
 
-        assertEquals(3, response.rankedCards().size());
+        assertEquals(4, response.rankedCards().size());
         assertEquals("card-2", response.recommendedCard().userCardId());
         assertEquals(new BigDecimal("30.00"), response.recommendedCard().estimatedValueKrw());
         assertEquals("card-1", response.rankedCards().get(1).userCardId());
@@ -88,6 +128,34 @@ class MerchantCardRecommendationServiceTest {
         assertEquals(new BigDecimal("180000"),
                 response.rankedCards().get(1).remainingPreviousSpendKrw());
         assertEquals(BigDecimal.ZERO, response.recommendedCard().remainingPreviousSpendKrw());
+        assertEquals(new BigDecimal("10000"), response.recommendedCard().estimatedPaymentAmountKrw());
+        assertEquals("MERCHANT_BENEFIT_MATCHED",
+                response.recommendedCard().recommendationReasons().get(0).code());
+        assertEquals(true, response.rankedCards().stream()
+                .anyMatch(card -> "cashback".equals(card.rewardType())));
+    }
+
+    @Test
+    @DisplayName("전월 실적 경계는 충족하고 월 한도 소진 경계는 잔여 0으로 표시한다")
+    void handlesPerformanceAndMonthlyLimitBoundaries() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        MerchantCardBenefitCandidate boundary = new MerchantCardBenefitCandidate(
+                "merchant-1", "이마트", "MART", "마트", "card-boundary", "경계 카드",
+                "카드사", null, "마트 할인", "discount", "percent", BigDecimal.ONE,
+                null, null, new BigDecimal("300000"), new BigDecimal("300000"),
+                BigDecimal.ONE, new BigDecimal("10000"), new BigDecimal("10000"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(boundary));
+
+        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
+                .recommendedCard();
+
+        assertEquals(true, card.performanceMet());
+        assertEquals(BigDecimal.ZERO, card.monthlyRemainingKrw());
+        assertEquals(false, card.recommendationReasons().get(3).satisfied());
     }
 
     @Test
@@ -224,10 +292,17 @@ class MerchantCardRecommendationServiceTest {
         return new MerchantCardBenefitCandidate("merchant-1", "이마트", "MART", "마트", cardId, cardName,
                 "카드사", null, "마트 혜택", rewardType, rewardUnit, new BigDecimal(rewardValue),
                 decimal(basis), decimal(transactionMinimum), decimal(requiredSpend), new BigDecimal(previousSpend),
-                new BigDecimal(conversion));
+                new BigDecimal(conversion), new BigDecimal("10000"), BigDecimal.ZERO);
     }
 
     private BigDecimal decimal(String value) {
         return value == null ? null : new BigDecimal(value);
+    }
+
+    private MerchantCardBenefitCandidate candidateWithoutMonthlyLimit() {
+        return new MerchantCardBenefitCandidate(
+                "m-1", "이마트", "MART", "마트", "card-no-limit", "한도 없음",
+                "카드사", null, "기본 할인", "discount", "percent", BigDecimal.ONE,
+                null, null, null, BigDecimal.ZERO, BigDecimal.ONE, null, BigDecimal.ZERO);
     }
 }

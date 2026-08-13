@@ -5,4 +5,9 @@ import java.util.List;
 
 public record MerchantCardRecommendationResponse(
         MerchantSummaryResponse merchant, BenefitPreferenceType benefitPreferenceType,
-        RankedCardBenefitResponse recommendedCard, List<RankedCardBenefitResponse> rankedCards) { }
+        RankedCardBenefitResponse recommendedCard, List<RankedCardBenefitResponse> rankedCards) {
+
+    public boolean recommendationAvailable() {
+        return recommendedCard != null;
+    }
+}
