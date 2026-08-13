@@ -577,6 +577,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /merchants/card-recommendations:
+    get:
+      tags: [Merchant]
+      summary: 가맹점 목록용 보유 카드 추천 일괄 조회
+      description: |
+        인증 사용자의 활성 보유 카드를 최대 50개 가맹점에 대해 일괄 추천합니다.
+        가맹점·카테고리 계보·혜택 후보를 각각 한 번씩 조회하여 가맹점 수에 따른 N+1 조회를 방지합니다.
+        존재하지 않거나 추천 카드가 없는 가맹점도 입력 순서대로 대표 추천 null과 빈 순위를 반환합니다.
+      operationId: getMerchantCardRecommendationBatch
+      security: [{ MocaBearerAuth: [] }]
+      parameters:
+        - name: merchantIds
+          in: query
+          required: true
+          description: 반복 쿼리 파라미터로 전달하는 내부 가맹점 식별자이며 중복 제거 후 처리합니다.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 50
+            items: { type: string }
+        - name: paymentAmount
+          in: query
+          required: false
+          description: 모든 가맹점 예상 혜택에 공통 적용할 결제 예정 금액이며 기본값은 10000원입니다.
+          schema: { type: number, minimum: 1, default: 10000 }
+      responses:
+        '200':
+          description: 입력 가맹점 순서의 카드 추천 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MerchantCardRecommendationBatchApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/AuthenticationError' }
         '401':
           description: 인증 필요
           content:
@@ -1617,10 +1650,24 @@ components:
       properties:
         success: { type: boolean, example: true }
         data: { $ref: '#/components/schemas/MerchantCardRecommendationResponse' }
+    MerchantCardRecommendationBatchApiResponse:
+      description: '가맹점 목록용 카드 추천 일괄 API의 공통 성공 응답입니다.'
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/MerchantCardRecommendationBatchResponse' }
+    MerchantCardRecommendationBatchResponse:
+      type: object
+      required: [recommendations]
+      properties:
+        recommendations:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/MerchantCardRecommendationResponse' }
     MerchantCardRecommendationResponse:
       description: '가맹점 정보·대표 추천·보유 카드 전체 순위를 묶은 결과입니다.'
       type: object
-      required: [merchant, benefitPreferenceType, rankedCards]
+      required: [merchant, benefitPreferenceType, recommendationAvailable, rankedCards]
       properties:
         merchant: { $ref: '#/components/schemas/MerchantSummaryResponse' }
         benefitPreferenceType:
@@ -1629,6 +1676,9 @@ components:
           description: '1위 카드입니다. 적용 가능한 보유 카드가 없으면 null입니다.'
           nullable: true
           allOf: [{ $ref: '#/components/schemas/RankedCardBenefitResponse' }]
+        recommendationAvailable:
+          type: boolean
+          description: '추천 가능한 활성 보유 카드가 한 장 이상 있는지 나타냅니다.'
         rankedCards:
           description: '가맹점 대상 혜택이 있는 활성 보유 카드 순위이며 없으면 빈 배열입니다.'
           type: array
@@ -1637,14 +1687,15 @@ components:
       type: object
       required: [merchantId, name, categoryCode, categoryName]
       properties:
-        merchantId: { type: string, description: '내부 가맹점 식별자입니다.' }
-        name: { type: string, description: '가맹점 또는 브랜드 표시명입니다.' }
-        categoryCode: { type: string, description: '혜택 대상 매칭에 사용한 내부 카테고리 코드입니다.' }
-        categoryName: { type: string, description: '화면에 표시할 카테고리명입니다.' }
+        merchantId: { type: string, nullable: true, description: '내부 가맹점 식별자이며 장소 추정 결과는 null일 수 있습니다.' }
+        name: { type: string, nullable: true, description: '가맹점 또는 브랜드 표시명이며 알 수 없는 식별자는 null입니다.' }
+        categoryCode: { type: string, nullable: true, description: '혜택 대상 매칭에 사용한 내부 카테고리 코드입니다.' }
+        categoryName: { type: string, nullable: true, description: '화면에 표시할 카테고리명입니다.' }
     RankedCardBenefitResponse:
       type: object
       required: [rank, userCardId, cardName, benefitTitle, rewardType, rewardUnit, rewardValue,
-                 estimatedValueKrw, previousMonthSpendKrw, remainingPreviousSpendKrw, performanceMet]
+                 estimatedValueKrw, estimatedPaymentAmountKrw, previousMonthSpendKrw,
+                 remainingPreviousSpendKrw, monthlyUsedKrw, performanceMet, recommendationReasons]
       properties:
         rank: { type: integer, minimum: 1, description: '온보딩 혜택 성향을 반영한 1부터 시작하는 순위입니다.' }
         userCardId: { type: string, description: '인증 사용자의 보유 카드 식별자입니다.' }
@@ -1656,10 +1707,30 @@ components:
         rewardUnit: { type: string, enum: [percent, KRW, point, mile], description: '혜택 원 단위입니다.' }
         rewardValue: { type: number, description: '혜택 원 단위 기준 값입니다.' }
         estimatedValueKrw: { type: number, description: '결제금액과 환산 정책으로 계산한 예상 원화 가치입니다.' }
+        estimatedPaymentAmountKrw: { type: number, description: '예상 혜택 계산에 사용한 결제 기준 금액입니다.' }
+        transactionMinKrw: { type: number, nullable: true, description: '혜택 적용 최소 결제금액이며 없으면 null입니다.' }
         previousMonthSpendKrw: { type: number, description: '전월 인정 실적 원화 금액이며 자료가 없으면 0입니다.' }
         requiredPreviousSpendKrw: { type: number, nullable: true, description: '혜택 적용에 필요한 전월 실적이며 없으면 null입니다.' }
         remainingPreviousSpendKrw: { type: number, description: '혜택 실적 조건까지 추가로 필요한 금액이며 이미 충족했거나 조건이 없으면 0입니다.' }
+        monthlyLimitKrw: { type: number, nullable: true, description: '확인 가능한 원화 월 혜택 한도이며 없거나 계산할 수 없으면 null입니다.' }
+        monthlyUsedKrw: { type: number, description: '현재 월에 확정 사용한 해당 혜택 금액입니다.' }
+        monthlyRemainingKrw: { type: number, nullable: true, description: '확인 가능한 월 잔여 혜택이며 한도를 계산할 수 없으면 null입니다.' }
         performanceMet: { type: boolean, description: '현재 저장된 전월 실적으로 혜택 조건을 충족하는지 여부입니다.' }
+        recommendationReasons:
+          type: array
+          description: '프론트가 추천 이유 문구를 조합할 수 있는 구조화 근거입니다.'
+          items: { $ref: '#/components/schemas/RecommendationReasonResponse' }
+    RecommendationReasonResponse:
+      type: object
+      required: [code, satisfied]
+      properties:
+        code:
+          type: string
+          enum: [MERCHANT_BENEFIT_MATCHED, PREVIOUS_SPEND, MINIMUM_PAYMENT, MONTHLY_LIMIT]
+        satisfied: { type: boolean, description: '현재 확인 가능한 데이터 기준 조건 충족 여부입니다.' }
+        currentValue: { type: number, nullable: true, description: '현재 값이며 확인할 수 없으면 null입니다.' }
+        requiredValue: { type: number, nullable: true, description: '조건 기준값이며 조건이 없으면 null입니다.' }
+        remainingValue: { type: number, nullable: true, description: '조건까지 남은 값이며 계산할 수 없으면 null입니다.' }
     HomeGreetingApiResponse:
       description: '홈 인사와 미사용 월 혜택 한도 조회의 공통 응답입니다.'
       type: object

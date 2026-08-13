@@ -17,6 +17,17 @@
         WHERE m.merchant_id = #{merchantId} AND m.status = 'active'
     </select>
 
+    <select id="findActiveMerchants" resultMap="merchantDetailMap">
+        SELECT m.merchant_id, m.name, mc.merchant_category_id, mc.category_code, mc.category_name
+        FROM merchants m
+        INNER JOIN merchant_categories mc ON mc.merchant_category_id = m.merchant_category_id
+        WHERE m.status = 'active' AND m.merchant_id IN
+        <foreach collection="merchantIds" item="merchantId" open="(" separator="," close=")">
+            #{merchantId}
+        </foreach>
+        ORDER BY m.merchant_id
+    </select>
+
     <select id="findCategoryTarget" resultMap="merchantDetailMap">
         SELECT NULL AS merchant_id, #{placeName} AS name, mc.merchant_category_id,
                mc.category_code, mc.category_name
@@ -43,6 +54,8 @@
             <arg column="previous_spend_min_krw" javaType="java.math.BigDecimal"/>
             <arg column="previous_month_spend_krw" javaType="java.math.BigDecimal"/>
             <arg column="krw_per_reward_unit" javaType="java.math.BigDecimal"/>
+            <arg column="monthly_limit_krw" javaType="java.math.BigDecimal"/>
+            <arg column="monthly_used_krw" javaType="java.math.BigDecimal"/>
             <arg column="rule_id" javaType="java.lang.String"/>
             <arg column="rule_effect" javaType="java.lang.String"/>
             <arg column="valid_from" javaType="java.time.LocalDate"/>
@@ -70,6 +83,32 @@
         SELECT merchant_category_id FROM category_lineage
     </select>
 
+    <resultMap id="merchantCategoryLineageMap"
+               type="com.moca.mocabe.domain.merchant.model.MerchantCategoryLineageRow">
+        <constructor>
+            <arg column="merchant_id" javaType="java.lang.String"/>
+            <arg column="merchant_category_id" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+    <select id="findCategoryLineages" resultMap="merchantCategoryLineageMap">
+        WITH RECURSIVE category_lineage AS (
+            SELECT merchant.merchant_id, category.merchant_category_id, category.parent_id
+            FROM merchants merchant
+            INNER JOIN merchant_categories category
+                ON category.merchant_category_id = merchant.merchant_category_id
+            WHERE merchant.merchant_id IN
+            <foreach collection="merchantIds" item="merchantId" open="(" separator="," close=")">
+                #{merchantId}
+            </foreach>
+            UNION ALL
+            SELECT child.merchant_id, parent.merchant_category_id, parent.parent_id
+            FROM merchant_categories parent
+            INNER JOIN category_lineage child ON child.parent_id = parent.merchant_category_id
+        )
+        SELECT merchant_id, merchant_category_id FROM category_lineage
+        ORDER BY merchant_id, merchant_category_id
+    </select>
+
     <!-- Mapper는 보유 카드의 룰과 대상 데이터를 조회만 한다. 적용 가능 여부는 도메인에서 판정한다. -->
     <select id="findOwnedCardBenefitRules" resultMap="ruleRowMap">
         SELECT #{merchantId} AS merchant_id, #{merchantName} AS merchant_name,
@@ -80,6 +119,28 @@
                r.transaction_min_krw, r.previous_spend_min_krw,
                COALESCE(ps.current_spend_amount, 0) AS previous_month_spend_krw,
                COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) AS krw_per_reward_unit,
+               (SELECT MAX(tier.limit_value) FROM benefit_limit_policies policy
+                INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
+                WHERE policy.offer_id = o.offer_id AND policy.limit_period = 'monthly'
+                  AND policy.limit_type = 'reward_amount' AND policy.limit_unit = 'KRW'
+                  AND (tier.previous_spend_min_krw IS NULL
+                       OR tier.previous_spend_min_krw &lt;= COALESCE(ps.current_spend_amount, 0)))
+                   AS monthly_limit_krw,
+               COALESCE((SELECT SUM(benefit_usage.reward_amount_krw)
+                         FROM user_benefit_usages benefit_usage
+                         WHERE benefit_usage.user_card_id = uc.user_card_id
+                           AND (benefit_usage.offer_id = o.offer_id
+                                OR benefit_usage.limit_policy_id IN (
+                                    SELECT sibling.limit_policy_id
+                                    FROM benefit_limit_policies current_policy
+                                    INNER JOIN benefit_limit_policies sibling
+                                      ON sibling.shared_group_key = current_policy.shared_group_key
+                                    WHERE current_policy.offer_id = o.offer_id
+                                      AND current_policy.shared_group_key IS NOT NULL))
+                           AND benefit_usage.usage_status = 'confirmed'
+                           AND benefit_usage.usage_date &gt;= DATE_FORMAT(#{usageDate}, '%Y-%m-01')
+                           AND benefit_usage.usage_date &lt; DATE_ADD(DATE_FORMAT(#{usageDate}, '%Y-%m-01'),
+                                                           INTERVAL 1 MONTH)), 0) AS monthly_used_krw,
                r.rule_id, r.rule_effect, r.valid_from, r.valid_to,
                t.match_mode, t.target_type,
                t.merchant_category_id AS target_merchant_category_id,
@@ -115,5 +176,73 @@
         )
         ORDER BY uc.display_order, uc.user_card_id, r.priority DESC, r.rule_id,
                  t.condition_group, t.match_mode, t.target_id
+    </select>
+
+    <select id="findOwnedCardBenefitRulesForMerchants" resultMap="ruleRowMap">
+        SELECT merchant.merchant_id, merchant.name AS merchant_name,
+               mc.category_code, mc.category_name,
+               uc.user_card_id, COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
+               i.issuer_name, NULLIF(cv.image_url, '') AS card_image_url,
+               o.offer_name, o.reward_type, r.reward_unit, r.reward_value, r.reward_basis_amount,
+               r.transaction_min_krw, r.previous_spend_min_krw,
+               COALESCE(ps.current_spend_amount, 0) AS previous_month_spend_krw,
+               COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) AS krw_per_reward_unit,
+               (SELECT MAX(tier.limit_value) FROM benefit_limit_policies policy
+                INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
+                WHERE policy.offer_id = o.offer_id AND policy.limit_period = 'monthly'
+                  AND policy.limit_type = 'reward_amount' AND policy.limit_unit = 'KRW'
+                  AND (tier.previous_spend_min_krw IS NULL
+                       OR tier.previous_spend_min_krw &lt;= COALESCE(ps.current_spend_amount, 0)))
+                   AS monthly_limit_krw,
+               COALESCE((SELECT SUM(benefit_usage.reward_amount_krw)
+                         FROM user_benefit_usages benefit_usage
+                         WHERE benefit_usage.user_card_id = uc.user_card_id
+                           AND (benefit_usage.offer_id = o.offer_id
+                                OR benefit_usage.limit_policy_id IN (
+                                    SELECT sibling.limit_policy_id
+                                    FROM benefit_limit_policies current_policy
+                                    INNER JOIN benefit_limit_policies sibling
+                                      ON sibling.shared_group_key = current_policy.shared_group_key
+                                    WHERE current_policy.offer_id = o.offer_id
+                                      AND current_policy.shared_group_key IS NOT NULL))
+                           AND benefit_usage.usage_status = 'confirmed'
+                           AND benefit_usage.usage_date &gt;= DATE_FORMAT(#{usageDate}, '%Y-%m-01')
+                           AND benefit_usage.usage_date &lt; DATE_ADD(DATE_FORMAT(#{usageDate}, '%Y-%m-01'),
+                                                           INTERVAL 1 MONTH)), 0) AS monthly_used_krw,
+               r.rule_id, r.rule_effect, r.valid_from, r.valid_to,
+               t.match_mode, t.target_type,
+               t.merchant_category_id AS target_merchant_category_id,
+               t.merchant_id AS target_merchant_id, t.minimum_place_confidence,
+               EXISTS (SELECT 1 FROM benefit_rule_schedules schedule
+                       WHERE schedule.rule_id = r.rule_id) AS has_schedule,
+               EXISTS (SELECT 1 FROM benefit_offer_option_requirements requirement
+                       WHERE requirement.offer_id = o.offer_id) AS has_option_requirement
+        FROM merchants merchant
+        INNER JOIN merchant_categories mc
+            ON mc.merchant_category_id = merchant.merchant_category_id
+        INNER JOIN user_cards uc ON uc.user_id = #{userId} AND uc.is_active = TRUE
+        INNER JOIN issuers i ON i.issuer_id = uc.issuer_id
+        INNER JOIN card_content_versions cv ON cv.card_id = uc.card_id
+          AND NOT EXISTS (SELECT 1 FROM card_content_versions newer
+                          WHERE newer.card_id = cv.card_id
+                            AND (newer.last_seen_at &gt; cv.last_seen_at OR
+                                (newer.last_seen_at = cv.last_seen_at
+                                 AND newer.content_version_id &gt; cv.content_version_id)))
+        INNER JOIN card_benefits cb ON cb.content_version_id = cv.content_version_id
+        INNER JOIN benefit_offers o ON o.benefit_id = cb.benefit_id
+        INNER JOIN benefit_rules r ON r.offer_id = o.offer_id
+        INNER JOIN benefit_rule_targets t ON t.rule_id = r.rule_id
+        LEFT JOIN user_card_performance_snapshots ps
+          ON ps.user_card_id = uc.user_card_id AND ps.performance_month = #{performanceMonth}
+        LEFT JOIN reward_conversion_policies conversion
+          ON conversion.reward_program_id = o.reward_program_id
+         AND conversion.valid_from &lt;= #{usageDate}
+         AND (conversion.valid_to IS NULL OR conversion.valid_to &gt;= #{usageDate})
+        WHERE merchant.status = 'active' AND merchant.merchant_id IN
+        <foreach collection="merchantIds" item="merchantId" open="(" separator="," close=")">
+            #{merchantId}
+        </foreach>
+        ORDER BY merchant.merchant_id, uc.display_order, uc.user_card_id, r.priority DESC,
+                 r.rule_id, t.condition_group, t.match_mode, t.target_id
     </select>
 </mapper>

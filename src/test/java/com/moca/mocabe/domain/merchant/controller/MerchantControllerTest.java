@@ -13,6 +13,7 @@ import com.moca.mocabe.domain.merchant.dto.MerchantCategoryResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantResponse;
 import com.moca.mocabe.domain.merchant.dto.NearbyMerchantResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationResponse;
+import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationBatchResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantSummaryResponse;
 import com.moca.mocabe.domain.user.type.BenefitPreferenceType;
 import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
@@ -73,6 +74,23 @@ class MerchantControllerTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
 
         assertEquals("MART", response.path("data").path("merchant").path("categoryCode").asText());
+    }
+
+    @Test
+    @DisplayName("목록 카드 추천 API는 여러 가맹점과 결제금액을 서비스에 전달한다")
+    void returnsMerchantCardRecommendationBatch() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn("user-1");
+        when(merchantCardRecommendationService.recommendBatch(
+                "user-1", List.of("m-1", "m-2"), new java.math.BigDecimal("30000")))
+                .thenReturn(new MerchantCardRecommendationBatchResponse(List.of()));
+
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(
+                        get("/merchants/card-recommendations")
+                                .param("merchantIds", "m-1", "m-2")
+                                .param("paymentAmount", "30000"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        assertTrue(response.path("data").path("recommendations").isArray());
     }
 
     @Test

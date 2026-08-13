@@ -140,6 +140,26 @@ CodeRabbit으로 `main`과 `dev` 대상 Pull Request를 한국어로 자동 리�
 
 현재 Swagger 문서는 Spring Boot 자동 설정 없이 정적 OpenAPI 계약을 사용합니다. REST API를 추가하거나 변경하면 `src/main/resources/openapi/openapi.yaml`도 함께 수정해야 합니다.
 
+## 카드 혜택 대상 매칭 운영
+
+카드고릴라의 `target_code`와 `target_name`은 원문 추적용으로 보존하고, 추천 계산은
+`benefit_rule_targets.merchant_category_id` 또는 `merchant_id` FK를 사용합니다. 임의의 기본
+카테고리로 보정하지 않으며, 최종 seed는 미해결 FK가 있으면 적재를 실패시킵니다.
+
+배포 전 아래 진단 결과가 0건인지 확인합니다.
+
+```sql
+SELECT target_type, target_code, target_name, COUNT(*) AS unresolved_count
+FROM benefit_rule_targets
+WHERE (target_type = 'merchant_category' AND merchant_category_id IS NULL)
+   OR (target_type = 'merchant' AND merchant_id IS NULL)
+GROUP BY target_type, target_code, target_name;
+```
+
+Kakao 장소는 `kakao_category_group_registry`와 `kakao_category_maps`의 활성 정책을 사용합니다.
+`benefit_match_policy=ALLOW`이고 최소 신뢰도를 충족한 장소만 추천 계산에 사용하며,
+`is_map_visible=false` 또는 `has_physical_location=false`인 데이터는 지도 검색에서 제외합니다.
+
 ## 라이선스
 
 이 프로젝트는 [MIT License](LICENSE)를 따릅니다.

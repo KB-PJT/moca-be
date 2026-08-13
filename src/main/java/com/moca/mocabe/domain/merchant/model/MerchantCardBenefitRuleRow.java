@@ -10,6 +10,7 @@ public record MerchantCardBenefitRuleRow(
         String offerName, String rewardType, String rewardUnit, BigDecimal rewardValue,
         BigDecimal rewardBasisAmount, BigDecimal transactionMinKrw, BigDecimal previousSpendMinKrw,
         BigDecimal previousMonthSpendKrw, BigDecimal krwPerRewardUnit,
+        BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw,
         String ruleId, String ruleEffect, LocalDate validFrom, LocalDate validTo,
         String matchMode, String targetType, String targetMerchantCategoryId, String targetMerchantId,
         BigDecimal minimumPlaceConfidence, boolean hasSchedule, boolean hasOptionRequirement) {
@@ -20,6 +21,6 @@ public record MerchantCardBenefitRuleRow(
                 userCardId, cardName, issuerName, cardImageUrl,
                 offerName, rewardType, rewardUnit, rewardValue,
                 rewardBasisAmount, transactionMinKrw, previousSpendMinKrw,
-                previousMonthSpendKrw, krwPerRewardUnit);
+                previousMonthSpendKrw, krwPerRewardUnit, monthlyLimitKrw, monthlyUsedKrw);
     }
 }

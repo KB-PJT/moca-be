@@ -57,6 +57,7 @@ class MocaFinalSeedIntegrationTest {
                   + "('benefit_medical_scopes','merchant_category_closure')"));
       assertMapVisibilityFlags(jdbc);
       assertMerchantPhysicalLocationFlags(jdbc);
+      assertRepresentativeRewardTargets(jdbc);
 
       String ruleId = jdbc.queryForObject("SELECT rule_id FROM benefit_rules LIMIT 1", String.class);
       String categoryId =
@@ -76,6 +77,23 @@ class MocaFinalSeedIntegrationTest {
                   categoryId,
                   merchantId));
     }
+  }
+
+  private void assertRepresentativeRewardTargets(JdbcTemplate jdbc) {
+    assertEquals(1, count(jdbc, "SELECT COUNT(*) > 0 FROM benefit_rules rule "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule.offer_id "
+        + "INNER JOIN benefit_rule_targets target ON target.rule_id=rule.rule_id "
+        + "WHERE offer.reward_type='discount' AND (target.merchant_category_id IS NOT NULL "
+        + "OR target.merchant_id IS NOT NULL OR target.target_type='all_merchants')"));
+    assertEquals(1, count(jdbc, "SELECT COUNT(*) > 0 FROM benefit_rules rule "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule.offer_id "
+        + "INNER JOIN benefit_rule_targets target ON target.rule_id=rule.rule_id "
+        + "WHERE offer.reward_type='cashback' AND (target.merchant_category_id IS NOT NULL "
+        + "OR target.merchant_id IS NOT NULL OR target.target_type='all_merchants')"));
+    assertEquals(1, count(jdbc, "SELECT COUNT(*) > 0 FROM benefit_rules rule "
+        + "INNER JOIN benefit_rule_targets target ON target.rule_id=rule.rule_id "
+        + "WHERE rule.reward_unit='point' AND (target.merchant_category_id IS NOT NULL "
+        + "OR target.merchant_id IS NOT NULL OR target.target_type='all_merchants')"));
   }
 
   private DataSource dataSource(MySQLContainer container) {

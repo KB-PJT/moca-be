@@ -1,12 +1,15 @@
 package com.moca.mocabe.domain.merchant.service;
 
 import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationResponse;
+import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationBatchResponse;
 import com.moca.mocabe.domain.merchant.dto.MerchantSummaryResponse;
+import com.moca.mocabe.domain.merchant.dto.RecommendationReasonResponse;
 import com.moca.mocabe.domain.merchant.dto.RankedCardBenefitResponse;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCardRecommendationMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.model.KakaoPlace;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate;
+import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitRuleRow;
 import com.moca.mocabe.domain.merchant.model.MerchantDetailRow;
 import com.moca.mocabe.domain.merchant.model.ResolvedKakaoCategory;
 import com.moca.mocabe.domain.merchant.recommendation.CardBenefitEligibilityEvaluator;
@@ -106,6 +109,49 @@ public class MerchantCardRecommendationService {
         return recommendTarget(userId, category, resolved.confidence(), paymentAmount);
     }
 
+    /** 목록 화면의 여러 가맹점을 세 번의 고정 Mapper 조회로 추천한다. */
+    @Transactional(readOnly = true)
+    public MerchantCardRecommendationBatchResponse recommendBatch(
+            String userId, List<String> merchantIds, BigDecimal paymentAmount) {
+        if (merchantIds == null || merchantIds.isEmpty() || merchantIds.size() > 50
+                || merchantIds.stream().anyMatch(id -> id == null || id.isBlank())) {
+            throw new InvalidMerchantQueryException("merchantIds는 1개 이상 50개 이하여야 합니다.");
+        }
+        List<String> distinctIds = merchantIds.stream().distinct().toList();
+        BigDecimal amount = paymentAmount == null ? DEFAULT_PAYMENT_AMOUNT : paymentAmount;
+        if (amount.signum() <= 0) {
+            throw new InvalidMerchantQueryException("paymentAmount는 0보다 커야 합니다.");
+        }
+        BenefitPreferenceType preference = preference(userId);
+        LocalDate today = LocalDate.now(clock);
+        String performanceMonth = YearMonth.from(today).minusMonths(1).toString();
+        Map<String, MerchantDetailRow> merchants = recommendationMapper.findActiveMerchants(distinctIds)
+                .stream().collect(java.util.stream.Collectors.toMap(MerchantDetailRow::merchantId, row -> row));
+        Map<String, List<String>> lineages = recommendationMapper.findCategoryLineages(distinctIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        com.moca.mocabe.domain.merchant.model.MerchantCategoryLineageRow::merchantId,
+                        java.util.stream.Collectors.mapping(
+                                com.moca.mocabe.domain.merchant.model.MerchantCategoryLineageRow::merchantCategoryId,
+                                java.util.stream.Collectors.toList())));
+        Map<String, List<MerchantCardBenefitRuleRow>> rules = recommendationMapper
+                .findOwnedCardBenefitRulesForMerchants(userId, distinctIds, today, performanceMonth).stream()
+                .collect(java.util.stream.Collectors.groupingBy(MerchantCardBenefitRuleRow::merchantId));
+        List<MerchantCardRecommendationResponse> responses = distinctIds.stream().map(id -> {
+            MerchantDetailRow merchant = merchants.get(id);
+            if (merchant == null) {
+                return new MerchantCardRecommendationResponse(
+                        new MerchantSummaryResponse(id, null, null, null), preference, null, List.of());
+            }
+            List<MerchantCardBenefitCandidate> candidates = eligibilityEvaluator.evaluate(
+                    rules.getOrDefault(id, List.of()), id, lineages.getOrDefault(id, List.of()), null, today);
+            List<RankedCardBenefitResponse> ranked = rank(candidates, amount, preference);
+            return new MerchantCardRecommendationResponse(
+                    new MerchantSummaryResponse(id, merchant.name(), merchant.categoryCode(),
+                            merchant.categoryName()), preference, ranked.isEmpty() ? null : ranked.get(0), ranked);
+        }).toList();
+        return new MerchantCardRecommendationBatchResponse(responses);
+    }
+
     private MerchantCardRecommendationResponse recommendTarget(String userId, MerchantDetailRow merchant,
                                                                BigDecimal placeConfidence,
                                                                BigDecimal paymentAmount) {
@@ -170,13 +216,43 @@ public class MerchantCardRecommendationService {
             ScoredCandidate item = sorted.get(index);
             MerchantCardBenefitCandidate candidate = item.candidate();
             BigDecimal remainingPreviousSpend = remainingPreviousSpend(candidate);
+            BigDecimal monthlyRemaining = monthlyRemaining(candidate);
             result.add(new RankedCardBenefitResponse(index + 1, candidate.userCardId(), candidate.cardName(),
                     candidate.issuerName(), candidate.cardImageUrl(), candidate.offerName(), candidate.rewardType(),
-                    candidate.rewardUnit(), candidate.rewardValue(), item.estimatedValueKrw(),
-                    candidate.previousMonthSpendKrw(), candidate.previousSpendMinKrw(), remainingPreviousSpend,
-                    item.performanceMet()));
+                    candidate.rewardUnit(), candidate.rewardValue(), item.estimatedValueKrw(), paymentAmount,
+                    candidate.transactionMinKrw(), candidate.previousMonthSpendKrw(),
+                    candidate.previousSpendMinKrw(), remainingPreviousSpend, candidate.monthlyLimitKrw(),
+                    candidate.monthlyUsedKrw(), monthlyRemaining, item.performanceMet(),
+                    recommendationReasons(candidate, item.performanceMet(), remainingPreviousSpend,
+                            monthlyRemaining)));
         }
         return List.copyOf(result);
+    }
+
+    private List<RecommendationReasonResponse> recommendationReasons(
+            MerchantCardBenefitCandidate candidate, boolean performanceMet,
+            BigDecimal remainingPreviousSpend, BigDecimal monthlyRemaining) {
+        List<RecommendationReasonResponse> reasons = new ArrayList<>(List.of(
+                new RecommendationReasonResponse("MERCHANT_BENEFIT_MATCHED", true, null, null,
+                        BigDecimal.ZERO),
+                new RecommendationReasonResponse("PREVIOUS_SPEND", performanceMet,
+                        candidate.previousMonthSpendKrw(), candidate.previousSpendMinKrw(),
+                        remainingPreviousSpend),
+                new RecommendationReasonResponse("MINIMUM_PAYMENT", true, null,
+                        candidate.transactionMinKrw(), BigDecimal.ZERO)));
+        if (candidate.monthlyLimitKrw() != null) {
+            reasons.add(new RecommendationReasonResponse("MONTHLY_LIMIT",
+                    monthlyRemaining.signum() > 0, candidate.monthlyUsedKrw(),
+                    candidate.monthlyLimitKrw(), monthlyRemaining));
+        }
+        return List.copyOf(reasons);
+    }
+
+    private BigDecimal monthlyRemaining(MerchantCardBenefitCandidate candidate) {
+        if (candidate.monthlyLimitKrw() == null) {
+            return null;
+        }
+        return candidate.monthlyLimitKrw().subtract(candidate.monthlyUsedKrw()).max(BigDecimal.ZERO);
     }
 
     private BigDecimal estimateValue(MerchantCardBenefitCandidate candidate, BigDecimal paymentAmount) {

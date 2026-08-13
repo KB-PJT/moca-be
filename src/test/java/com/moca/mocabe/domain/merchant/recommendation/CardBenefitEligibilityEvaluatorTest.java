@@ -121,7 +121,7 @@ class CardBenefitEligibilityEvaluatorTest {
         return new MerchantCardBenefitRuleRow(
                 "merchant-1", "이마트", "MART", "마트", "card-1", "카드",
                 "카드사", null, "혜택", rewardType, rewardUnit, rewardValue,
-                null, null, null, BigDecimal.ZERO, BigDecimal.ONE,
+                null, null, null, BigDecimal.ZERO, BigDecimal.ONE, null, BigDecimal.ZERO,
                 ruleId, ruleEffect, validFrom, validTo, matchMode, targetType,
                 targetCategoryId, targetMerchantId, minimumConfidence,
                 hasSchedule, hasOptionRequirement);

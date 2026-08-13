@@ -8,4 +8,5 @@ public record MerchantCardBenefitCandidate(
         String userCardId, String cardName, String issuerName, String cardImageUrl,
         String offerName, String rewardType, String rewardUnit, BigDecimal rewardValue,
         BigDecimal rewardBasisAmount, BigDecimal transactionMinKrw, BigDecimal previousSpendMinKrw,
-        BigDecimal previousMonthSpendKrw, BigDecimal krwPerRewardUnit) { }
+        BigDecimal previousMonthSpendKrw, BigDecimal krwPerRewardUnit,
+        BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw) { }
