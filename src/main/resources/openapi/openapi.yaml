@@ -1851,10 +1851,10 @@ components:
           description: '승인내역에 연결된 가맹점명입니다.'
           type: string
         benefitType:
-          description: '혜택 유형입니다. 여러 유형이 함께 있으면 MULTIPLE, 혜택 계산 내역이 없으면 null입니다.'
+          description: '혜택 유형입니다. MILEAGE는 마일리지이며, 여러 유형이 함께 있으면 MULTIPLE, 혜택 계산 내역이 없으면 null입니다.'
           type: string
           nullable: true
-          enum: [DISCOUNT, CASHBACK, POINT, MULTIPLE]
+          enum: [DISCOUNT, CASHBACK, POINT, MILEAGE, MULTIPLE]
         benefitTitle:
           description: '카드 상품 안내에 정의된 혜택명입니다.'
           type: string

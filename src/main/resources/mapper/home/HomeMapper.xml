@@ -345,10 +345,18 @@
                    MIN(benefit_usage.usage_id) AS benefit_history_id,
                    SUM(benefit_usage.reward_amount_krw) AS benefit_amount,
                    CASE
-                       WHEN COUNT(DISTINCT offer.reward_type) &gt; 1 THEN 'MULTIPLE'
-                       WHEN MAX(offer.reward_type) = 'discount' THEN 'DISCOUNT'
-                       WHEN MAX(offer.reward_type) = 'cashback' THEN 'CASHBACK'
-                       WHEN MAX(offer.reward_type) = 'points' THEN 'POINT'
+                       WHEN COUNT(DISTINCT CASE
+                           WHEN benefit_usage.reward_original_unit = 'mile' THEN 'MILEAGE'
+                           WHEN offer.reward_type = 'discount' THEN 'DISCOUNT'
+                           WHEN offer.reward_type = 'cashback' THEN 'CASHBACK'
+                           WHEN offer.reward_type = 'points' THEN 'POINT'
+                       END) &gt; 1 THEN 'MULTIPLE'
+                       ELSE MAX(CASE
+                           WHEN benefit_usage.reward_original_unit = 'mile' THEN 'MILEAGE'
+                           WHEN offer.reward_type = 'discount' THEN 'DISCOUNT'
+                           WHEN offer.reward_type = 'cashback' THEN 'CASHBACK'
+                           WHEN offer.reward_type = 'points' THEN 'POINT'
+                       END)
                    END AS benefit_type,
                    GROUP_CONCAT(DISTINCT COALESCE(offer.offer_name, benefit.title)
                                 ORDER BY COALESCE(offer.offer_name, benefit.title)
@@ -366,10 +374,18 @@
                    SUM(CASE WHEN outcome.reward_unit = 'KRW'
                             THEN outcome.missed_reward_value ELSE 0 END) AS missed_benefit_amount,
                    CASE
-                       WHEN COUNT(DISTINCT offer.reward_type) &gt; 1 THEN 'MULTIPLE'
-                       WHEN MAX(offer.reward_type) = 'discount' THEN 'DISCOUNT'
-                       WHEN MAX(offer.reward_type) = 'cashback' THEN 'CASHBACK'
-                       WHEN MAX(offer.reward_type) = 'points' THEN 'POINT'
+                       WHEN COUNT(DISTINCT CASE
+                           WHEN outcome.reward_unit = 'mile' THEN 'MILEAGE'
+                           WHEN offer.reward_type = 'discount' THEN 'DISCOUNT'
+                           WHEN offer.reward_type = 'cashback' THEN 'CASHBACK'
+                           WHEN offer.reward_type = 'points' THEN 'POINT'
+                       END) &gt; 1 THEN 'MULTIPLE'
+                       ELSE MAX(CASE
+                           WHEN outcome.reward_unit = 'mile' THEN 'MILEAGE'
+                           WHEN offer.reward_type = 'discount' THEN 'DISCOUNT'
+                           WHEN offer.reward_type = 'cashback' THEN 'CASHBACK'
+                           WHEN offer.reward_type = 'points' THEN 'POINT'
+                       END)
                    END AS benefit_type,
                    GROUP_CONCAT(DISTINCT COALESCE(offer.offer_name, benefit.title)
                                 ORDER BY COALESCE(offer.offer_name, benefit.title)
@@ -395,7 +411,7 @@
                COALESCE(outcome.missed_benefit_amount, 0) AS missed_benefit_amount,
                CASE
                    WHEN benefit_usage.approval_id IS NOT NULL
-                        AND COALESCE(outcome.missed_benefit_amount, 0) &gt; 0
+                        AND outcome.approval_id IS NOT NULL
                        THEN 'PARTIALLY_APPLIED'
                    WHEN benefit_usage.approval_id IS NOT NULL THEN 'APPLIED'
                    WHEN outcome.approval_id IS NOT NULL THEN 'NOT_APPLIED'
