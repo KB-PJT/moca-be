@@ -45,6 +45,11 @@ import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.mapper.WithdrawalRequestMapper;
 import com.moca.mocabe.domain.user.service.UserApplicationService;
+import com.moca.mocabe.domain.notification.mapper.DeviceMapper;
+import com.moca.mocabe.domain.notification.service.DeviceService;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.moca.mocabe.domain.notification.service.UserLocationService;
 import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.domain.home.mapper.HomeMapper;
@@ -67,11 +72,20 @@ import java.util.Locale;
 import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.context.annotation.Lazy;
+import com.moca.mocabe.domain.notification.mapper.NotificationMapper;
+import com.moca.mocabe.domain.notification.service.NotificationService;
+import com.moca.mocabe.domain.notification.service.NotificationScheduler;
+import com.moca.mocabe.domain.notification.service.FcmService;
 import org.springframework.core.env.Environment;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /** 애플리케이션 객체의 생성과 의존성 연결을 한 곳에서 관리한다. */
 @Configuration
+@Import(FirebaseConfig.class)
+@EnableScheduling
 public class AppConfig {
 
     private static final long DEFAULT_CODEF_CONNECT_TIMEOUT_MS = 3_000L;
@@ -87,6 +101,11 @@ public class AppConfig {
     // 이 목록 자체는 환경변수로 재정의할 수 없게 해야 검증의 의미가 있다.
     private static final Set<String> ALLOWED_CODEF_HOSTS =
             Set.of("development.codef.io", "api.codef.io", "oauth.codef.io");
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
 
     @Bean
     public CurrentUserProvider currentUserProvider() {
@@ -111,6 +130,36 @@ public class AppConfig {
     @Bean
     public SupportInquiryService supportInquiryService(SupportInquiryMapper supportInquiryMapper) {
         return new SupportInquiryService(supportInquiryMapper);
+    }
+
+    @Bean
+    public DeviceService deviceService(DeviceMapper deviceMapper) {
+        return new DeviceService(deviceMapper);
+    }
+
+    @Bean
+    public NotificationService notificationService(NotificationMapper notificationMapper,
+                                                   DeviceMapper deviceMapper,
+                                                   @Lazy FcmService fcmService, Clock recommendationClock,
+                                                   UserLocationService userLocationService,
+                                                   MerchantCategoryMapper merchantCategoryMapper,
+                                                   MerchantNearbyQueryService merchantNearbyQueryService,
+                                                   MerchantCardRecommendationService
+                                                           merchantCardRecommendationService) {
+        return new NotificationService(notificationMapper, deviceMapper, fcmService, recommendationClock,
+                userLocationService, merchantCategoryMapper, merchantNearbyQueryService,
+                merchantCardRecommendationService);
+    }
+
+    @Bean
+    public NotificationScheduler notificationScheduler(NotificationService notificationService) {
+        return new NotificationScheduler(notificationService);
+    }
+
+
+    @Bean
+    public UserLocationService userLocationService(StringRedisTemplate redis, ObjectMapper objectMapper) {
+        return new UserLocationService(redis, objectMapper);
     }
 
     @Bean

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.notification.mapper.NotificationMapper">
+  <resultMap id="deadlineMap" type="com.moca.mocabe.domain.notification.model.PerformanceDeadlineCandidate">
+    <constructor><arg column="user_id"/><arg column="user_card_id"/><arg column="card_name"/><arg column="current_spend_amount"/><arg column="required_spend_amount"/></constructor>
+  </resultMap>
+  <select id="findPerformanceDeadlineCandidates" resultMap="deadlineMap">
+    SELECT uc.user_id, uc.user_card_id, COALESCE(cv.name, uc.card_name_from_codef) card_name,
+           COALESCE(ps.current_spend_amount, 0) current_spend_amount,
+           MIN(r.previous_spend_min_krw) required_spend_amount
+    FROM user_cards uc INNER JOIN user_notification_settings ns ON ns.user_id=uc.user_id
+    INNER JOIN card_content_versions cv ON cv.card_id=uc.card_id
+    INNER JOIN card_benefits cb ON cb.content_version_id=cv.content_version_id
+    INNER JOIN benefit_offers o ON o.benefit_id=cb.benefit_id
+    INNER JOIN benefit_rules r ON r.offer_id=o.offer_id
+    LEFT JOIN user_card_performance_snapshots ps ON ps.user_card_id=uc.user_card_id AND ps.performance_month=#{performanceMonth}
+    WHERE uc.is_active=TRUE AND ns.performance_closing_enabled=TRUE AND r.previous_spend_min_krw IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM card_content_versions newer WHERE newer.card_id=cv.card_id AND (newer.last_seen_at>cv.last_seen_at OR (newer.last_seen_at=cv.last_seen_at AND newer.content_version_id>cv.content_version_id)))
+    GROUP BY uc.user_id,uc.user_card_id,cv.name,uc.card_name_from_codef,ps.current_spend_amount
+    HAVING current_spend_amount &lt; required_spend_amount
+  </select>
+  <select id="existsSent" resultType="boolean">SELECT EXISTS(SELECT 1 FROM notification_history WHERE user_id=#{userId} AND notification_type=#{type} AND ((reference_id=#{referenceId}) OR (reference_id IS NULL AND #{referenceId} IS NULL)) AND notification_date=#{date} AND ((time_slot=#{timeSlot}) OR (time_slot IS NULL AND #{timeSlot} IS NULL)) AND status='SENT')</select>
+  <insert id="claimPending">INSERT IGNORE INTO notification_history(notification_history_id,delivery_key,user_id,user_device_id,notification_type,reference_id,time_slot,notification_date,title,body,status,created_at,updated_at) VALUES(#{historyId},#{deliveryKey},#{userId},#{deviceId},#{type},#{referenceId},#{timeSlot},#{date},#{title},#{body},#{status},UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))</insert>
+  <update id="updateHistory">UPDATE notification_history SET status=#{status},fcm_message_id=#{messageId},error_message=#{errorMessage},sent_at=<choose><when test="status == 'SENT'">UTC_TIMESTAMP(6)</when><otherwise>NULL</otherwise></choose>,updated_at=UTC_TIMESTAMP(6) WHERE notification_history_id=#{historyId}</update>
+</mapper>

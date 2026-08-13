@@ -7,6 +7,7 @@ import org.flywaydb.core.Flyway;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.annotation.MapperScan;
+import org.apache.ibatis.annotations.Mapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
@@ -19,7 +20,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 /** MyBatis와 MySQL을 연결하는 Legacy Spring 설정이다. */
 @Configuration
 @EnableTransactionManagement
-@MapperScan(basePackages = "com.moca.mocabe.domain")
+@MapperScan(basePackages = "com.moca.mocabe.domain", annotationClass = Mapper.class)
 @PropertySource(value = "file:${MOCA_ENV_FILE:.env}", ignoreResourceNotFound = true)
 public class PersistenceConfig {
 

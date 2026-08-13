@@ -1,0 +1,41 @@
+CREATE TABLE user_devices (
+    user_device_id CHAR(36) NOT NULL,
+    user_id CHAR(36) NOT NULL,
+    fcm_token VARCHAR(2048) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    device_type VARCHAR(20) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_token_updated_at DATETIME(6) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (user_device_id),
+    CONSTRAINT uk_user_devices_fcm_token UNIQUE (fcm_token),
+    CONSTRAINT fk_user_devices_user FOREIGN KEY (user_id) REFERENCES users (user_id),
+    CONSTRAINT chk_user_devices_type CHECK (device_type IN ('WEB', 'ANDROID', 'IOS')),
+    INDEX idx_user_devices_user_active (user_id, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE notification_history (
+    notification_history_id CHAR(36) NOT NULL,
+    user_id CHAR(36) NOT NULL,
+    user_device_id CHAR(36) NOT NULL,
+    notification_type VARCHAR(40) NOT NULL,
+    reference_id CHAR(36) NULL,
+    time_slot VARCHAR(20) NULL,
+    notification_date DATE NOT NULL,
+    delivery_key CHAR(64) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    body VARCHAR(500) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    fcm_message_id VARCHAR(255) NULL,
+    error_message VARCHAR(1000) NULL,
+    sent_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (notification_history_id),
+    CONSTRAINT fk_notification_history_user FOREIGN KEY (user_id) REFERENCES users (user_id),
+    CONSTRAINT fk_notification_history_device FOREIGN KEY (user_device_id) REFERENCES user_devices (user_device_id),
+    CONSTRAINT chk_notification_history_type CHECK (notification_type IN ('PERFORMANCE_DEADLINE', 'TIME_BASED_BENEFIT')),
+    CONSTRAINT chk_notification_history_status CHECK (status IN ('PENDING', 'SENT', 'FAILED')),
+    CONSTRAINT uk_notification_history_delivery_key UNIQUE (delivery_key),
+    INDEX idx_notification_history_dedup (user_id, notification_type, reference_id, notification_date, time_slot, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

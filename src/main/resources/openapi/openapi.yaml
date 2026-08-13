@@ -32,6 +32,42 @@ tags:
   - name: Health
     description: 서버 상태 확인
 paths:
+  /devices:
+    post:
+      tags: [Notification]
+      summary: FCM 디바이스 토큰 등록
+      description: 인증 사용자의 FCM 토큰을 등록하거나 기존 토큰을 활성화합니다.
+      operationId: registerDevice
+      security: [{ MocaBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceRequest' }
+      responses:
+        '200':
+          description: 토큰 등록 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/AuthenticationError' }
+  /users/me/location:
+    put:
+      tags: [Notification]
+      summary: 최근 사용자 위치 갱신
+      description: 위치 기반 알림 판단용 위치를 Redis에 30분간 저장합니다.
+      operationId: updateUserLocation
+      security: [{ MocaBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateLocationRequest' }
+      responses:
+        '200': { description: 위치 저장 성공 }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/AuthenticationError' }
   /health:
     get:
       tags: [Health]
@@ -1520,6 +1556,30 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    RegisterDeviceRequest:
+      type: object
+      required: [fcmToken, deviceType]
+      properties:
+        fcmToken: { type: string, description: Firebase Cloud Messaging 토큰 }
+        deviceType: { type: string, enum: [WEB, ANDROID, IOS] }
+    DeviceApiResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/DeviceResponse' }
+    DeviceResponse:
+      type: object
+      required: [userDeviceId, deviceType, active]
+      properties:
+        userDeviceId: { type: string, format: uuid }
+        deviceType: { type: string, enum: [WEB, ANDROID, IOS] }
+        active: { type: boolean }
+    UpdateLocationRequest:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
     MerchantCategoriesApiResponse:
       description: 'MerchantCategories API의 공통 성공 응답입니다.'
       type: object

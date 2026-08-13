@@ -22,6 +22,8 @@ ext {
     lombokVersion = '1.18.46'
     testcontainersVersion = '2.0.5'
     flywayVersion = '12.10.0'
+    slf4jVersion = '2.0.17'
+    logbackVersion = '1.5.18'
 }
 
 java {
@@ -58,7 +60,8 @@ dependencies {
     implementation("org.springframework.security:spring-security-core:${springSecurityVersion}")
     implementation("org.springframework.security:spring-security-config:${springSecurityVersion}")
     implementation("org.springframework.security:spring-security-web:${springSecurityVersion}")
-    implementation('ch.qos.logback:logback-classic:1.2.13')
+    implementation("org.slf4j:slf4j-api:${slf4jVersion}")
+    implementation("ch.qos.logback:logback-classic:${logbackVersion}")
     implementation('org.springframework.data:spring-data-redis:2.7.18')
     implementation('io.lettuce:lettuce-core:6.1.10.RELEASE')
     implementation('com.zaxxer:HikariCP:5.1.0')
@@ -70,6 +73,7 @@ dependencies {
     implementation('org.glassfish:javax.el:3.0.1-b12')
     implementation("com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
     implementation("org.webjars:swagger-ui:${swaggerUiVersion}")
+    implementation('com.google.firebase:firebase-admin:9.4.3')
 
     compileOnly("org.projectlombok:lombok:${lombokVersion}")
     annotationProcessor("org.projectlombok:lombok:${lombokVersion}")

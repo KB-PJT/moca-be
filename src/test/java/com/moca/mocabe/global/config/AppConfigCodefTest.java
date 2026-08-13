@@ -1,6 +1,7 @@
 package com.moca.mocabe.global.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.moca.mocabe.domain.codef.infra.CodefHttpClient;
@@ -13,6 +14,12 @@ import org.springframework.mock.env.MockEnvironment;
 class AppConfigCodefTest {
 
     private final AppConfig appConfig = new AppConfig();
+
+    @Test
+    @DisplayName("루트 컨텍스트에서 사용할 JSON 매퍼를 제공한다")
+    void providesObjectMapper() {
+        assertNotNull(appConfig.objectMapper());
+    }
 
     @Test
     @DisplayName("CODEF 기본 URL이 없으면 클라이언트 조립에 실패한다")

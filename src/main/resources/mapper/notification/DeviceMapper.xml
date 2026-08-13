@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.notification.mapper.DeviceMapper">
+  <resultMap id="deviceMap" type="com.moca.mocabe.domain.notification.model.UserDevice">
+    <constructor><arg column="user_device_id"/><arg column="user_id"/><arg column="fcm_token"/><arg column="device_type"/></constructor>
+  </resultMap>
+  <select id="findByToken" resultMap="deviceMap">SELECT user_device_id,user_id,fcm_token,device_type FROM user_devices WHERE fcm_token=#{fcmToken}</select>
+  <insert id="insert">INSERT INTO user_devices(user_device_id,user_id,fcm_token,device_type,is_active,last_token_updated_at,created_at,updated_at) VALUES(#{deviceId},#{userId},#{fcmToken},#{deviceType},TRUE,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))</insert>
+  <update id="activate">UPDATE user_devices SET user_id=#{userId},device_type=#{deviceType},is_active=TRUE,last_token_updated_at=UTC_TIMESTAMP(6),updated_at=UTC_TIMESTAMP(6) WHERE user_device_id=#{deviceId}</update>
+  <update id="deactivate">UPDATE user_devices SET is_active=FALSE,updated_at=UTC_TIMESTAMP(6) WHERE user_device_id=#{deviceId} AND user_id=#{userId}</update>
+  <select id="findActiveByUserId" resultMap="deviceMap">SELECT user_device_id,user_id,fcm_token,device_type FROM user_devices WHERE user_id=#{userId} AND is_active=TRUE</select>
+  <select id="findActiveNearbyBenefitDevices" resultMap="deviceMap">SELECT d.user_device_id,d.user_id,d.fcm_token,d.device_type FROM user_devices d INNER JOIN user_notification_settings s ON s.user_id=d.user_id WHERE d.is_active=TRUE AND s.nearby_benefit_enabled=TRUE</select>
+</mapper>
