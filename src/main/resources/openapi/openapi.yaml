@@ -29,9 +29,55 @@ tags:
     description: 가맹점 카테고리 조회
   - name: Support
     description: 인증 사용자의 문의 등록
+  - name: Notification
+    description: 인증 사용자의 FCM 디바이스 토큰과 위치 기반 알림용 최근 위치 관리
   - name: Health
     description: 서버 상태 확인
 paths:
+  /devices:
+    post:
+      tags: [Notification]
+      summary: FCM 디바이스 토큰 등록
+      description: |
+        인증 사용자의 FCM 토큰을 등록하거나 기존 토큰의 소유자·기기 유형을 갱신하고 활성화합니다.
+        사용자 식별자는 요청에서 받지 않고 opaque access token의 인증 정보만 사용합니다.
+      operationId: registerDevice
+      security: [{ MocaBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceRequest' }
+      responses:
+        '200':
+          description: 토큰 등록 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/AuthenticationError' }
+  /users/me/location:
+    put:
+      tags: [Notification]
+      summary: 최근 사용자 위치 갱신
+      description: |
+        인증 사용자의 위치 기반 알림 판단용 최근 위치를 Redis에 30분간 저장합니다.
+        TTL이 만료되면 점심·저녁 주변 혜택 알림 대상에서 제외되며, 사용자 식별자는 인증 정보만 사용합니다.
+      operationId: updateUserLocation
+      security: [{ MocaBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateLocationRequest' }
+      responses:
+        '200':
+          description: 최근 위치 저장 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BooleanApiResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/AuthenticationError' }
   /health:
     get:
       tags: [Health]
@@ -1520,6 +1566,47 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    RegisterDeviceRequest:
+      description: 인증 사용자에게 연결할 Firebase Cloud Messaging 디바이스 정보입니다.
+      type: object
+      required: [fcmToken, deviceType]
+      properties:
+        fcmToken:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          pattern: '.*\S.*'
+          description: Firebase가 발급한 원문 디바이스 토큰이며 로그에 기록하지 않습니다.
+        deviceType:
+          type: string
+          enum: [WEB, ANDROID, IOS]
+          description: 토큰이 발급된 클라이언트 플랫폼입니다.
+    DeviceApiResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/DeviceResponse' }
+    DeviceResponse:
+      type: object
+      required: [userDeviceId, deviceType, active]
+      properties:
+        userDeviceId: { type: string, format: uuid }
+        deviceType: { type: string, enum: [WEB, ANDROID, IOS] }
+        active: { type: boolean }
+    UpdateLocationRequest:
+      description: 위치 기반 알림에 사용할 WGS84 최근 좌표입니다.
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number, minimum: -90, maximum: 90, description: WGS84 위도입니다. }
+        longitude: { type: number, minimum: -180, maximum: 180, description: WGS84 경도입니다. }
+    BooleanApiResponse:
+      description: Boolean 결과를 반환하는 공통 성공 응답입니다.
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, example: true }
+        data: { type: boolean, example: true }
     MerchantCategoriesApiResponse:
       description: 'MerchantCategories API의 공통 성공 응답입니다.'
       type: object

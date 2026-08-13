@@ -98,6 +98,31 @@ export MOCA_ENV_FILE='/absolute/path/to/moca-be/.env'
 주입하는 방식을 권장합니다. `MOCA_REFRESH_COOKIE_SECURE`는 local HTTP에서는 `false`, HTTPS 배포에서는
 반드시 `true`로 설정합니다.
 
+### Firebase Cloud Messaging 운영 설정
+
+Firebase 서비스 계정 JSON은 저장소, Docker 이미지, WAR에 포함하지 않습니다. 외부 Tomcat으로 실행할 때는
+Tomcat 프로세스만 읽을 수 있는 프로젝트 외부 경로에 파일을 두고 `$CATALINA_BASE/bin/setenv.sh`에서
+Application Default Credentials 경로를 지정합니다.
+
+```sh
+export GOOGLE_APPLICATION_CREDENTIALS='/absolute/secret/path/firebase-service-account.json'
+```
+
+Docker 배포에서는 호스트의 서비스 계정 JSON 절대 경로를 Compose 보간 변수로 전달합니다.
+`docker-compose.prod.yml`은 파일을 읽기 전용으로 `/run/secrets/firebase-service-account.json`에 마운트하고,
+컨테이너의 `GOOGLE_APPLICATION_CREDENTIALS`를 이 경로로 고정합니다.
+
+```sh
+export MOCA_IMAGE='ghcr.io/example/moca-be:tag'
+export MOCA_FIREBASE_CREDENTIALS_FILE='/home/ec2-user/moca/secrets/firebase-service-account.json'
+docker compose --env-file /home/ec2-user/moca/.env -f docker-compose.prod.yml up -d
+```
+
+서비스 계정 파일은 Git에 추가하지 말고 소유자 읽기 권한만 허용합니다. Firebase 자격정보가 없거나 잘못되면
+서버 기동은 계속되지만 실제 알림 발송 시 해당 발송 이력이 `FAILED`로 기록됩니다. 운영 배포 후 테스트 사용자와
+실제 FCM 토큰으로 수신을 확인하고, 만료 토큰의 비활성화와 다음 사용자 발송 지속 여부를 로그와
+`notification_history`에서 점검합니다.
+
 ## 테스트와 커버리지
 
 ```bash
