@@ -2,9 +2,10 @@ package com.moca.mocabe.domain.home.model;
 
 import java.time.LocalDateTime;
 
-/** 최근 확정 혜택 한 건의 MyBatis 조회 결과다. */
-public class RecentBenefitRow {
+/** 최근 결제 승인 한 건과 혜택 계산 요약의 MyBatis 조회 결과다. */
+public class RecentHistoryRow {
 
+  private String approvalId;
   private String benefitHistoryId;
   private String merchantName;
   private String benefitType;
@@ -12,7 +13,18 @@ public class RecentBenefitRow {
   private String cardName;
   private long paymentAmount;
   private long benefitAmount;
+  private long missedBenefitAmount;
+  private String calculationStatus;
+  private String rejectionReason;
   private LocalDateTime occurredAt;
+
+  public String getApprovalId() {
+    return approvalId;
+  }
+
+  public void setApprovalId(String approvalId) {
+    this.approvalId = approvalId;
+  }
 
   public String getBenefitHistoryId() {
     return benefitHistoryId;
@@ -68,6 +80,30 @@ public class RecentBenefitRow {
 
   public void setBenefitAmount(long benefitAmount) {
     this.benefitAmount = benefitAmount;
+  }
+
+  public long getMissedBenefitAmount() {
+    return missedBenefitAmount;
+  }
+
+  public void setMissedBenefitAmount(long missedBenefitAmount) {
+    this.missedBenefitAmount = missedBenefitAmount;
+  }
+
+  public String getCalculationStatus() {
+    return calculationStatus;
+  }
+
+  public void setCalculationStatus(String calculationStatus) {
+    this.calculationStatus = calculationStatus;
+  }
+
+  public String getRejectionReason() {
+    return rejectionReason;
+  }
+
+  public void setRejectionReason(String rejectionReason) {
+    this.rejectionReason = rejectionReason;
   }
 
   public LocalDateTime getOccurredAt() {

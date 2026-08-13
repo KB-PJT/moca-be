@@ -12,6 +12,9 @@ public class BenefitHistoryItemResponse {
   private final String userCardId;
   private final String cardName;
   private final String calculationStatus;
+  private final long missedBenefitAmount;
+  private final String rejectionReason;
+  private final PerformanceShortfallResponse performanceShortfall;
 
   public BenefitHistoryItemResponse(
       String id,
@@ -23,7 +26,10 @@ public class BenefitHistoryItemResponse {
       String title,
       String cardId,
       String cardName,
-      String status) {
+      String status,
+      long missedBenefit,
+      String rejectionReason,
+      PerformanceShortfallResponse performanceShortfall) {
     this.benefitHistoryId = id;
     this.merchantName = merchant;
     this.approvedAt = approvedAt;
@@ -34,6 +40,9 @@ public class BenefitHistoryItemResponse {
     this.userCardId = cardId;
     this.cardName = cardName;
     this.calculationStatus = status;
+    this.missedBenefitAmount = missedBenefit;
+    this.rejectionReason = rejectionReason;
+    this.performanceShortfall = performanceShortfall;
   }
 
   public String getBenefitHistoryId() {
@@ -74,5 +83,17 @@ public class BenefitHistoryItemResponse {
 
   public String getCalculationStatus() {
     return calculationStatus;
+  }
+
+  public long getMissedBenefitAmount() {
+    return missedBenefitAmount;
+  }
+
+  public String getRejectionReason() {
+    return rejectionReason;
+  }
+
+  public PerformanceShortfallResponse getPerformanceShortfall() {
+    return performanceShortfall;
   }
 }

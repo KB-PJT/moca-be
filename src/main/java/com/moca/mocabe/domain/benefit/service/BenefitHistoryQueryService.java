@@ -6,6 +6,7 @@ import com.moca.mocabe.domain.benefit.dto.BenefitHistoryMetaResponse;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistoryResponse;
 import com.moca.mocabe.domain.benefit.dto.BenefitHistorySummaryResponse;
 import com.moca.mocabe.domain.benefit.dto.MonthlyLimitResponse;
+import com.moca.mocabe.domain.benefit.dto.PerformanceShortfallResponse;
 import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryDetailRow;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
@@ -97,7 +98,10 @@ public class BenefitHistoryQueryService {
         row.getBenefitType(),
         row.getBenefitTitle(),
         new MonthlyLimitResponse(used, limit, Math.max(0, limit - used)),
-        row.getEarnedMileage());
+        row.getEarnedMileage(),
+        row.getMissedBenefitAmount(),
+        row.getRejectionReason(),
+        performanceShortfall(row));
   }
 
   private BenefitHistoryItemResponse toItem(BenefitHistoryRow row) {
@@ -111,7 +115,20 @@ public class BenefitHistoryQueryService {
         row.getBenefitTitle(),
         row.getUserCardId(),
         row.getCardName(),
-        row.getCalculationStatus());
+        row.getCalculationStatus(),
+        row.getMissedBenefitAmount(),
+        row.getRejectionReason(),
+        performanceShortfall(row));
+  }
+
+  private PerformanceShortfallResponse performanceShortfall(BenefitHistoryRow row) {
+    if (!"PERFORMANCE_NOT_MET".equals(row.getRejectionReason())
+        || row.getRequiredPreviousSpendAmount() == null) {
+      return null;
+    }
+    long required = row.getRequiredPreviousSpendAmount();
+    long achieved = row.getPreviousMonthSpendAmount() == null ? 0 : row.getPreviousMonthSpendAmount();
+    return new PerformanceShortfallResponse(required, achieved, Math.max(0, required - achieved));
   }
 
   private String format(LocalDateTime value) {

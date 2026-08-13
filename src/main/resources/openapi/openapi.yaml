@@ -106,16 +106,17 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/AuthenticationError'
-  /home/recent-benefits:
+  /home/recent-history:
     get:
       tags: [Home]
-      summary: 홈 최근 혜택 내역 조회
+      summary: 홈 최근 전체 결제 내역 조회
       description: |
-        인증 사용자의 기준 월 확정 혜택 중 최근 내역을 승인 시각 내림차순으로 반환합니다.
-        `data.benefits`의 각 항목에는 혜택 이력 식별자, 가맹점·카드명, 결제금액, 혜택 유형·금액과 발생 시각이 담깁니다.
+        인증 사용자의 기준 월 카드 결제 승인 전체에서 최근 내역을 승인 시각 내림차순으로 반환합니다.
+        혜택이 적용되지 않았거나 계산 결과가 없는 승인도 제외하지 않습니다.
+        `calculationStatus`로 적용·부분 적용·미적용·미계산을 구분하며, 혜택이 없으면 혜택 관련 필드는 null 또는 0입니다.
         yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하고, limit을 생략하면 최대 5건을 반환합니다.
-        확정 혜택이 없으면 `benefits`는 빈 배열입니다.
-      operationId: getHomeRecentBenefits
+        승인내역이 없으면 `history`는 빈 배열입니다.
+      operationId: getHomeRecentHistory
       security:
         - MocaBearerAuth: []
       parameters:
@@ -131,11 +132,11 @@ paths:
             default: 5
       responses:
         '200':
-          description: 최근 혜택 내역
+          description: 최근 전체 결제 내역
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RecentBenefitsApiResponse'
+                $ref: '#/components/schemas/RecentHistoryApiResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -145,9 +146,9 @@ paths:
       tags: [Benefit]
       summary: 혜택 내역 목록 조회
       description: |
-        인증 사용자의 확정 할인·캐시백·포인트·마일리지 이력을 페이지 단위로 반환합니다.
+        인증 사용자의 확정 할인·캐시백·포인트·마일리지 이력과 전월 실적 미충족으로 받지 못한 혜택을 페이지 단위로 반환합니다.
         보유카드와 혜택 유형으로 필터링할 수 있고, 최신 승인순 또는 혜택 금액순으로 정렬할 수 있습니다.
-        `data.data`에는 승인·가맹점·카드·혜택 정보가, `data.summary`에는 월·카드 조건의 유형별 합계가,
+        `data.data`에는 승인·가맹점·카드·혜택 및 실적 부족 정보가, `data.summary`에는 실제 확정 혜택의 월·카드 조건별 합계가,
         `data.meta`에는 페이지 번호·크기·전체 건수·다음 페이지 여부가 담깁니다.
         yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하며, 조회 결과가 없으면 목록은 빈 배열입니다.
       operationId: getBenefitHistory
@@ -188,8 +189,9 @@ paths:
       tags: [Benefit]
       summary: 혜택 내역 상세 조회
       description: |
-        로그인 사용자의 확정 혜택 한 건을 조회합니다. 승인 시각·가맹점·카드·결제금액·혜택 유형과 금액을 반환하고,
+        로그인 사용자의 확정 혜택 또는 전월 실적 미충족 혜택 한 건을 조회합니다. 승인 시각·가맹점·카드·결제금액·혜택 유형과 금액을 반환하고,
         `monthlyLimit`에는 해당 혜택의 월 한도 사용액·전체 한도·잔여 한도가 담깁니다.
+        실적 미충족 건은 `missedBenefitAmount`, `rejectionReason`, `performanceShortfall`을 제공하며 실제 적용 혜택은 0입니다.
         마일리지 적립 건만 `earnedMileage`가 값으로 제공되고 그 외에는 null이며, 다른 사용자의 이력은 조회할 수 없습니다.
       operationId: getBenefitHistoryDetail
       security:
@@ -1810,8 +1812,8 @@ components:
           description: 목표 실적까지 남은 인정 실적 금액입니다. 이미 달성했으면 0입니다.
           type: integer
           format: int64
-    RecentBenefitsApiResponse:
-      description: 'RecentBenefits API의 공통 성공 응답입니다.'
+    RecentHistoryApiResponse:
+      description: 'RecentHistory API의 공통 성공 응답입니다.'
       type: object
       properties:
         success:
@@ -1820,37 +1822,43 @@ components:
           example: true
         data:
           description: 'API의 실제 처리 결과입니다.'
-          $ref: '#/components/schemas/RecentBenefitsResponse'
-    RecentBenefitsResponse:
-      description: '홈 화면에 표시할 최근 확정 혜택 목록입니다.'
+          $ref: '#/components/schemas/RecentHistoryResponse'
+    RecentHistoryResponse:
+      description: '홈 화면에 표시할 최근 전체 결제 내역입니다.'
       type: object
-      required: [benefits]
+      required: [history]
       properties:
-        benefits:
-          description: '조건에 해당하는 혜택 목록입니다. 내역이 없으면 빈 배열입니다.'
+        history:
+          description: '조건에 해당하는 결제 승인 목록입니다. 내역이 없으면 빈 배열입니다.'
           type: array
           maxItems: 5
           items:
-            $ref: '#/components/schemas/RecentBenefitItemResponse'
-    RecentBenefitItemResponse:
-      description: '홈에 표시할 최근 확정 혜택 한 건입니다.'
+            $ref: '#/components/schemas/RecentHistoryItemResponse'
+    RecentHistoryItemResponse:
+      description: '홈에 표시할 최근 결제 승인과 혜택 계산 요약 한 건입니다.'
       type: object
-      required: [benefitHistoryId, merchantName, benefitType, benefitTitle, cardName,
-                 paymentAmount, benefitAmount, occurredAt]
+      required: [approvalId, merchantName, cardName, paymentAmount, benefitAmount,
+                 missedBenefitAmount, calculationStatus, occurredAt]
       properties:
-        benefitHistoryId:
-          description: '확정 혜택 이력의 식별자입니다.'
+        approvalId:
+          description: '결제 승인 식별자입니다.'
           type: string
+        benefitHistoryId:
+          description: '대표 혜택 적용 또는 계산 결과 식별자입니다. 계산 내역이 없으면 null입니다.'
+          type: string
+          nullable: true
         merchantName:
           description: '승인내역에 연결된 가맹점명입니다.'
           type: string
         benefitType:
-          description: '혜택 유형입니다. DISCOUNT는 할인, CASHBACK은 캐시백, POINT는 포인트입니다.'
+          description: '혜택 유형입니다. MILEAGE는 마일리지이며, 여러 유형이 함께 있으면 MULTIPLE, 혜택 계산 내역이 없으면 null입니다.'
           type: string
-          enum: [DISCOUNT, CASHBACK, POINT]
+          nullable: true
+          enum: [DISCOUNT, CASHBACK, POINT, MILEAGE, MULTIPLE]
         benefitTitle:
           description: '카드 상품 안내에 정의된 혜택명입니다.'
           type: string
+          nullable: true
         cardName:
           description: '카드 상품명입니다.'
           type: string
@@ -1859,11 +1867,23 @@ components:
           type: integer
           format: int64
         benefitAmount:
-          description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'
+          description: '해당 승인에 실제 적용된 원화 환산 혜택 합계입니다. 적용 혜택이 없으면 0입니다.'
           type: integer
           format: int64
+        missedBenefitAmount:
+          description: '해당 승인에서 적용되지 못한 원화 혜택 합계입니다. 포인트·마일 단위는 합산하지 않습니다.'
+          type: integer
+          format: int64
+        calculationStatus:
+          description: '혜택 계산 상태입니다.'
+          type: string
+          enum: [APPLIED, PARTIALLY_APPLIED, NOT_APPLIED, NOT_CALCULATED]
+        rejectionReason:
+          description: '미적용 또는 부분 적용 사유입니다. 여러 사유는 쉼표로 구분하고 없으면 null입니다.'
+          type: string
+          nullable: true
         occurredAt:
-          description: '혜택이 발생한 승인 시각입니다.'
+          description: '결제 승인 시각입니다.'
           type: string
           format: date-time
     BenefitHistoryApiResponse:
@@ -1873,7 +1893,7 @@ components:
         success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/BenefitHistoryResponse' }
     BenefitHistoryResponse:
-      description: '조회 조건에 맞는 확정 혜택 목록과 페이지 정보입니다.'
+      description: '조회 조건에 맞는 확정 혜택과 전월 실적 미충족 혜택 목록 및 페이지 정보입니다.'
       type: object
       required: [data, summary, meta]
       properties:
@@ -1894,20 +1914,23 @@ components:
         pointAmount: { type: integer, format: int64, description: '적립 포인트의 합계입니다. 단위는 포인트입니다.' }
         mileageAmount: { type: integer, format: int64, description: '적립 마일리지의 합계입니다. 단위는 마일입니다.' }
     BenefitHistoryItemResponse:
-      description: '혜택 이력 목록에 표시할 확정 혜택 한 건입니다.'
+      description: '혜택 이력 목록에 표시할 확정 또는 전월 실적 미충족 혜택 한 건입니다.'
       type: object
-      required: [benefitHistoryId, merchantName, approvedAt, paymentAmount, benefitAmount, benefitType, benefitTitle, userCardId, cardName, calculationStatus]
+      required: [benefitHistoryId, merchantName, approvedAt, paymentAmount, benefitAmount, missedBenefitAmount, benefitType, benefitTitle, userCardId, cardName, calculationStatus]
       properties:
         benefitHistoryId: { type: string, format: uuid , description: '확정 혜택 이력의 식별자입니다.'}
         merchantName: { type: string , description: '승인내역에 연결된 가맹점명입니다.'}
         approvedAt: { type: string, format: date-time , description: '카드 승인이 발생한 시각입니다.'}
         paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
         benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
+        missedBenefitAmount: { type: integer, format: int64, description: '전월 실적 미충족으로 받지 못한 예상 혜택입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위입니다.' }
         benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE] , description: '혜택 유형입니다. DISCOUNT는 할인, CASHBACK은 캐시백, POINT는 포인트, MILEAGE는 마일리지입니다.'}
         benefitTitle: { type: string , description: '카드 상품 안내에 정의된 혜택명입니다.'}
         userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
         cardName: { type: string , description: '카드 상품명과 저장된 마스킹 카드번호를 공백으로 연결한 표시명입니다. 카드번호가 없으면 상품명만 반환합니다.'}
-        calculationStatus: { type: string, enum: [APPLIED] , description: '혜택 계산 상태입니다.'}
+        calculationStatus: { type: string, enum: [APPLIED, NOT_APPLIED], description: 'APPLIED는 실제 적용, NOT_APPLIED는 전월 실적 미충족으로 미적용된 상태입니다.' }
+        rejectionReason: { type: string, enum: [PERFORMANCE_NOT_MET], nullable: true, description: '미적용 사유입니다. 적용 건은 null입니다.' }
+        performanceShortfall: { $ref: '#/components/schemas/PerformanceShortfallResponse' }
     BenefitHistoryMetaResponse:
       description: '혜택 이력 목록의 페이지 번호·크기·전체 건수·다음 페이지 여부입니다.'
       type: object
@@ -1924,21 +1947,33 @@ components:
         success: { type: boolean, example: true , description: '요청 처리 성공 여부입니다.'}
         data: { $ref: '#/components/schemas/BenefitHistoryDetailResponse' }
     BenefitHistoryDetailResponse:
-      description: '확정 혜택 한 건의 승인·혜택·월 한도 상세 정보입니다.'
+      description: '확정 또는 전월 실적 미충족 혜택 한 건의 승인·혜택·월 한도·실적 부족 상세 정보입니다.'
       type: object
-      required: [benefitHistoryId, calculationStatus, merchantName, approvedAt, cardName, paymentAmount, benefitAmount, benefitType, benefitTitle, monthlyLimit]
+      required: [benefitHistoryId, calculationStatus, merchantName, approvedAt, cardName, paymentAmount, benefitAmount, missedBenefitAmount, benefitType, benefitTitle, monthlyLimit]
       properties:
         benefitHistoryId: { type: string, format: uuid , description: '확정 혜택 이력의 식별자입니다.'}
-        calculationStatus: { type: string, enum: [APPLIED] , description: '혜택 계산 상태입니다.'}
+        calculationStatus: { type: string, enum: [APPLIED, NOT_APPLIED], description: 'APPLIED는 실제 적용, NOT_APPLIED는 전월 실적 미충족으로 미적용된 상태입니다.' }
         merchantName: { type: string , description: '승인내역에 연결된 가맹점명입니다.'}
         approvedAt: { type: string, format: date-time , description: '카드 승인이 발생한 시각입니다.'}
         cardName: { type: string , description: '카드 상품명과 저장된 마스킹 카드번호를 공백으로 연결한 표시명입니다. 카드번호가 없으면 상품명만 반환합니다.'}
         paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
         benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
+        missedBenefitAmount: { type: integer, format: int64, description: '전월 실적 미충족으로 받지 못한 예상 혜택입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위입니다.' }
         benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE] , description: '혜택 유형입니다. DISCOUNT는 할인, CASHBACK은 캐시백, POINT는 포인트, MILEAGE는 마일리지입니다.'}
         benefitTitle: { type: string , description: '카드 상품 안내에 정의된 혜택명입니다.'}
         monthlyLimit: { $ref: '#/components/schemas/MonthlyLimitResponse' }
         earnedMileage: { type: integer, format: int64, nullable: true, description: 마일리지 적립 건에서만 반환 }
+        rejectionReason: { type: string, enum: [PERFORMANCE_NOT_MET], nullable: true, description: '미적용 사유입니다. 적용 건은 null입니다.' }
+        performanceShortfall: { $ref: '#/components/schemas/PerformanceShortfallResponse' }
+    PerformanceShortfallResponse:
+      description: '전월 실적 미충족 건의 필요 실적·달성 실적·부족 실적입니다. 적용 건에서는 null입니다.'
+      type: object
+      nullable: true
+      required: [requiredAmount, achievedAmount, remainingAmount]
+      properties:
+        requiredAmount: { type: integer, format: int64, description: '혜택 적용에 필요한 전월 실적입니다. 단위는 원입니다.' }
+        achievedAmount: { type: integer, format: int64, description: '조회된 전월 인정 실적입니다. 스냅샷이 없으면 0입니다. 단위는 원입니다.' }
+        remainingAmount: { type: integer, format: int64, description: '필요 실적에서 달성 실적을 뺀 부족 금액이며 최소 0입니다. 단위는 원입니다.' }
     MonthlyLimitResponse:
       description: '혜택의 월 한도 사용 현황입니다.'
       type: object

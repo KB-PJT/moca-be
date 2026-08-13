@@ -5,11 +5,11 @@ import com.moca.mocabe.domain.home.dto.HomeCardResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardSummaryResponse;
 import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
-import com.moca.mocabe.domain.home.dto.RecentBenefitItemResponse;
-import com.moca.mocabe.domain.home.dto.RecentBenefitsResponse;
+import com.moca.mocabe.domain.home.dto.RecentHistoryItemResponse;
+import com.moca.mocabe.domain.home.dto.RecentHistoryResponse;
 import com.moca.mocabe.domain.home.mapper.HomeMapper;
 import com.moca.mocabe.domain.home.model.HomeCardRow;
-import com.moca.mocabe.domain.home.model.RecentBenefitRow;
+import com.moca.mocabe.domain.home.model.RecentHistoryRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
@@ -70,7 +70,7 @@ public class HomeQueryService {
   }
 
   @Transactional(readOnly = true)
-  public RecentBenefitsResponse getRecentBenefits(
+  public RecentHistoryResponse getRecentHistory(
       String userId, String requestedYearMonth, int limit) {
     requireProfile(userId);
     YearMonth yearMonth = parseYearMonth(requestedYearMonth);
@@ -90,11 +90,11 @@ public class HomeQueryService {
             .atStartOfDay(SEOUL)
             .withZoneSameInstant(ZoneOffset.UTC)
             .toLocalDateTime();
-    List<RecentBenefitRow> rows = homeMapper.findRecentBenefits(userId, fromUtc, toUtc, limit);
-    List<RecentBenefitItemResponse> benefits =
-        (rows == null ? List.<RecentBenefitRow>of() : rows)
-            .stream().map(this::toRecentBenefit).toList();
-    return new RecentBenefitsResponse(benefits);
+    List<RecentHistoryRow> rows = homeMapper.findRecentHistory(userId, fromUtc, toUtc, limit);
+    List<RecentHistoryItemResponse> history =
+        (rows == null ? List.<RecentHistoryRow>of() : rows)
+            .stream().map(this::toRecentHistory).toList();
+    return new RecentHistoryResponse(history);
   }
 
   private UserProfile requireProfile(String userId) {
@@ -157,13 +157,14 @@ public class HomeQueryService {
         summary);
   }
 
-  private RecentBenefitItemResponse toRecentBenefit(RecentBenefitRow row) {
+  private RecentHistoryItemResponse toRecentHistory(RecentHistoryRow row) {
     String occurredAt =
         row.getOccurredAt()
             .atZone(ZoneOffset.UTC)
             .withZoneSameInstant(SEOUL)
             .format(OCCURRED_AT_FORMATTER);
-    return new RecentBenefitItemResponse(
+    return new RecentHistoryItemResponse(
+        row.getApprovalId(),
         row.getBenefitHistoryId(),
         row.getMerchantName(),
         row.getBenefitType(),
@@ -171,6 +172,9 @@ public class HomeQueryService {
         row.getCardName(),
         row.getPaymentAmount(),
         row.getBenefitAmount(),
+        row.getMissedBenefitAmount(),
+        row.getCalculationStatus(),
+        row.getRejectionReason(),
         occurredAt);
   }
 
