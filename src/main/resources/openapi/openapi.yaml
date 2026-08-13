@@ -610,34 +610,6 @@ paths:
               schema: { $ref: '#/components/schemas/MerchantCardRecommendationBatchApiResponse' }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/AuthenticationError' }
-        '401':
-          description: 인증 필요
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: 등록되지 않은 발급사
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: 이미 연동된 카드사 계정 또는 카드
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '423':
-          description: >-
-            카드사 비밀번호 오류 횟수 초과로 계정이 잠김(code=CODEF_ACCOUNT_LOCKED). 재시도 안내가 아니라
-            카드사를 통한 잠금 해제가 필요하다는 뜻입니다.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/CodefUnavailableError'
   /card-links/{linkId}/cards:
     patch:
       tags: [CardLink]
