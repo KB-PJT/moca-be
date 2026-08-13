@@ -64,7 +64,7 @@ public class NotificationService {
 
     private void sendTimeBasedBenefitNotification(UserDevice device, TimeSlot timeSlot, LocalDate today) {
         try {
-            if (mapper.existsSent(device.userId(), "TIME_BASED_BENEFIT", null,
+            if (mapper.existsSent(device.userId(), device.userDeviceId(), "TIME_BASED_BENEFIT", null,
                     today.toString(), timeSlot.name())) {
                 return;
             }
@@ -83,7 +83,8 @@ public class NotificationService {
     private void sendPerformanceCandidate(PerformanceDeadlineCandidate candidate, LocalDate today) {
         BigDecimal remaining = candidate.requiredSpendAmount().subtract(candidate.currentSpendAmount());
         for (UserDevice device : deviceMapper.findActiveByUserId(candidate.userId())) {
-            if (!mapper.existsSent(candidate.userId(), "PERFORMANCE_DEADLINE", candidate.userCardId(),
+            if (!mapper.existsSent(candidate.userId(), device.userDeviceId(),
+                    "PERFORMANCE_DEADLINE", candidate.userCardId(),
                     today.toString(), null)) {
                 send(candidate.userId(), device, "PERFORMANCE_DEADLINE", candidate.userCardId(), null, today,
                         candidate.cardName() + " 실적까지 " + remaining.toPlainString() + "원 남았어요. D-3",
@@ -110,7 +111,7 @@ public class NotificationService {
     private void send(String userId, UserDevice device, String type, String referenceId, TimeSlot slot,
                       LocalDate date, String title, String body, Map<String, String> data) {
         String historyId = UUID.randomUUID().toString();
-        String deliveryKey = deliveryKey(userId, type, referenceId, slot, date);
+        String deliveryKey = deliveryKey(userId, device.userDeviceId(), type, referenceId, slot, date);
         if (mapper.claimPending(historyId, deliveryKey, userId, device.userDeviceId(), type, referenceId,
                 slot == null ? null : slot.name(), date.toString(), title, body, "PENDING") == 0) {
             return;
@@ -131,8 +132,9 @@ public class NotificationService {
         }
     }
 
-    private String deliveryKey(String userId, String type, String referenceId, TimeSlot slot, LocalDate date) {
-        String raw = String.join("|", userId, type, referenceId == null ? "" : referenceId,
+    private String deliveryKey(String userId, String deviceId, String type, String referenceId,
+                               TimeSlot slot, LocalDate date) {
+        String raw = String.join("|", userId, deviceId, type, referenceId == null ? "" : referenceId,
                 slot == null ? "" : slot.name(), date.toString());
         return UUID.nameUUIDFromBytes(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
     }

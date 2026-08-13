@@ -7,10 +7,16 @@ services:
     restart: unless-stopped
     init: true
     env_file:
-      - /home/ec2-user/moca/.env
+      - ${MOCA_SERVICE_ENV_FILE:-/home/ec2-user/moca/.env}
     environment:
       TZ: Asia/Seoul
       CATALINA_OPTS: -Xms256m -Xmx512m -Duser.timezone=Asia/Seoul
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    volumes:
+      - type: bind
+        source: ${MOCA_FIREBASE_CREDENTIALS_FILE:?MOCA_FIREBASE_CREDENTIALS_FILE 환경 변수가 필요합니다.}
+        target: /run/secrets/firebase-service-account.json
+        read_only: true
     ports:
       - "127.0.0.1:8080:8080"
     security_opt:

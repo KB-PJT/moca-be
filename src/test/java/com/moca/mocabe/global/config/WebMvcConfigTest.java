@@ -17,6 +17,8 @@ import com.moca.mocabe.domain.merchant.service.MerchantCategoryQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantNearbyQueryService;
 import com.moca.mocabe.domain.merchant.service.MerchantCardRecommendationService;
 import com.moca.mocabe.domain.merchant.service.MerchantQueryService;
+import com.moca.mocabe.domain.notification.service.DeviceService;
+import com.moca.mocabe.domain.notification.service.UserLocationService;
 import com.moca.mocabe.domain.report.service.ReportQueryService;
 import com.moca.mocabe.domain.support.service.SupportInquiryService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
@@ -79,6 +81,12 @@ class WebMvcConfigTest {
                 .andExpect(status().isOk())
                 .andExpect(result -> assertEquals("https://moca-fe-rho.vercel.app",
                         result.getResponse().getHeader("Access-Control-Allow-Origin")));
+        mockMvc.perform(options("/api/v1/users/me/location")
+                        .header("Origin", "https://moca-fe-rho.vercel.app")
+                        .header("Access-Control-Request-Method", "PUT"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertTrue(result.getResponse()
+                        .getHeader("Access-Control-Allow-Methods").contains("PUT")));
     }
 
     @Test
@@ -198,6 +206,16 @@ class WebMvcConfigTest {
         @Bean
         public MerchantCardRecommendationService merchantCardRecommendationService() {
             return org.mockito.Mockito.mock(MerchantCardRecommendationService.class);
+        }
+
+        @Bean
+        public DeviceService deviceService() {
+            return org.mockito.Mockito.mock(DeviceService.class);
+        }
+
+        @Bean
+        public UserLocationService userLocationService() {
+            return org.mockito.Mockito.mock(UserLocationService.class);
         }
 
         @Bean

@@ -9,7 +9,8 @@ import java.util.List;
 public interface NotificationMapper {
     List<PerformanceDeadlineCandidate> findPerformanceDeadlineCandidates(
             @Param("performanceMonth") String performanceMonth);
-    boolean existsSent(@Param("userId") String userId, @Param("type") String type,
+    boolean existsSent(@Param("userId") String userId, @Param("deviceId") String deviceId,
+                       @Param("type") String type,
                        @Param("referenceId") String referenceId, @Param("date") String date,
                        @Param("timeSlot") String timeSlot);
     int claimPending(@Param("historyId") String historyId, @Param("deliveryKey") String deliveryKey,

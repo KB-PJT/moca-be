@@ -3,9 +3,11 @@ package com.moca.mocabe.domain.notification.dto;
 import com.moca.mocabe.domain.notification.type.DeviceType;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 
 public class RegisterDeviceRequest {
     @NotBlank
+    @Size(max = 2048)
     private String fcmToken;
     @NotNull
     private DeviceType deviceType;

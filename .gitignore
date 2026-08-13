@@ -47,6 +47,8 @@ outputs/
 .env
 .env.local
 deploy/.env.production
+firebase-service-account*.json
+*-firebase-adminsdk-*.json
 
 ### Locally generated card catalog seed data ###
 src/main/resources/db/seed/*.sql

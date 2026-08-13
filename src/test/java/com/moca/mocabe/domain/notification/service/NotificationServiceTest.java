@@ -1,8 +1,11 @@
 package com.moca.mocabe.domain.notification.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,9 +29,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 @DisplayName("알림 발송 서비스")
 class NotificationServiceTest {
@@ -42,7 +47,8 @@ class NotificationServiceTest {
                 new PerformanceDeadlineCandidate("user", "card", "카드", new BigDecimal("120000"),
                         new BigDecimal("150000"))));
         when(devices.findActiveByUserId("user")).thenReturn(List.of(new UserDevice("device", "user", "token", "WEB")));
-        when(history.existsSent("user", "PERFORMANCE_DEADLINE", "card", "2026-08-28", null)).thenReturn(false);
+        when(history.existsSent("user", "device", "PERFORMANCE_DEADLINE", "card", "2026-08-28", null))
+                .thenReturn(false);
         when(history.claimPending(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
         when(fcm.send(eq("token"), any(), any(), any())).thenReturn("message");
@@ -110,6 +116,43 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("첫 기기 발송 실패가 같은 사용자의 다음 기기 발송을 막지 않는다")
+    void isolatesDeviceFailure() throws Exception {
+        Fixture fixture = fixture();
+        fixture.performanceCandidate();
+        when(fixture.devices.findActiveByUserId("user")).thenReturn(List.of(
+                new UserDevice("first", "user", "first-token", "WEB"),
+                new UserDevice("second", "user", "second-token", "ANDROID")));
+        fixture.claims();
+        when(fixture.fcm.send(eq("first-token"), any(), any(), any()))
+                .thenThrow(new IllegalStateException("failure"));
+        when(fixture.fcm.send(eq("second-token"), any(), any(), any())).thenReturn("second-message");
+
+        fixture.service.sendPerformanceDeadlineNotifications();
+
+        verify(fixture.fcm).send(eq("first-token"), any(), any(), any());
+        verify(fixture.fcm).send(eq("second-token"), any(), any(), any());
+        ArgumentCaptor<String> deliveryKeys = ArgumentCaptor.forClass(String.class);
+        verify(fixture.history, times(2)).claimPending(any(), deliveryKeys.capture(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any());
+        assertNotEquals(deliveryKeys.getAllValues().get(0), deliveryKeys.getAllValues().get(1));
+    }
+
+    @Test
+    @DisplayName("활성 FCM 기기가 없는 사용자는 실적 알림을 발송하지 않는다")
+    void skipsPerformanceCandidateWithoutActiveDevice() throws Exception {
+        Fixture fixture = fixture();
+        when(fixture.history.findPerformanceDeadlineCandidates("2026-08")).thenReturn(List.of(
+                new PerformanceDeadlineCandidate("user", "card", "카드", new BigDecimal("120000"),
+                        new BigDecimal("150000"))));
+        when(fixture.devices.findActiveByUserId("user")).thenReturn(List.of());
+
+        fixture.service.sendPerformanceDeadlineNotifications();
+
+        verify(fixture.fcm, never()).send(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("최근 위치 주변에 보유 카드 혜택이 있으면 시간대 알림을 발송한다")
     void sendsTimeBasedBenefit() throws Exception {
         Fixture fixture = fixture();
@@ -131,6 +174,10 @@ class NotificationServiceTest {
         when(fixture.fcm.send(any(), any(), any(), any())).thenReturn("message");
         fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.LUNCH);
         verify(fixture.fcm).send(eq("token"), any(), any(), any());
+        ArgumentCaptor<Map<String, String>> payload = ArgumentCaptor.forClass(Map.class);
+        verify(fixture.fcm).send(eq("token"), any(), any(), payload.capture());
+        assertEquals("TIME_BASED_BENEFIT", payload.getValue().get("type"));
+        assertEquals("MAP", payload.getValue().get("target"));
     }
 
     @Test
@@ -152,6 +199,69 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("500m 내 가맹점이 없으면 추천 조회와 시간대 알림을 건너뛴다")
+    void skipsWhenNoNearbyMerchantExists() throws Exception {
+        Fixture fixture = fixture();
+        fixture.nearbyDevice();
+        when(fixture.locations.find("user")).thenReturn(Optional.of(new UserLocationService.Location(35.1, 129.1)));
+        when(fixture.categories.findAllOrderedByDisplayOrder()).thenReturn(List.of(
+                new MerchantCategoryRow("category", "CAFE", "카페", 1)));
+        when(fixture.nearby.getNearbyMerchants(eq("category"), any(), any(), eq(500), eq(null)))
+                .thenReturn(List.of());
+
+        fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.LUNCH);
+
+        verify(fixture.recommendations, never()).recommendBatch(any(), any(), any());
+        verify(fixture.fcm, never()).send(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("같은 날 점심 알림 이후 저녁 알림을 별도로 발송한다")
+    void sendsLunchAndDinnerSeparately() throws Exception {
+        Fixture fixture = fixture();
+        fixture.eligibleNearbyBenefit();
+        fixture.claims();
+        when(fixture.fcm.send(any(), any(), any(), any())).thenReturn("message");
+
+        fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.LUNCH);
+        fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.DINNER);
+
+        verify(fixture.fcm, times(2)).send(eq("token"), any(), any(), any());
+        verify(fixture.history).claimPending(any(), any(), any(), any(), any(), any(), eq("LUNCH"),
+                any(), any(), any(), any());
+        verify(fixture.history).claimPending(any(), any(), any(), any(), any(), any(), eq("DINNER"),
+                any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("첫 사용자 FCM 실패 후에도 다음 사용자의 시간대 알림을 발송한다")
+    void continuesWithNextUserAfterFcmFailure() throws Exception {
+        Fixture fixture = fixture();
+        UserDevice first = new UserDevice("first", "first-user", "first-token", "WEB");
+        UserDevice second = new UserDevice("second", "second-user", "second-token", "WEB");
+        when(fixture.devices.findActiveNearbyBenefitDevices()).thenReturn(List.of(first, second));
+        when(fixture.locations.find(any())).thenReturn(Optional.of(new UserLocationService.Location(35.1, 129.1)));
+        when(fixture.categories.findAllOrderedByDisplayOrder()).thenReturn(List.of(
+                new MerchantCategoryRow("category", "CAFE", "카페", 1)));
+        when(fixture.nearby.getNearbyMerchants(eq("category"), any(), any(), eq(500), eq(null)))
+                .thenReturn(List.of(new NearbyMerchantResponse("merchant", "가맹점", 35.1, 129.1, 10, "주소")));
+        MerchantCardRecommendationResponse recommendation = org.mockito.Mockito.mock(
+                MerchantCardRecommendationResponse.class);
+        when(recommendation.recommendedCard()).thenReturn(org.mockito.Mockito.mock(RankedCardBenefitResponse.class));
+        when(fixture.recommendations.recommendBatch(any(), any(), eq(null))).thenReturn(
+                new MerchantCardRecommendationBatchResponse(List.of(recommendation)));
+        fixture.claims();
+        when(fixture.fcm.send(eq("first-token"), any(), any(), any()))
+                .thenThrow(new IllegalStateException("failure"));
+        when(fixture.fcm.send(eq("second-token"), any(), any(), any())).thenReturn("message");
+
+        fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.DINNER);
+
+        verify(fixture.fcm).send(eq("first-token"), any(), any(), any());
+        verify(fixture.fcm).send(eq("second-token"), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("위치가 없거나 이미 발송됐거나 사용자 조회가 실패하면 시간대 알림을 건너뛴다")
     void skipsIneligibleTimeBasedNotifications() throws Exception {
         Fixture fixture = fixture();
@@ -159,7 +269,8 @@ class NotificationServiceTest {
         UserDevice second = new UserDevice("second", "second-user", "second-token", "WEB");
         UserDevice third = new UserDevice("third", "third-user", "third-token", "WEB");
         when(fixture.devices.findActiveNearbyBenefitDevices()).thenReturn(List.of(first, second, third));
-        when(fixture.history.existsSent("first-user", "TIME_BASED_BENEFIT", null, "2026-08-28", "DINNER"))
+        when(fixture.history.existsSent("first-user", "first", "TIME_BASED_BENEFIT", null,
+                "2026-08-28", "DINNER"))
                 .thenReturn(true);
         when(fixture.locations.find("second-user")).thenReturn(Optional.empty());
         when(fixture.locations.find("third-user")).thenThrow(new IllegalStateException("failure"));
@@ -204,6 +315,22 @@ class NotificationServiceTest {
         private void nearbyDevice() {
             when(devices.findActiveNearbyBenefitDevices()).thenReturn(List.of(
                     new UserDevice("device", "user", "token", "WEB")));
+        }
+
+        private void eligibleNearbyBenefit() {
+            nearbyDevice();
+            when(locations.find("user")).thenReturn(Optional.of(new UserLocationService.Location(35.1, 129.1)));
+            when(categories.findAllOrderedByDisplayOrder()).thenReturn(List.of(
+                    new MerchantCategoryRow("category", "CAFE", "카페", 1)));
+            when(nearby.getNearbyMerchants(eq("category"), any(), any(), eq(500), eq(null)))
+                    .thenReturn(List.of(new NearbyMerchantResponse(
+                            "merchant", "가맹점", 35.1, 129.1, 10, "주소")));
+            MerchantCardRecommendationResponse recommendation = org.mockito.Mockito.mock(
+                    MerchantCardRecommendationResponse.class);
+            when(recommendation.recommendedCard()).thenReturn(
+                    org.mockito.Mockito.mock(RankedCardBenefitResponse.class));
+            when(recommendations.recommendBatch(eq("user"), any(), eq(null))).thenReturn(
+                    new MerchantCardRecommendationBatchResponse(List.of(recommendation)));
         }
 
         private void claims() {
