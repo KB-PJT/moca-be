@@ -136,6 +136,19 @@ class NotificationMapperIntegrationTest {
                 String.class));
     }
 
+    @Test
+    @DisplayName("알림 중복 조회 인덱스는 사용자 다음에 기기를 구분한다")
+    void indexesNotificationDeduplicationByDevice() {
+        List<String> columns = jdbcTemplate.queryForList(
+                "SELECT column_name FROM information_schema.statistics "
+                        + "WHERE table_schema=DATABASE() AND table_name='notification_history' "
+                        + "AND index_name='idx_notification_history_dedup' ORDER BY seq_in_index",
+                String.class);
+
+        assertEquals(List.of("user_id", "user_device_id", "notification_type", "reference_id",
+                "notification_date", "time_slot", "status"), columns);
+    }
+
     private int claim(String historyId, String deliveryKey, String deviceId) {
         return notificationMapper.claimPending(historyId, deliveryKey, USER_ID, deviceId,
                 "PERFORMANCE_DEADLINE", USER_CARD_ID, null, "2026-08-28", "title", "body", "PENDING");

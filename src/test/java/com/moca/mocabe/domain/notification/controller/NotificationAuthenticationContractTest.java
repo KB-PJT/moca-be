@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.notification.controller;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -16,6 +17,7 @@ import com.moca.mocabe.global.auth.CurrentUserProvider;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
 import com.moca.mocabe.global.auth.SecurityContextCurrentUserProvider;
 import com.moca.mocabe.global.config.AuthConfig;
+import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponseWriter;
 import com.moca.mocabe.global.exception.security.JsonAccessDeniedHandler;
 import com.moca.mocabe.global.exception.security.JsonAuthenticationEntryPoint;
@@ -79,6 +81,27 @@ class NotificationAuthenticationContractTest {
         mockMvc.perform(put("/api/v1/users/me/location").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"latitude\":35.1,\"longitude\":129.1}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 Bearer 토큰은 두 알림 API에서 INVALID_TOKEN 401을 반환한다")
+    void rejectsInvalidBearerToken() throws Exception {
+        when(tokenService.authenticate("invalid-token")).thenThrow(new InvalidOpaqueTokenException());
+
+        mockMvc.perform(post("/api/v1/devices")
+                        .header("Authorization", "Bearer invalid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fcmToken\":\"token\",\"deviceType\":\"WEB\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
+                        .contains("\"code\":\"INVALID_TOKEN\"")));
+        mockMvc.perform(put("/api/v1/users/me/location")
+                        .header("Authorization", "Bearer invalid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"latitude\":35.1,\"longitude\":129.1}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(result -> assertTrue(result.getResponse().getContentAsString()
+                        .contains("\"code\":\"INVALID_TOKEN\"")));
     }
 
     @Test

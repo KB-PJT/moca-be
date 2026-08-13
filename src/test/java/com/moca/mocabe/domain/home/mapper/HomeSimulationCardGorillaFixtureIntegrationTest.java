@@ -101,8 +101,8 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
     }
 
     @Test
-    @DisplayName("V1부터 V19까지 적용한 MySQL 스키마에 fixture를 적재한다")
-    void loadsFixtureAgainstV1ToV18Schema() {
+    @DisplayName("V1부터 V20까지 적용한 MySQL 스키마에 fixture를 적재한다")
+    void loadsFixtureAgainstCurrentSchema() {
         Integer migrationCount =
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE",
@@ -114,7 +114,7 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM user_cards WHERE user_id = ?", Integer.class, USER_ID);
 
-        assertEquals(19, migrationCount);
+        assertEquals(20, migrationCount);
         assertEquals(1, userCount);
         assertEquals(4, cardCount);
     }

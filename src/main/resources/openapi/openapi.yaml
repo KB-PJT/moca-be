@@ -1575,6 +1575,7 @@ components:
           type: string
           minLength: 1
           maxLength: 2048
+          pattern: '.*\S.*'
           description: Firebase가 발급한 원문 디바이스 토큰이며 로그에 기록하지 않습니다.
         deviceType:
           type: string

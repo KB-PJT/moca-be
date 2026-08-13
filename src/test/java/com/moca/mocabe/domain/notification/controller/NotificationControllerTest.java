@@ -78,6 +78,14 @@ class NotificationControllerTest {
     }
 
     @Test
+    @DisplayName("공백으로만 구성된 FCM 토큰은 400으로 거절한다")
+    void rejectsWhitespaceOnlyFcmToken() throws Exception {
+        mockMvc.perform(post("/devices").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fcmToken\":\"   \",\"deviceType\":\"WEB\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("최근 위치 갱신은 인증 사용자 ID를 사용한다")
     void updatesLocationForCurrentUser() throws Exception {
         when(currentUser.getCurrentUserId()).thenReturn("user");

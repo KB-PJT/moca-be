@@ -28,14 +28,14 @@ class FcmServiceTest {
     }
 
     @Test
-    @DisplayName("등록 해제와 잘못된 토큰 오류만 비활성화 대상으로 판정한다")
+    @DisplayName("등록 해제 오류만 비활성화 대상으로 판정한다")
     void identifiesInvalidTokens() {
         FcmService service = new FcmService(org.mockito.Mockito.mock(ObjectProvider.class));
         FirebaseMessagingException unregistered = exception(MessagingErrorCode.UNREGISTERED);
         FirebaseMessagingException invalid = exception(MessagingErrorCode.INVALID_ARGUMENT);
         FirebaseMessagingException unavailable = exception(MessagingErrorCode.UNAVAILABLE);
         assertTrue(service.isInvalidToken(unregistered));
-        assertTrue(service.isInvalidToken(invalid));
+        assertFalse(service.isInvalidToken(invalid));
         assertFalse(service.isInvalidToken(unavailable));
     }
 

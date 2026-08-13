@@ -21,9 +21,8 @@ public class FcmService {
         return messagingProvider.getObject().send(message);
     }
 
-    /** 등록 해제·유효하지 않은 토큰에만 재사용 중지를 적용한다. */
+    /** Firebase가 등록 해제를 확정한 토큰만 재사용 중지 대상으로 판정한다. */
     public boolean isInvalidToken(FirebaseMessagingException exception) {
-        MessagingErrorCode code = exception.getMessagingErrorCode();
-        return code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT;
+        return exception.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED;
     }
 }
