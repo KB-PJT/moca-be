@@ -13,7 +13,8 @@ public record MerchantCardBenefitRuleRow(
         BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw,
         String ruleId, String ruleEffect, LocalDate validFrom, LocalDate validTo,
         String matchMode, String targetType, String targetMerchantCategoryId, String targetMerchantId,
-        BigDecimal minimumPlaceConfidence, Boolean hasSchedule, Boolean hasOptionRequirement) {
+        BigDecimal minimumPlaceConfidence, Boolean hasSchedule, Boolean hasOptionRequirement,
+        String offerId, Integer benefitTierPosition) {
 
     public MerchantCardBenefitCandidate toCandidate() {
         return new MerchantCardBenefitCandidate(
@@ -21,6 +22,26 @@ public record MerchantCardBenefitRuleRow(
                 userCardId, cardName, issuerName, cardImageUrl,
                 offerName, rewardType, rewardUnit, rewardValue,
                 rewardBasisAmount, transactionMinKrw, previousSpendMinKrw,
-                previousMonthSpendKrw, krwPerRewardUnit, monthlyLimitKrw, monthlyUsedKrw);
+                previousMonthSpendKrw, krwPerRewardUnit, monthlyLimitKrw, monthlyUsedKrw,
+                offerId, benefitTierPosition);
+    }
+
+    /** 기존 테스트 fixture와의 호환을 위한 생성자다. */
+    public MerchantCardBenefitRuleRow(
+            String merchantId, String merchantName, String categoryCode, String categoryName,
+            String userCardId, String cardName, String issuerName, String cardImageUrl,
+            String offerName, String rewardType, String rewardUnit, BigDecimal rewardValue,
+            BigDecimal rewardBasisAmount, BigDecimal transactionMinKrw, BigDecimal previousSpendMinKrw,
+            BigDecimal previousMonthSpendKrw, BigDecimal krwPerRewardUnit,
+            BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw,
+            String ruleId, String ruleEffect, LocalDate validFrom, LocalDate validTo,
+            String matchMode, String targetType, String targetMerchantCategoryId, String targetMerchantId,
+            BigDecimal minimumPlaceConfidence, Boolean hasSchedule, Boolean hasOptionRequirement) {
+        this(merchantId, merchantName, categoryCode, categoryName, userCardId, cardName, issuerName,
+                cardImageUrl, offerName, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
+                transactionMinKrw, previousSpendMinKrw, previousMonthSpendKrw, krwPerRewardUnit,
+                monthlyLimitKrw, monthlyUsedKrw, ruleId, ruleEffect, validFrom, validTo, matchMode,
+                targetType, targetMerchantCategoryId, targetMerchantId, minimumPlaceConfidence,
+                hasSchedule, hasOptionRequirement, null, null);
     }
 }

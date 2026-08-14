@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 가맹점 카테고리에 적용되는 보유 카드 혜택을 온보딩 성향에 따라 정렬한다. */
@@ -216,13 +217,17 @@ public class MerchantCardRecommendationService {
             ScoredCandidate item = sorted.get(index);
             MerchantCardBenefitCandidate candidate = item.candidate();
             BigDecimal remainingPreviousSpend = remainingPreviousSpend(candidate);
+            BenefitTierProgress tierProgress = tierProgress(candidate, candidates);
             BigDecimal monthlyRemaining = monthlyRemaining(candidate);
             result.add(new RankedCardBenefitResponse(index + 1, candidate.userCardId(), candidate.cardName(),
                     candidate.issuerName(), candidate.cardImageUrl(), candidate.offerName(), candidate.rewardType(),
                     candidate.rewardUnit(), candidate.rewardValue(), item.estimatedValueKrw(), paymentAmount,
                     candidate.transactionMinKrw(), candidate.previousMonthSpendKrw(),
-                    candidate.previousSpendMinKrw(), remainingPreviousSpend, candidate.monthlyLimitKrw(),
-                    candidate.monthlyUsedKrw(), monthlyRemaining, item.performanceMet(),
+                    candidate.previousSpendMinKrw(), remainingPreviousSpend,
+                    tierProgress.currentTier(), tierProgress.nextTier(), tierProgress.targetAmount(),
+                    tierProgress.currentTierAchieved(), tierProgress.remainingAmountToNextTier(),
+                    candidate.monthlyLimitKrw(), candidate.monthlyUsedKrw(), monthlyRemaining,
+                    item.performanceMet(),
                     recommendationReasons(candidate, item.performanceMet(), remainingPreviousSpend,
                             monthlyRemaining)));
         }
@@ -279,6 +284,65 @@ public class MerchantCardRecommendationService {
         return candidate.previousSpendMinKrw().subtract(candidate.previousMonthSpendKrw()).max(BigDecimal.ZERO);
     }
 
+    /**
+     * 카드 전체 실적 구간이 아니라, 현재 가맹점에 매칭된 동일 offer의 룰 구간만 사용한다.
+     * 선택된 룰의 실적 기준이 현재 구간이고, 달성 뒤에는 다음 구간까지 남은 금액을 반환한다.
+     */
+    private BenefitTierProgress tierProgress(MerchantCardBenefitCandidate candidate,
+                                             List<MerchantCardBenefitCandidate> candidates) {
+        if (candidate.previousSpendMinKrw() == null) {
+            return BenefitTierProgress.withoutPerformanceRequirement();
+        }
+        List<BigDecimal> targets = candidates.stream()
+                .filter(other -> candidate.userCardId().equals(other.userCardId()))
+                .filter(other -> sameOffer(candidate, other))
+                .map(MerchantCardBenefitCandidate::previousSpendMinKrw)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+        int targetIndex = targets.indexOf(candidate.previousSpendMinKrw());
+        int currentTier = candidate.benefitTierPosition() == null
+                ? targetIndex + 1 : candidate.benefitTierPosition();
+        BigDecimal nextTarget = targetIndex + 1 < targets.size() ? targets.get(targetIndex + 1) : null;
+        Integer nextTier = nextTarget == null ? null : nextTierNumber(candidate, candidates,
+                nextTarget, currentTier + 1);
+        BigDecimal currentSpend = candidate.previousMonthSpendKrw();
+        boolean currentTierAchieved = currentSpend.compareTo(candidate.previousSpendMinKrw()) >= 0;
+        BigDecimal remainingTarget = currentTierAchieved && nextTarget != null
+                ? nextTarget : candidate.previousSpendMinKrw();
+        return new BenefitTierProgress(currentTier, nextTier, candidate.previousSpendMinKrw(),
+                currentTierAchieved, remainingTarget.subtract(currentSpend).max(BigDecimal.ZERO));
+    }
+
+    private boolean sameOffer(MerchantCardBenefitCandidate left, MerchantCardBenefitCandidate right) {
+        if (left.offerId() != null || right.offerId() != null) {
+            return Objects.equals(left.offerId(), right.offerId());
+        }
+        return Objects.equals(left.offerName(), right.offerName());
+    }
+
+    private Integer nextTierNumber(MerchantCardBenefitCandidate candidate,
+                                   List<MerchantCardBenefitCandidate> candidates,
+                                   BigDecimal nextTarget, int fallback) {
+        return candidates.stream()
+                .filter(other -> candidate.userCardId().equals(other.userCardId()))
+                .filter(other -> sameOffer(candidate, other))
+                .filter(other -> nextTarget.equals(other.previousSpendMinKrw()))
+                .map(MerchantCardBenefitCandidate::benefitTierPosition)
+                .filter(Objects::nonNull)
+                .min(Integer::compareTo)
+                .orElse(fallback);
+    }
+
     private record ScoredCandidate(MerchantCardBenefitCandidate candidate, BigDecimal estimatedValueKrw,
                                    BigDecimal score, boolean performanceMet) { }
+
+    private record BenefitTierProgress(Integer currentTier, Integer nextTier, BigDecimal targetAmount,
+                                       boolean currentTierAchieved,
+                                       BigDecimal remainingAmountToNextTier) {
+        private static BenefitTierProgress withoutPerformanceRequirement() {
+            return new BenefitTierProgress(null, null, null, true, BigDecimal.ZERO);
+        }
+    }
 }
