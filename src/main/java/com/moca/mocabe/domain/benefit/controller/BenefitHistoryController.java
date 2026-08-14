@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 인증 사용자의 혜택 이력 목록과 상세를 제공한다. */
+/** 인증 사용자의 전체 카드 결제 내역 목록과 상세를 제공한다. */
 @RestController
 @RequestMapping("/benefit-history")
 @RequiredArgsConstructor
