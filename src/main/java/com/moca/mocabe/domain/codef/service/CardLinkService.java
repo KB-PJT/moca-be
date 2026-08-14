@@ -72,7 +72,7 @@ public class CardLinkService {
     private static final int OWNED_CARD_FETCH_MAX_ATTEMPTS = 2;
     /** 재시도 전 대기 시간이다. CODEF가 카드사에 따라 connectedId 계정 세션을 반영하는 데 시간이 걸려
      * 발급 직후 첫 조회가 "로그인 파라미터 누락" 류로 실패하는 경우가 있어(NH카드에서 확인됨) 짧게 대기한다. */
-    private static final long OWNED_CARD_FETCH_RETRY_DELAY_MS = 1500;
+    private static final long OWNED_CARD_FETCH_RETRY_DELAY_MS = 1000;
 
     private final CodefClient codefClient;
     private final CodefCredentialMapper codefCredentialMapper;
