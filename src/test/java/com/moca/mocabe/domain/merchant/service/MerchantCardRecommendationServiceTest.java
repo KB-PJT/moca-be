@@ -184,6 +184,53 @@ class MerchantCardRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("최고 실적 구간을 달성한 가맹점 혜택은 다음 구간 없이 잔여 0원을 반환한다")
+    void returnsNoNextTierForAchievedHighestMerchantBenefitTier() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        List<MerchantCardBenefitCandidate> tiers = List.of(
+                candidate("card-top-tier", "구간 카드", "discount", "percent", "1", null,
+                        "300000", "600000", "1", "offer-tier", 1),
+                candidate("card-top-tier", "구간 카드", "discount", "percent", "10", null,
+                        "500000", "600000", "1", "offer-tier", 2));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(tiers);
+
+        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
+                .recommendedCard();
+
+        assertEquals(2, card.currentTier());
+        assertNull(card.nextTier());
+        assertEquals(new BigDecimal("500000"), card.currentTierTargetAmount());
+        assertEquals(true, card.isCurrentTierAchieved());
+        assertEquals(BigDecimal.ZERO, card.remainingAmountToNextTier());
+    }
+
+    @Test
+    @DisplayName("실적 조건 없는 가맹점 혜택은 게이지 미노출 값을 반환한다")
+    void returnsNoTierProgressWithoutPreviousSpendRequirement() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        candidate("card-no-tier", "실적 없음 카드", "discount", "percent", "5", null,
+                                null, "0", "1")));
+
+        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
+                .recommendedCard();
+
+        assertNull(card.currentTier());
+        assertNull(card.nextTier());
+        assertNull(card.currentTierTargetAmount());
+        assertEquals(true, card.isCurrentTierAchieved());
+        assertEquals(BigDecimal.ZERO, card.remainingAmountToNextTier());
+    }
+
+    @Test
     @DisplayName("가맹점과 결제금액 입력을 검증한다")
     void validatesInput() {
         assertThrows(InvalidMerchantQueryException.class, () -> service.recommend("user", " ", null));
