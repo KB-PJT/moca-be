@@ -8,7 +8,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-/** 확정 혜택 사용 이력의 사용자 소유 범위 조회를 담당한다. */
+/** 사용자의 전체 카드 결제 내역과 혜택 계산 결과 조회를 담당한다. */
 @Mapper
 public interface BenefitHistoryMapper {
 

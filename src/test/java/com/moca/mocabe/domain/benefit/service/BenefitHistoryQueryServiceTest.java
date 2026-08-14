@@ -1,6 +1,7 @@
 package com.moca.mocabe.domain.benefit.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -104,6 +105,25 @@ class BenefitHistoryQueryServiceTest {
     assertEquals(300000, result.getPerformanceShortfall().requiredAmount());
     assertEquals(120000, result.getPerformanceShortfall().achievedAmount());
     assertEquals(180000, result.getPerformanceShortfall().remainingAmount());
+  }
+
+  @Test
+  void doesNotExposePerformanceShortfallForNonPerformanceRejection() {
+    BenefitHistoryDetailRow row = new BenefitHistoryDetailRow();
+    copy(row);
+    row.setCalculationStatus("NOT_APPLIED");
+    row.setBenefitAmount(0);
+    row.setMissedBenefitAmount(1800);
+    row.setRejectionReason("MONTHLY_LIMIT_EXHAUSTED");
+    row.setRequiredPreviousSpendAmount(300000L);
+    row.setPreviousMonthSpendAmount(120000L);
+    when(mapper.findDetail("user-1", "outcome-2")).thenReturn(row);
+
+    BenefitHistoryDetailResponse result =
+        new BenefitHistoryQueryService(mapper).getDetail("user-1", "outcome-2");
+
+    assertEquals("MONTHLY_LIMIT_EXHAUSTED", result.getRejectionReason());
+    assertNull(result.getPerformanceShortfall());
   }
 
   @Test
