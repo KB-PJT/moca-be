@@ -38,6 +38,36 @@ class ApprovalCardMatcherTest {
     }
 
     @Test
+    @DisplayName("겹치는 글자가 후보 하나뿐이어도 최소 비율을 못 넘기면 매칭하지 않는다")
+    void doesNotMatchWhenOnlyCandidateOverlapsTooLittle() {
+        // 같은 카드사 후보가 uc-1 하나뿐이라도, "실적조회카드" 대비 "전혀다른상품명카드" 정도의 약한 겹침으로는
+        // 매칭되면 안 된다(과거엔 후보가 1장이면 글자 1~2개만 겹쳐도 그대로 채택됐다).
+        List<UserCardMatchRow> cards = List.of(
+                new UserCardMatchRow("uc-1", ISSUER_1, "실적조회카드", "1234****5678"));
+
+        assertNull(matcher.match(cards, "전혀다른상품명카드", "9999****9999", ISSUER_1));
+    }
+
+    @Test
+    @DisplayName("이름 매칭이 최소 비율을 못 넘겨 실패해도 마스킹 카드번호가 일치하면 매칭한다")
+    void fallsBackToCardNoWhenNameRatioTooLow() {
+        List<UserCardMatchRow> cards = List.of(
+                new UserCardMatchRow("uc-1", ISSUER_1, "실적조회카드", "943646******1069"));
+
+        assertEquals("uc-1", matcher.match(cards, "전혀다른상품명카드", "943646******1069", ISSUER_1));
+    }
+
+    @Test
+    @DisplayName("보유카드명이 정규화하면 빈 문자열인 후보는 유사 매칭에서 건너뛰고 다른 후보와 비교한다")
+    void skipsCandidateWithEmptyNormalizedNameInFuzzyMatch() {
+        List<UserCardMatchRow> cards = List.of(
+                new UserCardMatchRow("uc-1", ISSUER_1, "()", "1234****5678"),
+                new UserCardMatchRow("uc-2", ISSUER_1, "실적조회카드", "9876****5432"));
+
+        assertEquals("uc-2", matcher.match(cards, "실적조회카드 추가혜택", "0000****0000", ISSUER_1));
+    }
+
+    @Test
     @DisplayName("승인명에 발급사 접두사가 붙어도 보유카드명이 포함되면 매칭한다")
     void matchesWhenApprovalNameHasIssuerPrefix() {
         List<UserCardMatchRow> cards = List.of(
@@ -129,10 +159,19 @@ class ApprovalCardMatcherTest {
     }
 
     @Test
-    @DisplayName("정규화 결과가 비는 카드명은 매칭하지 않는다")
-    void returnsNullWhenNormalizedNameEmpty() {
+    @DisplayName("정규화 결과가 비는 카드명은 이름 매칭을 포기하고 마스킹 카드번호로 폴백한다")
+    void fallsBackToCardNoWhenNormalizedNameEmpty() {
         List<UserCardMatchRow> cards = List.of(
                 new UserCardMatchRow("uc-1", ISSUER_1, "카드 A", "1234****5678"));
+
+        assertEquals("uc-1", matcher.match(cards, approvalWithName("()"), ISSUER_1));
+    }
+
+    @Test
+    @DisplayName("정규화 결과가 비고 카드번호도 일치하지 않으면 매칭 실패로 null을 반환한다")
+    void returnsNullWhenNormalizedNameEmptyAndCardNoMismatch() {
+        List<UserCardMatchRow> cards = List.of(
+                new UserCardMatchRow("uc-1", ISSUER_1, "카드 A", "9999****9999"));
 
         assertNull(matcher.match(cards, approvalWithName("()"), ISSUER_1));
     }
