@@ -133,9 +133,9 @@ class CodefPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("재조회가 pending 카드번호로 카드를 실제로 저장하면 pending을 지우고, "
+    @DisplayName("연동 생성 시 즉시 조회로 카드가 실제로 저장되면 pending을 그 자리에서 지우고, "
             + "이후 재조회는 그 카드의 저장된 카드번호를 재사용한다")
-    void syncConsumesPendingCredentialsOnceCardIsStored() {
+    void createLinkConsumesPendingCredentialsOnceCardIsStored() {
         jdbcTemplate.update("INSERT INTO cards "
                         + "(card_id, issuer_id, card_type, first_seen_at, last_seen_at) "
                         + "VALUES (?, ?, 'check', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
@@ -153,17 +153,10 @@ class CodefPersistenceIntegrationTest {
                 .thenReturn(List.of(
                         new CodefOwnedCard("노리2 체크카드(KB Pay)_비교통", "123456******3456", "체크/본인", "")));
 
+        // 카드번호가 필요한 카드사도 createLink가 즉시 보유카드를 조회해 카드를 저장하고 pending을 지운다.
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
-        assertNotNull(jdbcTemplate.queryForObject(
-                "SELECT pending_card_number_enc FROM codef_account_credentials "
-                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
-        assertNotNull(jdbcTemplate.queryForObject(
-                "SELECT pending_card_password_enc FROM codef_account_credentials "
-                        + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
-
-        SyncOwnedCardsResponse firstSync = cardLinkService.syncOwnedCards(USER_ID, "0301");
-        assertTrue(firstSync.results().get(0).success());
-
+        assertEquals(1, link.cards().size());
+        assertTrue(link.cards().get(0).matched());
         assertNull(jdbcTemplate.queryForObject(
                 "SELECT pending_card_number_enc FROM codef_account_credentials "
                         + "WHERE codef_account_credential_id = ?", byte[].class, link.linkId()));
@@ -173,6 +166,8 @@ class CodefPersistenceIntegrationTest {
 
         // pending은 이미 소비됐지만, 방금 저장된 카드의 카드번호를 재사용해 재조회가 계속 성공한다
         // (같은 stub이 그대로 매칭되므로 별도 stub 추가가 필요 없다).
+        SyncOwnedCardsResponse firstSync = cardLinkService.syncOwnedCards(USER_ID, "0301");
+        assertTrue(firstSync.results().get(0).success());
         SyncOwnedCardsResponse secondSync = cardLinkService.syncOwnedCards(USER_ID, "0301");
         assertTrue(secondSync.results().get(0).success());
     }
@@ -246,6 +241,9 @@ class CodefPersistenceIntegrationTest {
                         new CodefOwnedCard("카탈로그에 없는 카드", "123456******3456", "체크/본인", "")));
 
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request());
+        // createLink도 즉시 조회하지만 카탈로그 매칭 실패로 저장되지 않아 회색 카드로만 응답된다.
+        assertEquals(1, link.cards().size());
+        assertFalse(link.cards().get(0).matched());
 
         SyncOwnedCardsResult first = cardLinkService.syncOwnedCards(USER_ID, "0301").results().get(0);
         assertTrue(first.success());
@@ -305,12 +303,10 @@ class CodefPersistenceIntegrationTest {
 
         CreateCardLinkRequest request = request();
         request.setCardNo("9436461234561069");
+        // 카드번호가 필요한 카드사도 createLink가 방금 입력받은 카드번호로 즉시 보유카드를 조회·매칭한다.
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request);
-        // 카드번호가 필요한 카드사라 createLink는 보유카드를 조회하지 않고 cards가 비어 있다.
-        // 재조회(syncOwnedCards)가 pending으로 저장해둔 카드번호를 이어받아 조회·매칭한다.
-        assertTrue(link.cards().isEmpty());
-        SyncOwnedCardsResult discovered = cardLinkService.syncOwnedCards(USER_ID, "0301").results().get(0);
-        String userCardId = discovered.cards().get(0).userCardId();
+        assertEquals(1, link.cards().size());
+        String userCardId = link.cards().get(0).userCardId();
         assertNotNull(userCardId);
         // 적재 직후에는 여전히 비활성 상태이지만, 카드번호/비밀번호는 이미 암호화 저장돼 있다.
         assertEquals(Boolean.FALSE, jdbcTemplate.queryForObject(
@@ -362,10 +358,11 @@ class CodefPersistenceIntegrationTest {
 
         CreateCardLinkRequest request = request();
         request.setCardNo("9436461234561069");
+        // 카드번호가 필요한 카드사도 createLink가 즉시 조회한다 — 카탈로그는 매칭되지만 마스킹
+        // 카드번호가 계정 생성 카드번호와 달라 크리덴셜 없이 비활성으로 적재된다.
         CardLinkResponse link = cardLinkService.createLink(USER_ID, request);
-        assertTrue(link.cards().isEmpty());
-        SyncOwnedCardsResult discovered = cardLinkService.syncOwnedCards(USER_ID, "0301").results().get(0);
-        String userCardId = discovered.cards().get(0).userCardId();
+        assertEquals(1, link.cards().size());
+        String userCardId = link.cards().get(0).userCardId();
         assertNotNull(userCardId);
         assertEquals(Boolean.FALSE, jdbcTemplate.queryForObject(
                 "SELECT is_active FROM user_cards WHERE user_card_id = ?", Boolean.class, userCardId));
