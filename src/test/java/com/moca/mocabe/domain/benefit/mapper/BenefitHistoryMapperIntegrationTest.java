@@ -37,8 +37,10 @@ class BenefitHistoryMapperIntegrationTest {
   private static final String APPROVAL = "90000000-0000-4000-8000-000000000001";
   private static final String MISSED_APPROVAL = "90000000-0000-4000-8000-000000000002";
   private static final String GENERAL_APPROVAL = "90000000-0000-4000-8000-000000000003";
+  private static final String LIMIT_APPROVAL = "90000000-0000-4000-8000-000000000004";
   private static final String USAGE = "a0000000-0000-4000-8000-000000000001";
   private static final String OUTCOME = "b0000000-0000-4000-8000-000000000001";
+  private static final String LIMIT_OUTCOME = "b0000000-0000-4000-8000-000000000002";
 
   @Autowired private JdbcTemplate jdbc;
   @Autowired private BenefitHistoryMapper mapper;
@@ -137,6 +139,14 @@ class BenefitHistoryMapperIntegrationTest {
         USER,
         USER_CARD);
     jdbc.update(
+        "INSERT INTO card_payment_approvals"
+            + " (approval_id,user_id,user_card_id,approved_at,merchant_name,amount,approval_status,"
+            + "source_payload,created_at) VALUES (?,?,?,'2026-07-20 05:30:00','영화관',18000,"
+            + "'approved',JSON_OBJECT(),UTC_TIMESTAMP(6))",
+        LIMIT_APPROVAL,
+        USER,
+        USER_CARD);
+    jdbc.update(
         "INSERT INTO user_card_performance_snapshots"
             + " (performance_snapshot_id,user_card_id,performance_month,current_spend_amount,"
             + "created_at,updated_at) VALUES (UUID(),?,'2026-06',120000,"
@@ -151,6 +161,17 @@ class BenefitHistoryMapperIntegrationTest {
         OUTCOME,
         USER_CARD,
         MISSED_APPROVAL,
+        OFFER,
+        RULE);
+    jdbc.update(
+        "INSERT INTO user_benefit_calculation_outcomes"
+            + " (outcome_id,user_card_id,approval_id,offer_id,rule_id,usage_date,reward_unit,"
+            + "expected_reward_value,applied_reward_value,missed_reward_value,outcome_status,"
+            + "rejection_reason) VALUES (?,?,?,?,?,'2026-07-20','KRW',1800,0,1800,"
+            + "'not_applied','MONTHLY_LIMIT_EXHAUSTED')",
+        LIMIT_OUTCOME,
+        USER_CARD,
+        LIMIT_APPROVAL,
         OFFER,
         RULE);
     jdbc.update(
@@ -176,29 +197,33 @@ class BenefitHistoryMapperIntegrationTest {
     LocalDateTime to = LocalDateTime.of(2026, 7, 31, 15, 0);
     List<BenefitHistoryRow> rows =
         mapper.findHistory(USER, from, to, null, "DISCOUNT", "LATEST", 0, 20);
-    assertEquals(2, rows.size());
-    assertEquals(OUTCOME, rows.get(0).getBenefitHistoryId());
-    assertEquals("NOT_APPLIED", rows.get(0).getCalculationStatus());
-    assertEquals(2000L, rows.get(0).getMissedBenefitAmount());
-    assertEquals(300000L, rows.get(0).getRequiredPreviousSpendAmount());
-    assertEquals(120000L, rows.get(0).getPreviousMonthSpendAmount());
-    assertEquals("이마트", rows.get(0).getMerchantName());
-    assertEquals("테스트 카드 1234********5678", rows.get(1).getCardName());
-    assertEquals(1500L, rows.get(1).getBenefitAmount());
+    assertEquals(3, rows.size());
+    BenefitHistoryRow performanceOutcome = find(rows, OUTCOME);
+    assertEquals("NOT_APPLIED", performanceOutcome.getCalculationStatus());
+    assertEquals(2000L, performanceOutcome.getMissedBenefitAmount());
+    assertEquals(300000L, performanceOutcome.getRequiredPreviousSpendAmount());
+    assertEquals(120000L, performanceOutcome.getPreviousMonthSpendAmount());
+    assertEquals("이마트", performanceOutcome.getMerchantName());
+    BenefitHistoryRow limitOutcome = find(rows, LIMIT_OUTCOME);
+    assertEquals("NOT_APPLIED", limitOutcome.getCalculationStatus());
+    assertEquals(1800L, limitOutcome.getMissedBenefitAmount());
+    assertEquals("MONTHLY_LIMIT_EXHAUSTED", limitOutcome.getRejectionReason());
+    assertEquals("테스트 카드 1234********5678", find(rows, USAGE).getCardName());
+    assertEquals(1500L, find(rows, USAGE).getBenefitAmount());
     BenefitHistorySummaryRow summary = mapper.summarizeHistory(USER, from, to, USER_CARD);
     assertEquals(1500L, summary.totalBenefitAmount());
     assertEquals(1500L, summary.discountAmount());
     assertEquals(0L, summary.cashbackAmount());
     assertEquals(0L, summary.pointAmount());
     assertEquals(0L, summary.mileageAmount());
-    assertEquals(2L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
+    assertEquals(3L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
     List<BenefitHistoryRow> allRows =
         mapper.findHistory(USER, from, to, null, null, "LATEST", 0, 20);
-    assertEquals(3, allRows.size());
-    assertEquals(GENERAL_APPROVAL, allRows.get(0).getBenefitHistoryId());
-    assertEquals("NOT_CALCULATED", allRows.get(0).getCalculationStatus());
-    assertNull(allRows.get(0).getBenefitType());
-    assertNull(allRows.get(0).getBenefitTitle());
+    assertEquals(4, allRows.size());
+    BenefitHistoryRow general = find(allRows, GENERAL_APPROVAL);
+    assertEquals("NOT_CALCULATED", general.getCalculationStatus());
+    assertNull(general.getBenefitType());
+    assertNull(general.getBenefitTitle());
     assertEquals(0L, mapper.countHistory(OTHER_USER, from, to, null, null));
     assertNull(mapper.findDetail(OTHER_USER, USAGE));
     BenefitHistoryDetailRow detail = mapper.findDetail(USER, USAGE);
@@ -207,9 +232,16 @@ class BenefitHistoryMapperIntegrationTest {
     BenefitHistoryDetailRow missed = mapper.findDetail(USER, OUTCOME);
     assertEquals("PERFORMANCE_NOT_MET", missed.getRejectionReason());
     assertEquals(2000L, missed.getMissedBenefitAmount());
-    BenefitHistoryDetailRow general = mapper.findDetail(USER, GENERAL_APPROVAL);
-    assertEquals("NOT_CALCULATED", general.getCalculationStatus());
-    assertNull(general.getBenefitTitle());
+    BenefitHistoryDetailRow generalDetail = mapper.findDetail(USER, GENERAL_APPROVAL);
+    assertEquals("NOT_CALCULATED", generalDetail.getCalculationStatus());
+    assertNull(generalDetail.getBenefitTitle());
+  }
+
+  private BenefitHistoryRow find(List<BenefitHistoryRow> rows, String historyId) {
+    return rows.stream()
+        .filter(row -> historyId.equals(row.getBenefitHistoryId()))
+        .findFirst()
+        .orElseThrow();
   }
 
   private void clean() {

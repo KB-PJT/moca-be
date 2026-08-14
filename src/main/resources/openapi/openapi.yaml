@@ -2055,7 +2055,7 @@ components:
         approvedAt: { type: string, format: date-time , description: '카드 승인이 발생한 시각입니다.'}
         paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
         benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
-        missedBenefitAmount: { type: integer, format: int64, description: '전월 실적 미충족으로 받지 못한 예상 혜택입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위입니다.' }
+        missedBenefitAmount: { type: integer, format: int64, description: '미적용된 예상 혜택 금액입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위이며, 미적용 사유는 rejectionReason을 참고합니다.' }
         benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE], nullable: true, description: '혜택 유형입니다. 혜택 계산 결과가 없는 일반 결제는 null입니다.'}
         benefitTitle: { type: string, nullable: true, description: '카드 상품 안내에 정의된 혜택명입니다. 일반 결제는 null입니다.'}
         userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
@@ -2090,7 +2090,7 @@ components:
         cardName: { type: string , description: '카드 상품명과 저장된 마스킹 카드번호를 공백으로 연결한 표시명입니다. 카드번호가 없으면 상품명만 반환합니다.'}
         paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
         benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
-        missedBenefitAmount: { type: integer, format: int64, description: '전월 실적 미충족으로 받지 못한 예상 혜택입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위입니다.' }
+        missedBenefitAmount: { type: integer, format: int64, description: '미적용된 예상 혜택 금액입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위이며, 미적용 사유는 rejectionReason을 참고합니다.' }
         benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE], nullable: true, description: '혜택 유형입니다. 혜택 계산 결과가 없는 일반 결제는 null입니다.'}
         benefitTitle: { type: string, nullable: true, description: '카드 상품 안내에 정의된 혜택명입니다. 일반 결제는 null입니다.'}
         monthlyLimit: { $ref: '#/components/schemas/MonthlyLimitResponse' }
