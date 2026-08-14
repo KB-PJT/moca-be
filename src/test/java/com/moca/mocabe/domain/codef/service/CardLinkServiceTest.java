@@ -198,6 +198,51 @@ class CardLinkServiceTest {
         verify(codefCredentialStore).saveCredential(any(CodefAccountCredential.class));
         verify(codefCredentialStore, never()).saveCard(any());
         verify(codefCredentialMapper, never()).clearPendingCardCredentials(any(), any());
+        // 짧게 대기 후 한 번만 자동 재시도한다(최초 시도 + 재시도 1회 = 총 2회).
+        verify(codefClient, times(2)).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+    }
+
+    @Test
+    @DisplayName("즉시 보유카드 조회가 첫 시도에 실패해도 짧게 대기 후 재시도가 성공하면 그 결과를 쓴다")
+    void retriesOnceAndSucceedsForCardNoIssuer() {
+        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
+        when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
+        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12"))
+                .thenThrow(new CodefUnavailableException("upstream timeout"))
+                .thenReturn(List.of());
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
+
+        CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
+
+        assertTrue(response.cards().isEmpty());
+        verify(codefClient, times(2)).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+        // 재시도 없이도 CODEF 호출 자체는 성공했으니, 계정 생성 카드가 저장되지 않았어도(빈 목록) pending 판단은
+        // creatorCardPersisted 기준 그대로다(빈 목록이라 저장된 카드가 없어 pending은 유지된다).
+        verify(codefCredentialMapper, never()).clearPendingCardCredentials(any(), any());
+    }
+
+    @Test
+    @DisplayName("재시도 대기 중 스레드가 인터럽트되어도 예외를 삼키고 재시도를 계속한다")
+    void continuesRetryWhenSleepIsInterrupted() {
+        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
+        when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
+        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12"))
+                .thenThrow(new CodefUnavailableException("upstream timeout"));
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
+        // 대기(Thread.sleep) 전에 인터럽트를 걸어두면 실제로 기다리지 않고 바로 InterruptedException이
+        // 발생해, 재시도 대기 중 인터럽트되는 경로를 실제로 대기하지 않고도 검증할 수 있다.
+        Thread.currentThread().interrupt();
+        try {
+            CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
+
+            assertTrue(response.cards().isEmpty());
+            verify(codefClient, times(2)).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+        } finally {
+            // 이 테스트가 세팅한 인터럽트 상태가 이후 다른 테스트로 새지 않도록 지운다.
+            Thread.interrupted();
+        }
     }
 
     @Test
