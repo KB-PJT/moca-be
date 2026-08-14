@@ -114,7 +114,9 @@ class MerchantCardRecommendationMapperIntegrationTest {
     assertEquals(1, rows.size());
     MerchantCardBenefitRuleRow row = rows.get(0);
     assertEquals(USER_CARD, row.userCardId());
+    assertEquals(OFFER, row.offerId());
     assertEquals("마트 적립", row.offerName());
+    assertEquals(1, row.benefitTierPosition());
     assertFalse(row.hasSchedule());
     assertFalse(row.hasOptionRequirement());
 
@@ -122,6 +124,7 @@ class MerchantCardRecommendationMapperIntegrationTest {
         USER, List.of(MERCHANT), LocalDate.of(2026, 8, 14), "2026-07");
     assertEquals(1, batchRows.size());
     assertEquals(RULE, batchRows.get(0).ruleId());
+    assertEquals(OFFER, batchRows.get(0).offerId());
   }
 
   @Configuration

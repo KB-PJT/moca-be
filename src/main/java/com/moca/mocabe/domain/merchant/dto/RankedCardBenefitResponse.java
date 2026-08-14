@@ -9,5 +9,7 @@ public record RankedCardBenefitResponse(
         BigDecimal estimatedValueKrw, BigDecimal estimatedPaymentAmountKrw,
         BigDecimal transactionMinKrw, BigDecimal previousMonthSpendKrw,
         BigDecimal requiredPreviousSpendKrw, BigDecimal remainingPreviousSpendKrw,
+        Integer currentTier, Integer nextTier, BigDecimal currentTierTargetAmount,
+        boolean isCurrentTierAchieved, BigDecimal remainingAmountToNextTier,
         BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw, BigDecimal monthlyRemainingKrw,
         boolean performanceMet, List<RecommendationReasonResponse> recommendationReasons) { }
