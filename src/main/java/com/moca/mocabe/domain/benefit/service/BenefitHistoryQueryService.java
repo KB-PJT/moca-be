@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 확정된 카드 혜택 사용 이력의 목록·상세 조회를 담당한다. */
+/** 카드 결제 승인 전체와 계산된 혜택 정보의 목록·상세 조회를 담당한다. */
 public class BenefitHistoryQueryService {
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final DateTimeFormatter YEAR_MONTH =

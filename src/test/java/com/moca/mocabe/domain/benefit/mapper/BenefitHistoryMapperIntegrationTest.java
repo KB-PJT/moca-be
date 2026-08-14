@@ -36,6 +36,7 @@ class BenefitHistoryMapperIntegrationTest {
   private static final String RULE = "81000000-0000-4000-8000-000000000001";
   private static final String APPROVAL = "90000000-0000-4000-8000-000000000001";
   private static final String MISSED_APPROVAL = "90000000-0000-4000-8000-000000000002";
+  private static final String GENERAL_APPROVAL = "90000000-0000-4000-8000-000000000003";
   private static final String USAGE = "a0000000-0000-4000-8000-000000000001";
   private static final String OUTCOME = "b0000000-0000-4000-8000-000000000001";
 
@@ -128,6 +129,14 @@ class BenefitHistoryMapperIntegrationTest {
         USER,
         USER_CARD);
     jdbc.update(
+        "INSERT INTO card_payment_approvals"
+            + " (approval_id,user_id,user_card_id,approved_at,merchant_name,amount,approval_status,"
+            + "source_payload,created_at) VALUES (?,?,?,'2026-07-19 05:30:00','서점',12000,"
+            + "'approved',JSON_OBJECT(),UTC_TIMESTAMP(6))",
+        GENERAL_APPROVAL,
+        USER,
+        USER_CARD);
+    jdbc.update(
         "INSERT INTO user_card_performance_snapshots"
             + " (performance_snapshot_id,user_card_id,performance_month,current_spend_amount,"
             + "created_at,updated_at) VALUES (UUID(),?,'2026-06',120000,"
@@ -183,6 +192,13 @@ class BenefitHistoryMapperIntegrationTest {
     assertEquals(0L, summary.pointAmount());
     assertEquals(0L, summary.mileageAmount());
     assertEquals(2L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
+    List<BenefitHistoryRow> allRows =
+        mapper.findHistory(USER, from, to, null, null, "LATEST", 0, 20);
+    assertEquals(3, allRows.size());
+    assertEquals(GENERAL_APPROVAL, allRows.get(0).getBenefitHistoryId());
+    assertEquals("NOT_CALCULATED", allRows.get(0).getCalculationStatus());
+    assertNull(allRows.get(0).getBenefitType());
+    assertNull(allRows.get(0).getBenefitTitle());
     assertEquals(0L, mapper.countHistory(OTHER_USER, from, to, null, null));
     assertNull(mapper.findDetail(OTHER_USER, USAGE));
     BenefitHistoryDetailRow detail = mapper.findDetail(USER, USAGE);
@@ -191,6 +207,9 @@ class BenefitHistoryMapperIntegrationTest {
     BenefitHistoryDetailRow missed = mapper.findDetail(USER, OUTCOME);
     assertEquals("PERFORMANCE_NOT_MET", missed.getRejectionReason());
     assertEquals(2000L, missed.getMissedBenefitAmount());
+    BenefitHistoryDetailRow general = mapper.findDetail(USER, GENERAL_APPROVAL);
+    assertEquals("NOT_CALCULATED", general.getCalculationStatus());
+    assertNull(general.getBenefitTitle());
   }
 
   private void clean() {
