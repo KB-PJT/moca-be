@@ -119,12 +119,15 @@ class CardLinkServiceTest {
     }
 
     @Test
-    @DisplayName("카드번호가 필요한 카드사는 connectedId·자격정보만 저장하고, 카드번호는 pending으로 "
-            + "암호화해 보관한 채 보유카드 조회는 하지 않는다(재조회 API가 이어서 처리)")
-    void createsLinkAndStoresCredential() {
+    @DisplayName("카드번호가 필요한 카드사도 방금 입력받은 카드번호로 즉시 보유카드를 조회해 적재하고, "
+            + "그 자리에서 성공했으니 pending도 지운다")
+    void createsLinkAndFetchesOwnedCardsImmediatelyForCardNoIssuer() {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
         when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        // cardPolicy()의 institutionCode(0301)는 KB카드라 카드 비밀번호가 앞 2자리로 잘려 CODEF에 전달된다.
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12"))
+                .thenReturn(List.of());
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 
         CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
@@ -138,7 +141,8 @@ class CardLinkServiceTest {
                 ArgumentCaptor.forClass(CodefAccountCredential.class);
         verify(codefCredentialStore).saveCredential(credentialCaptor.capture());
         verify(codefCredentialStore, never()).saveCard(any());
-        verify(codefClient, never()).getOwnedCards(any(), any(), any(), any(), any());
+        verify(codefClient).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+        verify(codefCredentialMapper).clearPendingCardCredentials(response.getLinkId(), USER_ID);
         CodefAccountCredential credential = credentialCaptor.getValue();
         assertEquals(response.getLinkId(), credential.getCodefAccountCredentialId());
         assertEquals("hash-1", credential.getCredentialIdentityHash());
@@ -146,6 +150,27 @@ class CardLinkServiceTest {
         assertNotNull(credential.getAccountPasswordEnc());
         assertNotNull(credential.getPendingCardNumberEnc());
         assertNotNull(credential.getPendingCardPasswordEnc());
+    }
+
+    @Test
+    @DisplayName("카드번호가 필요한 카드사에서 즉시 보유카드 조회가 실패해도 connectedId·pending은 "
+            + "그대로 유지해 POST /card-links/cards/sync로 재시도할 수 있다")
+    void keepsPendingWhenImmediateOwnedCardFetchFailsForCardNoIssuer() {
+        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
+        when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
+        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12"))
+                .thenThrow(new CodefUnavailableException("upstream timeout"));
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
+
+        CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
+
+        assertNotNull(response.getLinkId());
+        assertEquals("PENDING_CARD_ACTIVATION", response.getStatus());
+        assertTrue(response.cards().isEmpty());
+        verify(codefCredentialStore).saveCredential(any(CodefAccountCredential.class));
+        verify(codefCredentialStore, never()).saveCard(any());
+        verify(codefCredentialMapper, never()).clearPendingCardCredentials(any(), any());
     }
 
     @Test

@@ -130,20 +130,27 @@ public class CardLinkService {
         codefCredentialStore.saveCredential(buildCredential(
                 userId, request, cardPassword, policy, connectedId, linkId, credentialIdentityHash));
 
-        // 카드번호가 필요 없는 카드사는 추가로 입력받을 값이 없어 나눌 이유가 없으므로 지금 바로
-        // 보유카드까지 조회한다(기존 동작 유지). 카드번호가 필요한 카드사는 보유카드 조회를 여기서
-        // 하지 않고 pending에 저장만 해두며, POST /card-links/cards/sync(재조회)가 그 pending을
-        // 이어서 소비한다 — 별도 API를 만들지 않고 기존 재조회 흐름을 그대로 재사용한다.
+        // 카드번호가 필요한 카드사도 방금 입력받은 카드번호/비밀번호가 있으니 지금 바로 보유카드까지
+        // 조회한다 — connectedId 발급 직후 CODEF가 계정을 아직 완전히 반영하지 못해 이 호출이 실패할
+        // 수 있는데, 그 경우에도 pending에 저장해둔 카드번호/비밀번호로 POST /card-links/cards/sync가
+        // 재시도할 수 있으므로 이 실패는 연동 생성 자체를 막지 않는다(기존 재조회 흐름 그대로 유지).
         List<CardLinkCardResponse> cards = List.of();
-        if (!policy.isRequiresCardNo()) {
-            try {
-                List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
-                        connectedId, policy.getInstitutionCode(), request.getBirthDate(), null, null);
-                cards = matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, null, null).cards();
-            } catch (RuntimeException exception) {
-                LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
-                        + describeException(exception));
+        try {
+            String cardNo = policy.isRequiresCardNo() ? request.getCardNo() : null;
+            String cardPasswordForLookup = policy.isRequiresCardNo() ? cardPassword : null;
+            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                    connectedId, policy.getInstitutionCode(), request.getBirthDate(),
+                    cardNo, cardPasswordForLookup);
+            cards = matchAndPersistOwnedCards(
+                    userId, linkId, policy, ownedCards, cardNo, cardPasswordForLookup).cards();
+            if (policy.isRequiresCardNo()) {
+                // 이 자리에서 이미 pending 값을 소비했으니, 나중에 POST /card-links/cards/sync가
+                // 같은 pending으로 또 재조회하지 않도록 지운다.
+                codefCredentialMapper.clearPendingCardCredentials(linkId, userId);
             }
+        } catch (RuntimeException exception) {
+            LOGGER.log(Level.WARNING, "보유카드 조회에 실패했지만 connectedId는 이미 저장되어 연동 생성은 유지합니다. "
+                    + describeException(exception));
         }
         return new CardLinkResponse(linkId, policy.getInstitutionCode(), STATUS_PENDING, cards);
     }
