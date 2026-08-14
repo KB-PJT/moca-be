@@ -198,6 +198,59 @@ class CardLinkServiceTest {
         verify(codefCredentialStore).saveCredential(any(CodefAccountCredential.class));
         verify(codefCredentialStore, never()).saveCard(any());
         verify(codefCredentialMapper, never()).clearPendingCardCredentials(any(), any());
+        // 짧게 대기 후 한 번만 자동 재시도한다(최초 시도 + 재시도 1회 = 총 2회).
+        verify(codefClient, times(2)).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+    }
+
+    @Test
+    @DisplayName("즉시 보유카드 조회가 첫 시도에 실패해도 짧게 대기 후 재시도가 성공하면 그 결과를 쓴다")
+    void retriesOnceAndSucceedsForCardNoIssuer() {
+        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
+        when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
+        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        // 첫 시도는 실패하고, 재시도(두 번째 호출)에서 계정 생성 카드번호와 마스킹이 일치하는 보유카드를 돌려준다.
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12"))
+                .thenThrow(new CodefUnavailableException("upstream timeout"))
+                .thenReturn(List.of(new CodefOwnedCard("정식 카드명", "123456******3456", "체크/본인", "")));
+        when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("new-key");
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "check", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("정식 카드명"))).thenReturn(matched);
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
+
+        CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
+
+        assertEquals(1, response.cards().size());
+        assertTrue(response.cards().get(0).matched());
+        verify(codefClient, times(2)).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+        verify(codefCredentialStore).saveCard(any());
+        // 재시도로 CODEF 호출이 성공해 계정 생성 카드가 실제로 저장됐으니 pending을 지운다.
+        verify(codefCredentialMapper).clearPendingCardCredentials(response.getLinkId(), USER_ID);
+    }
+
+    @Test
+    @DisplayName("재시도 대기 중 스레드가 인터럽트되어도 예외를 삼키고 재시도를 계속한다")
+    void continuesRetryWhenSleepIsInterrupted() {
+        when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
+        when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
+        when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12"))
+                .thenThrow(new CodefUnavailableException("upstream timeout"));
+        when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
+        // 대기(Thread.sleep) 전에 인터럽트를 걸어두면 실제로 기다리지 않고 바로 InterruptedException이
+        // 발생해, 재시도 대기 중 인터럽트되는 경로를 실제로 대기하지 않고도 검증할 수 있다.
+        Thread.currentThread().interrupt();
+        try {
+            CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
+
+            assertTrue(response.cards().isEmpty());
+            verify(codefClient, times(2)).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
+        } finally {
+            // 이 테스트가 세팅한 인터럽트 상태가 이후 다른 테스트로 새지 않도록 지운다.
+            Thread.interrupted();
+        }
     }
 
     @Test

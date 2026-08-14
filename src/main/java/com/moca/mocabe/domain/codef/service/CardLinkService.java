@@ -68,6 +68,11 @@ public class CardLinkService {
     private static final String HASH_TYPE_ACCOUNT_ID = "ACCOUNT_ID";
     private static final String HASH_TYPE_CODEF_CARD = "CODEF_CARD";
     private static final String KB_CARD_INSTITUTION_CODE = "0301";
+    /** connectedId 발급 직후 즉시 보유카드 조회를 시도하는 최대 횟수(최초 시도 + 재시도 1회). */
+    private static final int OWNED_CARD_FETCH_MAX_ATTEMPTS = 2;
+    /** 재시도 전 대기 시간이다. CODEF가 카드사에 따라 connectedId 계정 세션을 반영하는 데 시간이 걸려
+     * 발급 직후 첫 조회가 "로그인 파라미터 누락" 류로 실패하는 경우가 있어(NH카드에서 확인됨) 짧게 대기한다. */
+    private static final long OWNED_CARD_FETCH_RETRY_DELAY_MS = 1000;
 
     private final CodefClient codefClient;
     private final CodefCredentialMapper codefCredentialMapper;
@@ -138,11 +143,8 @@ public class CardLinkService {
         try {
             String cardNo = policy.isRequiresCardNo() ? request.getCardNo() : null;
             String cardPasswordForLookup = policy.isRequiresCardNo() ? cardPassword : null;
-            List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
-                    connectedId, policy.getInstitutionCode(), request.getBirthDate(),
-                    cardNo, cardPasswordForLookup);
-            MatchAndPersistResult result = matchAndPersistOwnedCards(
-                    userId, linkId, policy, ownedCards, cardNo, cardPasswordForLookup);
+            MatchAndPersistResult result = fetchAndMatchOwnedCardsWithRetry(
+                    userId, linkId, policy, connectedId, request.getBirthDate(), cardNo, cardPasswordForLookup);
             cards = result.cards();
             if (policy.isRequiresCardNo() && result.creatorCardPersisted()) {
                 // 계정 생성 카드가 실제로 크리덴셜을 갖고 저장됐을 때만 pending을 지운다 — 카탈로그
@@ -155,6 +157,42 @@ public class CardLinkService {
                     + describeException(exception));
         }
         return new CardLinkResponse(linkId, policy.getInstitutionCode(), STATUS_PENDING, cards);
+    }
+
+    /**
+     * connectedId 발급 직후 CODEF가 계정 세션을 아직 완전히 반영하지 못해 첫 보유카드 조회가 실패하는
+     * 경우가 있어(카드사마다 반영 속도 차이가 크고, NH카드에서 "로그인 파라미터 누락" 오류로 확인됨),
+     * 짧게 대기한 뒤 한 번만 자동 재시도한다. 재시도까지 실패하면 예외를 그대로 던져 호출자(createLink)가
+     * pending을 유지하고 POST /card-links/cards/sync로 다시 시도하게 둔다.
+     */
+    private MatchAndPersistResult fetchAndMatchOwnedCardsWithRetry(String userId, String linkId,
+                                                                    CodefIssuerPolicy policy, String connectedId,
+                                                                    String birthDate, String cardNo,
+                                                                    String cardPassword) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= OWNED_CARD_FETCH_MAX_ATTEMPTS; attempt++) {
+            try {
+                List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
+                        connectedId, policy.getInstitutionCode(), birthDate, cardNo, cardPassword);
+                return matchAndPersistOwnedCards(userId, linkId, policy, ownedCards, cardNo, cardPassword);
+            } catch (RuntimeException exception) {
+                lastFailure = exception;
+                if (attempt < OWNED_CARD_FETCH_MAX_ATTEMPTS) {
+                    LOGGER.log(Level.INFO, "즉시 보유카드 조회가 실패해 짧게 대기 후 재시도합니다. "
+                            + describeException(exception));
+                    sleepBeforeRetry();
+                }
+            }
+        }
+        throw lastFailure;
+    }
+
+    private void sleepBeforeRetry() {
+        try {
+            Thread.sleep(OWNED_CARD_FETCH_RETRY_DELAY_MS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
