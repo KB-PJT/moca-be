@@ -13,7 +13,7 @@ public record MerchantCardBenefitRuleRow(
         BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw,
         String ruleId, String ruleEffect, LocalDate validFrom, LocalDate validTo,
         String matchMode, String targetType, String targetMerchantCategoryId, String targetMerchantId,
-        BigDecimal minimumPlaceConfidence, boolean hasSchedule, boolean hasOptionRequirement) {
+        BigDecimal minimumPlaceConfidence, Boolean hasSchedule, Boolean hasOptionRequirement) {
 
     public MerchantCardBenefitCandidate toCandidate() {
         return new MerchantCardBenefitCandidate(

@@ -59,8 +59,8 @@ public class CardBenefitEligibilityEvaluator {
                 && SUPPORTED_REWARD_UNITS.contains(rule.rewardUnit())
                 && (rule.validFrom() == null || !usageDate.isBefore(rule.validFrom()))
                 && (rule.validTo() == null || !usageDate.isAfter(rule.validTo()))
-                && !rule.hasSchedule()
-                && !rule.hasOptionRequirement();
+                && !Boolean.TRUE.equals(rule.hasSchedule())
+                && !Boolean.TRUE.equals(rule.hasOptionRequirement());
     }
 
     private boolean targetMatches(MerchantCardBenefitRuleRow row, String merchantId,

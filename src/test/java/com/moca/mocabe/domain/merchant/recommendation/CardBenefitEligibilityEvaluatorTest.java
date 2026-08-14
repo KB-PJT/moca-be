@@ -106,6 +106,17 @@ class CardBenefitEligibilityEvaluatorTest {
         assertEquals(0, evaluate(rows, null, List.of(), null).size());
     }
 
+    @Test
+    @DisplayName("일정과 옵션 플래그가 null인 룰은 제한 조건 없이 적용한다")
+    void appliesRuleWhenScheduleAndOptionFlagsAreNull() {
+        MerchantCardBenefitRuleRow row = row(
+                "null-flags", "include", "all_merchants", null, null, BigDecimal.ZERO,
+                "grant", "discount", "percent", BigDecimal.ONE,
+                null, null, null, null);
+
+        assertEquals(1, evaluate(List.of(row), null, List.of(), null).size());
+    }
+
     private List<?> evaluate(List<MerchantCardBenefitRuleRow> rows, String merchantId,
                              List<String> lineageIds, String confidence) {
         BigDecimal placeConfidence = confidence == null ? null : new BigDecimal(confidence);
@@ -116,8 +127,8 @@ class CardBenefitEligibilityEvaluatorTest {
             String ruleId, String matchMode, String targetType, String targetCategoryId,
             String targetMerchantId, BigDecimal minimumConfidence, String ruleEffect,
             String rewardType, String rewardUnit, BigDecimal rewardValue,
-            LocalDate validFrom, LocalDate validTo, boolean hasSchedule,
-            boolean hasOptionRequirement) {
+            LocalDate validFrom, LocalDate validTo, Boolean hasSchedule,
+            Boolean hasOptionRequirement) {
         return new MerchantCardBenefitRuleRow(
                 "merchant-1", "이마트", "MART", "마트", "card-1", "카드",
                 "카드사", null, "혜택", rewardType, rewardUnit, rewardValue,
