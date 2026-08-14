@@ -141,11 +141,13 @@ public class CardLinkService {
             List<CodefOwnedCard> ownedCards = codefClient.getOwnedCards(
                     connectedId, policy.getInstitutionCode(), request.getBirthDate(),
                     cardNo, cardPasswordForLookup);
-            cards = matchAndPersistOwnedCards(
-                    userId, linkId, policy, ownedCards, cardNo, cardPasswordForLookup).cards();
-            if (policy.isRequiresCardNo()) {
-                // 이 자리에서 이미 pending 값을 소비했으니, 나중에 POST /card-links/cards/sync가
-                // 같은 pending으로 또 재조회하지 않도록 지운다.
+            MatchAndPersistResult result = matchAndPersistOwnedCards(
+                    userId, linkId, policy, ownedCards, cardNo, cardPasswordForLookup);
+            cards = result.cards();
+            if (policy.isRequiresCardNo() && result.creatorCardPersisted()) {
+                // 계정 생성 카드가 실제로 크리덴셜을 갖고 저장됐을 때만 pending을 지운다 — 카탈로그
+                // 매칭 실패 등으로 저장되지 않았다면 pending을 남겨둬야 POST /card-links/cards/sync가
+                // 같은 카드번호로 다시 시도할 수 있다(syncOwnedCardsForConnection과 동일한 조건).
                 codefCredentialMapper.clearPendingCardCredentials(linkId, userId);
             }
         } catch (RuntimeException exception) {
