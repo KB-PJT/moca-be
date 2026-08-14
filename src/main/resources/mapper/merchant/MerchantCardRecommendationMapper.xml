@@ -65,8 +65,8 @@
             <arg column="target_merchant_category_id" javaType="java.lang.String"/>
             <arg column="target_merchant_id" javaType="java.lang.String"/>
             <arg column="minimum_place_confidence" javaType="java.math.BigDecimal"/>
-            <arg column="has_schedule" javaType="boolean"/>
-            <arg column="has_option_requirement" javaType="boolean"/>
+            <arg column="has_schedule" javaType="java.lang.Boolean"/>
+            <arg column="has_option_requirement" javaType="java.lang.Boolean"/>
         </constructor>
     </resultMap>
 
