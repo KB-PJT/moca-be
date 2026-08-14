@@ -208,18 +208,26 @@ class CardLinkServiceTest {
         when(issuerMapper.findCodefPolicyByInstitutionCode(INSTITUTION_CODE)).thenReturn(cardPolicy());
         when(credentialHasher.generate("CARD_NO", "1234567890123456")).thenReturn("hash-1");
         when(codefClient.createConnectedId(any(CodefConnectionCommand.class))).thenReturn("cid-1");
+        // 첫 시도는 실패하고, 재시도(두 번째 호출)에서 계정 생성 카드번호와 마스킹이 일치하는 보유카드를 돌려준다.
         when(codefClient.getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12"))
                 .thenThrow(new CodefUnavailableException("upstream timeout"))
-                .thenReturn(List.of());
+                .thenReturn(List.of(new CodefOwnedCard("정식 카드명", "123456******3456", "체크/본인", "")));
+        when(credentialHasher.generate(eq("CODEF_CARD"), anyString())).thenReturn("new-key");
+        CardCatalogEntry matched = new CardCatalogEntry(
+                "card-1", ISSUER_ID, "정식 카드명", "check", "https://gorilla/card.png");
+        when(cardCatalogMapper.findCardsByIssuerId(ISSUER_ID)).thenReturn(List.of(matched));
+        when(cardCatalogMatcher.match(any(), eq("정식 카드명"))).thenReturn(matched);
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
         when(encryptor.encrypt(anyString())).thenReturn(new byte[] {1, 2, 3});
 
         CardLinkResponse response = cardLinkService.createLink(USER_ID, request());
 
-        assertTrue(response.cards().isEmpty());
+        assertEquals(1, response.cards().size());
+        assertTrue(response.cards().get(0).matched());
         verify(codefClient, times(2)).getOwnedCards("cid-1", "0301", "900101", "1234567890123456", "12");
-        // 재시도 없이도 CODEF 호출 자체는 성공했으니, 계정 생성 카드가 저장되지 않았어도(빈 목록) pending 판단은
-        // creatorCardPersisted 기준 그대로다(빈 목록이라 저장된 카드가 없어 pending은 유지된다).
-        verify(codefCredentialMapper, never()).clearPendingCardCredentials(any(), any());
+        verify(codefCredentialStore).saveCard(any());
+        // 재시도로 CODEF 호출이 성공해 계정 생성 카드가 실제로 저장됐으니 pending을 지운다.
+        verify(codefCredentialMapper).clearPendingCardCredentials(response.getLinkId(), USER_ID);
     }
 
     @Test
