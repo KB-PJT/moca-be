@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -523,6 +524,37 @@ class CodefClientTest {
 
         assertThrows(CodefUnavailableException.class,
                 () -> codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608"));
+    }
+
+    @Test
+    @DisplayName("expires_in이 있으면 만료 전까지 토큰을 재사용해 다음 호출에서 토큰 발급을 다시 하지 않는다")
+    void reusesCachedTokenWhileNotExpired() {
+        String tokenWithExpiry = "{\"access_token\":\"tok-1\",\"expires_in\":3600}";
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(tokenWithExpiry));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
+
+        codefClient.getApprovals("cid-1", "0301", "900101", "20260801", "20260803", null, null);
+        codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608");
+
+        verify(httpClient, times(1)).post(eq(TOKEN_URL), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("expires_in이 없으면 캐싱하지 않고 호출마다 토큰을 다시 발급받는다")
+    void doesNotCacheTokenWithoutExpiresIn() {
+        when(httpClient.post(eq(TOKEN_URL), any(), anyString())).thenReturn(ok(TOKEN_RESPONSE));
+        when(httpClient.post(eq(APPROVAL_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":[]}")));
+        when(httpClient.post(eq(PERFORMANCE_URL), any(), anyString())).thenReturn(ok(urlEncoded(
+                "{\"result\":{\"code\":\"CF-00000\"},\"data\":{}}")));
+
+        codefClient.getApprovals("cid-1", "0301", "900101", "20260801", "20260803", null, null);
+        codefClient.getPerformance("cid-1", "0301", "900101", null, null, "202608");
+
+        verify(httpClient, times(2)).post(eq(TOKEN_URL), any(), anyString());
     }
 
     private CodefConnectionCommand command(String password, String cardNo, String cardPassword,
