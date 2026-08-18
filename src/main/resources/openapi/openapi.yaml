@@ -1023,6 +1023,7 @@ paths:
         또는 조회 가능 범위 초과)는 재시도해도 항상 실패하는 영구 조건이므로 503이 아니라 400으로 응답합니다.
         전월 실적은 부가 정보라 카드사가 지원하지 않거나 조회에 실패해도 전월분만 건너뛸 뿐 전체 동기화를
         실패시키지 않습니다.
+        institutionCode를 주면 그 카드사 연동만, 생략하면 모든 활성 연동을 대상으로 동기화합니다.
       operationId: syncMyCardApprovals
       security:
         - MocaBearerAuth: []
@@ -1043,6 +1044,13 @@ paths:
             type: string
             format: date
             example: "2026-08-03"
+        - name: institutionCode
+          in: query
+          required: false
+          description: 카드사 기관코드(issuers.institution_code). 생략하면 모든 활성 연동을 동기화합니다.
+          schema:
+            type: string
+            example: "0301"
       responses:
         '200':
           description: 승인내역 동기화 성공
@@ -1063,6 +1071,12 @@ paths:
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/AuthorizationError'
+        '404':
+          description: 지정한 기관코드로 연동된 활성 계정이 없음(code=CODEF_CONNECTION_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/CardSyncFailedError'
   /me/cards/{userCardId}:

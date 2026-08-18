@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.codef.service;
 import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
@@ -31,46 +32,46 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * POST /me/cards/sync에서 CODEF 승인내역을 조회해 새 건만 card_payment_approvals에 적재하고, 실적현황을 조회해
- * user_card_performance_snapshots에 upsert한다. 실적 조회 대상 월은 sync의 startDate가 속한 달이며(기본값은 이번 달), 그 달이
- * 카드사가 지원하는 조회 가능 범위 (issuers.performance_lookback_months, NULL이면 이번 달까지만)를 벗어나거나 카드사가 실적조회 자체를
- * 지원하지 않으면(-1) 재시도해도 항상 실패하는 영구 조건이므로 {@link PerformanceUnsupportedException}(400)을 던져 동기화 전체를
- * 실패시킨다. CODEF 실적조회 호출 자체가 실패하는 일시적 상황은 {@link PerformanceSyncFailedException}(503)으로 구분한다. 승인내역 조회
- * 실패는 {@link ApprovalSyncFailedException}으로 구분해 응답 code를 다르게 내려보낸다 (사용자 결정: 부분 성공 대신 하나라도 실패하면 무엇이
- * 문제인지 구분해서 전체를 실패로 처리). 비씨카드(0305)는 CODEF가 startDate 기준 "전월" 실적을 주는 카드사라 조회 대상 월보다 한 달 뒤를
- * startDate로 보내야 하며, 이 보정은 이 카드사에만 적용한다.
- *
- * 대상 월의 실적과 더불어 바로 전 달(대상 월 - 1개월) 실적도 가능하면 함께 조회해 적재한다. 다만 지난 달 실적은 부가 정보이므로 카드사가 그만큼 과거를
- * 지원하지 않거나(PerformanceUnsupportedException) CODEF 호출이 실패해도(PerformanceSyncFailedException) 대상 월 동기화
- * 전체를 실패시키지 않고 지난 달분만 건너뛴다.
- *
- * 취소·부분취소·거절 및 해외결제는 반전 처리하지 않고 완전히 제외한다. 따라서 이 항목들은 승인 적재, 혜택 계산, 미적용 혜택 집계 어느 단계에도 들어가지 않으며 정상
- * 국내 승인건만 적재한다. 카드 매칭은 {@link ApprovalCardMatcher}, 가맹점 매칭은 {@link MerchantLookup}에 위임하며, 이미 적재된 건은
- * (카드+승인번호) 또는 (카드+시각+금액+가맹점명)으로 중복을 걸러낸다.
+ * POST /me/cards/sync에서 CODEF 승인내역·실적을 조회해 적재한다. 실적 조회 대상 월은 카드사가 지원하는 범위(issuers.
+ * performance_lookback_months)를 벗어나면 {@link PerformanceUnsupportedException}, CODEF 호출 자체가 실패하면
+ * {@link ApprovalSyncFailedException}/{@link PerformanceSyncFailedException}으로 구분해 던진다(하나라도 실패하면 전체
+ * 실패 처리). 취소·부분취소·거절·해외결제는 완전히 제외하고 정상 국내 승인건만 적재하며, 중복은 (카드+승인번호) 또는
+ * (카드+시각+금액+가맹점명)으로 걸러낸다.
  */
-public class CardSyncService {
+public class CardSyncService implements DisposableBean {
 
   private static final Logger LOGGER = Logger.getLogger(CardSyncService.class.getName());
+
+  /** CODEF 호출(승인내역/실적, 카드 수 × 3개)을 동시에 몇 개까지 병행할지. 순차 호출 시 카드가 많으면 프론트 타임아웃(80초)을 넘겨서 도입했다. */
+  private static final int CODEF_FETCH_PARALLELISM = 16;
   private static final ZoneId KST = ZoneId.of("Asia/Seoul");
   private static final DateTimeFormatter CODEF_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
   private static final DateTimeFormatter CODEF_MONTH = DateTimeFormatter.ofPattern("yyyyMM");
   private static final DateTimeFormatter PERFORMANCE_MONTH = DateTimeFormatter.ofPattern("yyyy-MM");
 
-  /** issuers.performance_lookback_months가 NULL(정책 미확인)일 때 보수적으로 적용하는 기본값(이번 달까지만). */
+  /** performance_lookback_months가 NULL(정책 미확인)일 때의 기본값(이번 달까지만). */
   private static final int DEFAULT_PERFORMANCE_LOOKBACK_MONTHS = 0;
 
-  /** 이 값이면 실적조회 자체를 지원하지 않는 카드사로 확인된 것이다(0=당월만 지원과 구분). */
+  /** 실적조회 자체를 지원하지 않는 카드사 표시값(0=당월만 지원과 구분). */
   private static final int PERFORMANCE_UNSUPPORTED_LOOKBACK_MONTHS = -1;
 
-  /** 비씨카드 기관코드. CODEF가 startDate 기준 "전월" 실적을 주므로 +1개월 보정이 필요하다. */
+  /** 비씨카드는 CODEF가 startDate 기준 "전월" 실적을 줘서 +1개월 보정이 필요하다. */
   private static final String BC_CARD_INSTITUTION_CODE = "0305";
 
   private final CodefClient codefClient;
@@ -82,6 +83,8 @@ public class CardSyncService {
   private final PerformanceSnapshotStore performanceSnapshotStore;
   private final Encryptor encryptor;
   private final BenefitUsageCalculationService benefitUsageCalculationService;
+  private final ExecutorService codefFetchExecutor =
+      Executors.newFixedThreadPool(CODEF_FETCH_PARALLELISM);
 
   public CardSyncService(
       CodefClient codefClient,
@@ -125,12 +128,23 @@ public class CardSyncService {
     this.benefitUsageCalculationService = benefitUsageCalculationService;
   }
 
+  @Override
+  public void destroy() {
+    codefFetchExecutor.shutdown();
+  }
+
+  public SyncMyCardsResponse sync(String userId, LocalDate startDate, LocalDate endDate) {
+    return sync(userId, startDate, endDate, null);
+  }
+
   /**
-   * startDate/endDate는 KST 기준이며, null이면 이번 달 1일~오늘로 기본값을 채운다. 승인 적재·혜택 계산·실적 스냅샷은 하나의 트랜잭션으로 확정한다.
-   * 계산이 실패하면 승인만 남아 재동기화에서 영구적으로 계산이 누락되는 상태를 막기 위해 전체를 롤백한다.
+   * startDate/endDate가 null이면 이번 달 1일~오늘로 채운다. 계산 실패 시 재동기화에서 영구 누락되지 않도록 전체를 하나의
+   * 트랜잭션으로 롤백한다. institutionCode를 주면 그 카드사 연동만 동기화하며, 연동이 없으면
+   * {@link CodefConnectionNotFoundException}(404)을 던진다.
    */
   @Transactional
-  public SyncMyCardsResponse sync(String userId, LocalDate startDate, LocalDate endDate) {
+  public SyncMyCardsResponse sync(
+      String userId, LocalDate startDate, LocalDate endDate, String institutionCode) {
     LocalDate today = LocalDate.now(KST);
     LocalDate from = startDate != null ? startDate : today.withDayOfMonth(1);
     LocalDate to = endDate != null ? endDate : today;
@@ -140,6 +154,14 @@ public class CardSyncService {
 
     List<UserCardMatchRow> userCards = cardApprovalMapper.findUserCardsForMatching(userId);
     List<CodefConnection> connections = codefCredentialMapper.findActiveConnectionsByUserId(userId);
+    if (institutionCode != null) {
+      connections = connections.stream()
+          .filter(connection -> institutionCode.equals(connection.institutionCode()))
+          .toList();
+      if (connections.isEmpty()) {
+        throw new CodefConnectionNotFoundException(institutionCode);
+      }
+    }
 
     IngestResult result = new IngestResult(0, 0);
     if (!userCards.isEmpty() && !connections.isEmpty()) {
@@ -176,17 +198,15 @@ public class CardSyncService {
 
     String startStr = from.format(CODEF_DATE);
     String endStr = to.format(CODEF_DATE);
-    // 카드 매칭 실패 원인을 진단할 수 있도록 매칭 후보(보유카드)의 이름·카드번호를 남긴다(FINE).
     for (UserCardMatchRow card : userCards) {
       LOGGER.fine("동기화 대상 보유카드: name='" + card.cardName() + "' cardNo='" + card.cardNo() + "'");
     }
-    // 가맹점 후보를 승인건마다 다시 조회하면 비용이 승인건 수만큼 반복되므로 이 회차 시작 시 한 번만 읽는다.
+    // 가맹점 후보는 승인건마다 다시 읽으면 비용이 커지므로 회차당 한 번만 로드한다.
     MerchantCandidateSnapshot merchantCandidates = merchantLookup.loadCandidates();
     IngestStats stats = new IngestStats();
     List<ApprovalInsert> inserts = new ArrayList<>();
     List<PerformanceSnapshotUpsert> performanceUpserts = new ArrayList<>();
-    // 실적 조회 대상 월은 승인내역 조회 시작일(from)이 속한 달로 삼는다(기본값 이번 달 1일 → 이번 달).
-    // 지난 달 실적도 가능하면 함께 적재한다(카드사가 지원하지 않으면 대상 월 동기화는 살리고 지난 달만 건너뛴다).
+    // 실적 조회 대상 월은 from이 속한 달이며, 지난 달 실적도 가능하면 함께 적재한다(미지원이면 그 달만 건너뜀).
     YearMonth targetMonth = YearMonth.from(from);
     YearMonth previousMonth = targetMonth.minusMonths(1);
     YearMonth currentMonth = YearMonth.now(KST);
@@ -194,77 +214,94 @@ public class CardSyncService {
     long previousMonthsBack = Math.max(0, ChronoUnit.MONTHS.between(previousMonth, currentMonth));
     String performanceMonth = targetMonth.format(PERFORMANCE_MONTH);
     String previousPerformanceMonth = previousMonth.format(PERFORMANCE_MONTH);
+
+    // CODEF 호출은 스레드풀에서 병행하고, DB 조회와 결과 반영은 메인 스레드에서만 한다(트랜잭션 커넥션이
+    // 스레드로컬에 묶여 있어 다른 스레드에서 매퍼를 부르면 트랜잭션 밖에서 별도 커넥션이 열린다).
+    // connectedId(=CODEF 계정 세션)가 같은 호출끼리는 동시에 보내면 CODEF가 거부할 수 있어(세션 하나를
+    // 여러 요청이 동시에 쓰는 셈), connectedId별로 순서를 유지하고 서로 다른 connectedId끼리만 병행한다.
+    long fetchStartMs = System.currentTimeMillis();
+    Map<String, CompletableFuture<?>> connectedIdChain = new HashMap<>();
+    List<FetchTask> fetchTasks = new ArrayList<>();
     for (CodefConnection connection : connections) {
       String birthDate = encryptor.decrypt(connection.birthDateEnc());
       if (connection.requiresCardNo()) {
-        // 카드번호가 필요한 카드사는 카드마다 카드번호가 달라 연동 전체를 한 번에 조회할 수 없으므로,
-        // 활성 카드별로 저장된 카드번호/비밀번호를 꺼내 승인내역·실적조회를 각각 호출한다.
+        // 카드번호가 필요한 카드사는 카드마다 카드번호가 달라 카드 단위로 개별 호출한다.
         for (ActiveCardCredential cardCredential :
             cardApprovalMapper.findActiveCardCredentialsByCredentialId(
                 connection.codefAccountCredentialId())) {
           if (cardCredential.cardNumberEnc() == null) {
-            // 활성화 검증(activateCards)이 정상 동작했다면 발생하지 않아야 하는 상태다.
             LOGGER.warning(
                 "활성 카드에 카드번호가 없어 동기화에서 건너뜁니다. userCardId=" + cardCredential.userCardId());
             continue;
           }
           String cardNo = encryptor.decrypt(cardCredential.cardNumberEnc());
-          // 카드사가 카드번호만 요구하고 카드 비밀번호는 요구하지 않으면 정상적으로 null이다.
           String cardPassword =
               cardCredential.cardPasswordEnc() == null
                   ? null
                   : encryptor.decrypt(cardCredential.cardPasswordEnc());
-          fetchAndCollect(
-              userId,
-              userCards,
-              connection,
-              birthDate,
-              startStr,
-              endStr,
-              cardNo,
-              cardPassword,
-              targetMonth,
-              monthsBack,
-              performanceMonth,
-              previousMonth,
-              previousMonthsBack,
-              previousPerformanceMonth,
-              merchantCandidates,
-              seenKeys,
-              stats,
-              inserts,
-              performanceUpserts);
+          fetchTasks.add(
+              submitFetch(
+                  connectedIdChain,
+                  connection,
+                  birthDate,
+                  startStr,
+                  endStr,
+                  cardNo,
+                  cardPassword,
+                  targetMonth,
+                  monthsBack,
+                  performanceMonth,
+                  previousMonth,
+                  previousMonthsBack,
+                  previousPerformanceMonth));
         }
       } else if (!cardApprovalMapper
           .findActiveCardCredentialsByCredentialId(connection.codefAccountCredentialId())
           .isEmpty()) {
-        fetchAndCollect(
-            userId,
-            userCards,
-            connection,
-            birthDate,
-            startStr,
-            endStr,
-            null,
-            null,
-            targetMonth,
-            monthsBack,
-            performanceMonth,
-            previousMonth,
-            previousMonthsBack,
-            previousPerformanceMonth,
-            merchantCandidates,
-            seenKeys,
-            stats,
-            inserts,
-            performanceUpserts);
+        fetchTasks.add(
+            submitFetch(
+                connectedIdChain,
+                connection,
+                birthDate,
+                startStr,
+                endStr,
+                null,
+                null,
+                targetMonth,
+                monthsBack,
+                performanceMonth,
+                previousMonth,
+                previousMonthsBack,
+                previousPerformanceMonth));
       } else {
-        // 매칭된 활성 카드가 없는 연동은 CODEF 응답을 붙일 카드가 없어 호출할 이유가 없다.
         LOGGER.fine(
             "매칭된 활성 카드가 없어 연동 동기화를 건너뜁니다. credentialId="
                 + connection.codefAccountCredentialId());
       }
     }
+
+    // seenKeys 등 공유 상태를 건드리는 매칭·중복제거는 결과가 온 순서대로 메인 스레드에서 처리한다.
+    for (FetchTask task : fetchTasks) {
+      List<CodefApproval> approvals = joinUnwrapped(task.approvalsFuture());
+      List<CodefCardPerformance> performances = joinUnwrapped(task.performancesFuture());
+      List<CodefCardPerformance> previousPerformances = joinUnwrapped(task.previousPerformancesFuture());
+      applyFetchResult(
+          userId,
+          userCards,
+          task.connection(),
+          approvals,
+          performances,
+          previousPerformances,
+          performanceMonth,
+          previousPerformanceMonth,
+          merchantCandidates,
+          seenKeys,
+          stats,
+          inserts,
+          performanceUpserts);
+    }
+    long fetchElapsedMs = System.currentTimeMillis() - fetchStartMs;
+
     int inserted;
     if (benefitUsageCalculationService.isEnabled()) {
       List<ApprovalInsert> insertedApprovals =
@@ -272,17 +309,18 @@ public class CardSyncService {
       inserted = insertedApprovals.size();
       benefitUsageCalculationService.calculateAndPersist(insertedApprovals);
     } else {
-      // 기존 단위 테스트와 혜택 계산을 구성하지 않은 실행 환경의 동기화 계약을 그대로 보존한다.
       inserted = approvalIngestStore.insertAll(inserts);
     }
     int upsertedPerformances = performanceSnapshotStore.upsertAll(performanceUpserts);
-    // 승인내역이 왜 적재되지 않는지 진단할 수 있도록 드랍 사유별 집계를 한 줄로 남긴다.
     LOGGER.info(
         String.format(
-            "승인내역 동기화 결과 period=%s~%s fetched=%d filtered=%d unmatched=%d invalid=%d duplicate=%d"
-                + " inserted=%d",
+            "승인내역 동기화 결과 period=%s~%s units=%d connectedIds=%d codefFetchMs=%d fetched=%d"
+                + " filtered=%d unmatched=%d invalid=%d duplicate=%d inserted=%d",
             startStr,
             endStr,
+            fetchTasks.size(),
+            connectedIdChain.size(),
+            fetchElapsedMs,
             stats.fetched,
             stats.filtered,
             stats.unmatched,
@@ -293,12 +331,22 @@ public class CardSyncService {
   }
 
   /**
-   * 연동(또는 카드번호가 필요한 카드사면 카드 한 장) 단위로 승인내역·실적을 조회해 inserts/ performanceUpserts에 누적한다.
-   * cardNo/cardPassword는 카드번호가 필요하지 않은 카드사면 null이다.
+   * 연동(또는 카드 한 장) 단위로 붙는 승인내역/당월실적/전월실적 CODEF 호출 3개의 future다. 카드 사이뿐 아니라
+   * 이 3개도 서로 독립적이라 별도 작업으로 풀어 동시에 던진다(같은 풀에서 안쪽 작업을 기다리는 중첩 제출이
+   * 아니라 메인 스레드가 셋 다 직접 제출하므로 스레드풀 고갈 데드락 위험이 없다).
    */
-  private void fetchAndCollect(
-      String userId,
-      List<UserCardMatchRow> userCards,
+  private record FetchTask(
+      CodefConnection connection,
+      CompletableFuture<List<CodefApproval>> approvalsFuture,
+      CompletableFuture<List<CodefCardPerformance>> performancesFuture,
+      CompletableFuture<List<CodefCardPerformance>> previousPerformancesFuture) { }
+
+  /**
+   * 연동(또는 카드 한 장) 단위 CODEF 호출 3개를 제출한다. connectedId가 다른 호출끼리는 스레드풀에서 병행하고,
+   * 같은 connectedId(=같은 CODEF 계정 세션)를 쓰는 호출끼리는 connectedIdChain으로 순서를 강제해 겹치지 않게 한다.
+   */
+  private FetchTask submitFetch(
+      Map<String, CompletableFuture<?>> connectedIdChain,
       CodefConnection connection,
       String birthDate,
       String startStr,
@@ -310,14 +358,68 @@ public class CardSyncService {
       String performanceMonth,
       YearMonth previousMonth,
       long previousMonthsBack,
+      String previousPerformanceMonth) {
+    CompletableFuture<List<CodefApproval>> approvalsFuture =
+        chainedSupply(
+            connectedIdChain,
+            connection.connectedId(),
+            () -> fetchApprovals(connection, birthDate, startStr, endStr, cardNo, cardPassword));
+    CompletableFuture<List<CodefCardPerformance>> performancesFuture =
+        chainedSupply(
+            connectedIdChain,
+            connection.connectedId(),
+            () -> fetchPerformances(
+                connection, birthDate, targetMonth, monthsBack, performanceMonth, cardNo, cardPassword));
+    CompletableFuture<List<CodefCardPerformance>> previousPerformancesFuture =
+        chainedSupply(
+            connectedIdChain,
+            connection.connectedId(),
+            () -> fetchPreviousPerformances(
+                connection, birthDate, previousMonth, previousMonthsBack,
+                previousPerformanceMonth, cardNo, cardPassword));
+    return new FetchTask(connection, approvalsFuture, performancesFuture, previousPerformancesFuture);
+  }
+
+  /**
+   * connectedId별로 마지막에 예약된 작업 뒤에 이어붙여, 같은 connectedId 호출은 항상 하나씩 순서대로
+   * 실행되게 한다(스레드풀 자체는 여러 connectedId를 동시에 처리하므로 다른 계정끼리는 그대로 병행된다).
+   */
+  private <T> CompletableFuture<T> chainedSupply(
+      Map<String, CompletableFuture<?>> connectedIdChain, String connectedId, Supplier<T> supplier) {
+    CompletableFuture<?> previous =
+        connectedIdChain.getOrDefault(connectedId, CompletableFuture.completedFuture(null));
+    CompletableFuture<T> next = previous.thenApplyAsync(ignored -> supplier.get(), codefFetchExecutor);
+    connectedIdChain.put(connectedId, next);
+    return next;
+  }
+
+  /**
+   * future가 던진 예외를 CompletionException 포장 없이 원래 타입 그대로 다시 던진다. fetchApprovals/
+   * fetchPerformances/fetchPreviousPerformances는 항상 RuntimeException만 던지므로 cause도 항상 그렇다.
+   */
+  private <T> T joinUnwrapped(CompletableFuture<T> future) {
+    try {
+      return future.join();
+    } catch (CompletionException exception) {
+      throw (RuntimeException) exception.getCause();
+    }
+  }
+
+  /** CODEF 원본 응답을 매칭·중복제거해 inserts/performanceUpserts에 누적한다(메인 스레드 순차 호출). */
+  private void applyFetchResult(
+      String userId,
+      List<UserCardMatchRow> userCards,
+      CodefConnection connection,
+      List<CodefApproval> approvals,
+      List<CodefCardPerformance> performances,
+      List<CodefCardPerformance> previousPerformances,
+      String performanceMonth,
       String previousPerformanceMonth,
       MerchantCandidateSnapshot merchantCandidates,
       Set<String> seenKeys,
       IngestStats stats,
       List<ApprovalInsert> inserts,
       List<PerformanceSnapshotUpsert> performanceUpserts) {
-    List<CodefApproval> approvals =
-        fetchApprovals(connection, birthDate, startStr, endStr, cardNo, cardPassword);
     for (CodefApproval approval : approvals) {
       ApprovalInsert insert =
           toInsert(
@@ -333,9 +435,6 @@ public class CardSyncService {
       }
     }
 
-    List<CodefCardPerformance> performances =
-        fetchPerformances(
-            connection, birthDate, targetMonth, monthsBack, performanceMonth, cardNo, cardPassword);
     for (CodefCardPerformance performance : performances) {
       PerformanceSnapshotUpsert upsert =
           toPerformanceUpsert(userCards, performance, connection.issuerId(), performanceMonth);
@@ -344,15 +443,6 @@ public class CardSyncService {
       }
     }
 
-    List<CodefCardPerformance> previousPerformances =
-        fetchPreviousPerformances(
-            connection,
-            birthDate,
-            previousMonth,
-            previousMonthsBack,
-            previousPerformanceMonth,
-            cardNo,
-            cardPassword);
     for (CodefCardPerformance performance : previousPerformances) {
       PerformanceSnapshotUpsert upsert =
           toPerformanceUpsert(
@@ -363,10 +453,7 @@ public class CardSyncService {
     }
   }
 
-  /**
-   * 지난 달 실적은 "가능하면" 함께 적재하는 부가 정보라, 조회 가능 범위를 벗어나거나(PerformanceUnsupportedException)
-   * CODEF 호출이 실패해도(PerformanceSyncFailedException) 대상 월 동기화 전체를 실패시키지 않고 지난 달만 건너뛴다.
-   */
+  /** 지난 달 실적은 부가 정보라 미지원/실패해도 그 달만 건너뛰고 대상 월 동기화는 살린다. */
   private List<CodefCardPerformance> fetchPreviousPerformances(
       CodefConnection connection,
       String birthDate,
@@ -396,7 +483,6 @@ public class CardSyncService {
     }
   }
 
-  /** CODEF 승인내역 조회가 실패하면 원인을 구분할 수 있도록 ApprovalSyncFailedException으로 감싼다. */
   private List<CodefApproval> fetchApprovals(
       CodefConnection connection,
       String birthDate,
@@ -420,12 +506,7 @@ public class CardSyncService {
     }
   }
 
-  /**
-   * 이 연동으로 조회 대상 월(targetMonth)의 실적을 받을 수 있는지 먼저 확인하고(카드사 미지원 또는 조회 가능 범위 초과면 재시도해도 항상 실패하는 영구
-   * 조건이므로 PerformanceUnsupportedException), 가능하면 CODEF를 호출한다. CODEF 호출 자체가 실패하면 일시적 상황이므로 별도로
-   * PerformanceSyncFailedException으로 감싸 승인내역 실패와 응답 code로 구분되게 한다. cardNo/cardPassword는 KB
-   * 카드소지확인·현대카드 아이디로그인처럼 일부 카드사만 요구하는 값으로, 요구하지 않으면 null이다.
-   */
+  /** 조회 가능 범위를 벗어나면 영구 실패(PerformanceUnsupportedException), CODEF 호출 자체가 실패하면 일시 실패로 구분한다. */
   private List<CodefCardPerformance> fetchPerformances(
       CodefConnection connection,
       String birthDate,
@@ -468,18 +549,13 @@ public class CardSyncService {
     }
   }
 
-  /**
-   * 실적조회 CODEF 요청의 startDate(YYYYMM)를 계산한다. 비씨카드(0305)는 CODEF가 startDate 기준 "전월" 실적을 응답하는 카드사라, 조회
-   * 대상 월(targetMonth)의 실적을 받으려면 startDate를 한 달 뒤로 보내야 한다(당월 실적 조회는 익월로 설정). 그 외 카드사는 targetMonth를
-   * 그대로 보낸다.
-   */
   private String resolvePerformanceStartDate(YearMonth targetMonth, String institutionCode) {
     YearMonth requestMonth =
         BC_CARD_INSTITUTION_CODE.equals(institutionCode) ? targetMonth.plusMonths(1) : targetMonth;
     return requestMonth.format(CODEF_MONTH);
   }
 
-  /** currentSpendAmount가 없거나(혜택 없음) 보유카드와 매칭되지 않으면 null을 반환해 upsert 대상에서 뺀다. */
+  /** currentSpendAmount가 없거나 보유카드와 매칭되지 않으면 null(upsert 대상 제외). */
   private PerformanceSnapshotUpsert toPerformanceUpsert(
       List<UserCardMatchRow> userCards,
       CodefCardPerformance performance,
@@ -516,14 +592,12 @@ public class CardSyncService {
       Set<String> seenKeys,
       IngestStats stats) {
     stats.fetched++;
-    // 취소/부분취소/거절·해외결제는 적재하지 않는다.
     if (!approval.isNormalApproval() || !approval.isDomestic()) {
       stats.filtered++;
       return null;
     }
     String userCardId = approvalCardMatcher.match(userCards, approval, issuerId);
     if (userCardId == null) {
-      // 보유카드와 매칭되지 않는 승인건은 적재하지 않고 미매칭으로 남긴다.
       stats.unmatched++;
       LOGGER.fine(
           "미매칭 승인: resCardName='"
@@ -559,7 +633,7 @@ public class CardSyncService {
         approval.sourcePayload());
   }
 
-  /** 승인내역 적재 과정에서 드랍된 사유를 집계해 진단 로그로 남기기 위한 카운터다. */
+  /** 적재 과정에서 드랍된 사유별 집계(진단 로그용). */
   private static final class IngestStats {
     private int fetched;
     private int filtered;
@@ -568,7 +642,7 @@ public class CardSyncService {
     private int duplicate;
   }
 
-  /** 승인번호가 있으면 (카드+승인번호), 없으면 (카드+시각+금액+가맹점명)으로 중복 판정 키를 만든다. */
+  /** 승인번호가 있으면 (카드+승인번호), 없으면 (카드+시각+금액+가맹점명)으로 중복 키를 만든다. */
   private String dedupeKey(
       String userCardId,
       String approvalNumber,
@@ -576,9 +650,9 @@ public class CardSyncService {
       int amount,
       String merchantName) {
     if (approvalNumber != null && !approvalNumber.isBlank()) {
-      return userCardId + "A" + approvalNumber;
+      return userCardId + "A" + approvalNumber;
     }
-    return userCardId + "B" + approvedAt + "" + amount + "" + merchantName;
+    return userCardId + "B" + approvedAt + "" + amount + "" + merchantName;
   }
 
   private LocalDateTime toApprovedAtUtc(String usedDate, String usedTime) {

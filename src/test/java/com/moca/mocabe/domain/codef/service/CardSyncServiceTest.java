@@ -1,5 +1,6 @@
 package com.moca.mocabe.domain.codef.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,6 +17,7 @@ import static org.mockito.Mockito.when;
 import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
 import com.moca.mocabe.domain.codef.exception.ApprovalSyncFailedException;
+import com.moca.mocabe.domain.codef.exception.CodefConnectionNotFoundException;
 import com.moca.mocabe.domain.codef.exception.CodefUnavailableException;
 import com.moca.mocabe.domain.codef.exception.InvalidSyncPeriodException;
 import com.moca.mocabe.domain.codef.exception.PerformanceSyncFailedException;
@@ -84,6 +86,12 @@ class CardSyncServiceTest {
             approvalIngestStore,
             performanceSnapshotStore,
             encryptor);
+  }
+
+  @Test
+  @DisplayName("destroy()를 호출하면 CODEF 조회용 스레드풀을 종료한다")
+  void destroyShutsDownFetchExecutor() {
+    assertDoesNotThrow(() -> service.destroy());
   }
 
   @Test
@@ -607,6 +615,45 @@ class CardSyncServiceTest {
             anyString(),
             eq((String) null),
             eq((String) null));
+  }
+
+  @Test
+  @DisplayName("institutionCode를 주면 그 기관코드 연동만 동기화한다")
+  void syncsOnlyMatchingInstitutionWhenInstitutionCodeGiven() {
+    CodefConnection kb = connection();
+    CodefConnection shinhan = new CodefConnection(
+        "link-2", "cid-2", "0302", "issuer-2", "신한카드", null, new byte[] {4, 5, 6}, false, false);
+    when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+    when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+        .thenReturn(List.of(kb, shinhan));
+    when(encryptor.decrypt(any())).thenReturn("900101");
+    when(cardApprovalMapper.findExistingApprovalKeys(eq(USER_ID), any(), any()))
+        .thenReturn(List.of());
+    when(codefClient.getApprovals(
+            eq("cid"), eq("0301"), anyString(), anyString(), anyString(), any(), any()))
+        .thenReturn(List.of());
+    when(approvalIngestStore.insertAll(any())).thenReturn(0);
+
+    service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), "0301");
+
+    verify(codefClient)
+        .getApprovals(eq("cid"), eq("0301"), anyString(), anyString(), anyString(), any(), any());
+    verify(codefClient, never())
+        .getApprovals(eq("cid-2"), anyString(), anyString(), anyString(), anyString(), any(), any());
+  }
+
+  @Test
+  @DisplayName("institutionCode에 해당하는 활성 연동이 없으면 404 예외를 던진다")
+  void throwsWhenInstitutionCodeNotFound() {
+    when(cardApprovalMapper.findUserCardsForMatching(USER_ID)).thenReturn(List.of(userCard()));
+    when(codefCredentialMapper.findActiveConnectionsByUserId(USER_ID))
+        .thenReturn(List.of(connection()));
+
+    assertThrows(
+        CodefConnectionNotFoundException.class,
+        () -> service.sync(
+            USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), "9999"));
+    verifyNoInteractions(codefClient);
   }
 
   private CodefApproval approval(

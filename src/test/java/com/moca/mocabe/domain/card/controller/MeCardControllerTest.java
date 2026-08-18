@@ -139,7 +139,7 @@ class MeCardControllerTest {
     @DisplayName("날짜를 생략하면 null 기간으로 동기화를 호출하고 결과를 반환한다")
     void syncsWithDefaultPeriodWhenDatesOmitted() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardSyncService.sync(eq(USER_ID), isNull(), isNull()))
+        when(cardSyncService.sync(eq(USER_ID), isNull(), isNull(), isNull()))
                 .thenReturn(new SyncMyCardsResponse(3, 42, 2, "2026-08-03T10:30:00+09:00"));
 
         String response = mockMvc.perform(post("/me/cards/sync"))
@@ -153,14 +153,15 @@ class MeCardControllerTest {
         assertEquals(42, data.path("syncedApprovalCount").asInt());
         assertEquals(2, data.path("syncedPerformanceCount").asInt());
         assertEquals("2026-08-03T10:30:00+09:00", data.path("syncedAt").asText());
-        verify(cardSyncService).sync(USER_ID, null, null);
+        verify(cardSyncService).sync(USER_ID, null, null, null);
     }
 
     @Test
     @DisplayName("startDate/endDate를 전달하면 파싱해 동기화에 넘긴다")
     void syncsWithProvidedPeriod() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardSyncService.sync(USER_ID, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31)))
+        when(cardSyncService.sync(
+                        eq(USER_ID), eq(LocalDate.of(2026, 7, 1)), eq(LocalDate.of(2026, 7, 31)), isNull()))
                 .thenReturn(new SyncMyCardsResponse(1, 5, 1, "2026-08-03T10:30:00+09:00"));
 
         mockMvc.perform(post("/me/cards/sync")
@@ -168,14 +169,28 @@ class MeCardControllerTest {
                         .param("endDate", "2026-07-31"))
                 .andExpect(status().isOk());
 
-        verify(cardSyncService).sync(USER_ID, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
+        verify(cardSyncService)
+                .sync(USER_ID, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), null);
+    }
+
+    @Test
+    @DisplayName("institutionCode를 전달하면 그대로 동기화에 넘긴다")
+    void syncsWithProvidedInstitutionCode() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(cardSyncService.sync(eq(USER_ID), isNull(), isNull(), eq("0301")))
+                .thenReturn(new SyncMyCardsResponse(1, 5, 1, "2026-08-03T10:30:00+09:00"));
+
+        mockMvc.perform(post("/me/cards/sync").param("institutionCode", "0301"))
+                .andExpect(status().isOk());
+
+        verify(cardSyncService).sync(USER_ID, null, null, "0301");
     }
 
     @Test
     @DisplayName("조회 기간이 올바르지 않으면 400을 반환한다")
     void returnsBadRequestWhenPeriodInvalid() throws Exception {
         when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(cardSyncService.sync(eq(USER_ID), isNull(), isNull()))
+        when(cardSyncService.sync(eq(USER_ID), isNull(), isNull(), isNull()))
                 .thenThrow(new InvalidSyncPeriodException("조회 시작일이 종료일보다 늦을 수 없습니다."));
 
         String response = mockMvc.perform(post("/me/cards/sync"))
