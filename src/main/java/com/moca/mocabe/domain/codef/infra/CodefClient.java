@@ -40,6 +40,9 @@ public class CodefClient {
     private static final String ERROR_CODE_ACCOUNT_LOCKED = "CF-12802";
     private static final Logger LOGGER = Logger.getLogger(CodefClient.class.getName());
 
+    /** 만료 임박(발급 응답의 expires_in 안) 토큰을 쓰다가 요청 도중 만료되는 걸 피하기 위한 여유분. */
+    private static final long TOKEN_EXPIRY_BUFFER_MS = 30_000;
+
     private final CodefHttpClient httpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String clientId;
@@ -47,6 +50,12 @@ public class CodefClient {
     private final String publicKeyBase64;
     private final String baseUrl;
     private final String tokenUrl;
+    private final Object tokenLock = new Object();
+
+    /** CODEF 호출마다 새로 토큰을 받던 걸 없애기 위한 캐시. CodefClient는 싱글턴이라 여러 요청 스레드가 공유한다. */
+    private CachedToken cachedToken;
+
+    private record CachedToken(String accessToken, long expiresAtEpochMillis) { }
 
     public CodefClient(CodefHttpClient httpClient, String clientId, String clientSecret,
                        String publicKeyBase64, String baseUrl, String tokenUrl) {
@@ -380,7 +389,23 @@ public class CodefClient {
         return value == null || value.isBlank() ? null : value;
     }
 
+    /**
+     * 캐시된 토큰이 유효하면 그대로 쓰고, 없거나 만료 임박이면 새로 발급받아 캐시에 채운다. CODEF 호출마다
+     * 토큰 발급 왕복이 추가로 붙는 걸 없애 동기화 소요시간을 줄인다.
+     */
     private String requestAccessToken() {
+        synchronized (tokenLock) {
+            CachedToken cached = cachedToken;
+            if (cached != null && cached.expiresAtEpochMillis() > System.currentTimeMillis()) {
+                return cached.accessToken();
+            }
+            cached = fetchAccessToken();
+            cachedToken = cached;
+            return cached.accessToken();
+        }
+    }
+
+    private CachedToken fetchAccessToken() {
         // client_credentials 방식으로 Basic 인증해 액세스 토큰을 발급받는다
         String basic = Base64.getEncoder().encodeToString(
                 (clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
@@ -388,11 +413,17 @@ public class CodefClient {
         headers.put("Authorization", "Basic " + basic);
         headers.put("Content-Type", "application/x-www-form-urlencoded");
         String body = postSuccessful(tokenUrl, headers, "grant_type=client_credentials&scope=read");
-        String accessToken = readTree(body).path("access_token").asText("");
+        JsonNode root = readTree(body);
+        String accessToken = root.path("access_token").asText("");
         if (accessToken.isBlank()) {
             throw new IllegalStateException("CODEF 액세스 토큰 발급에 실패했습니다.");
         }
-        return accessToken;
+        // expires_in(초)이 없거나 0 이하면 캐싱하지 않고 다음 호출에서 다시 받는다(기존 동작과 동일).
+        long expiresInSeconds = root.path("expires_in").asLong(0);
+        long expiresAt = expiresInSeconds > 0
+                ? System.currentTimeMillis() + Math.max(0, expiresInSeconds * 1000 - TOKEN_EXPIRY_BUFFER_MS)
+                : System.currentTimeMillis();
+        return new CachedToken(accessToken, expiresAt);
     }
 
     private String postSuccessful(String url, Map<String, String> headers, String body) {

@@ -96,11 +96,12 @@ public class MeCardController {
             @RequestParam(name = "startDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "institutionCode", required = false) String institutionCode
     ) {
-        // startDate/endDate를 생략하면 이번 달 1일~오늘 범위로 승인내역을 조회·적재한다.
+        // startDate/endDate를 생략하면 이번 달 1일~오늘, institutionCode를 생략하면 전체 연동을 동기화한다.
         SyncMyCardsResponse response = cardSyncService.sync(
-                currentUserProvider.getCurrentUserId(), startDate, endDate);
+                currentUserProvider.getCurrentUserId(), startDate, endDate, institutionCode);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
