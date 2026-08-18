@@ -11,6 +11,7 @@ import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
 import com.moca.mocabe.domain.benefit.model.BenefitRule;
+import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
@@ -360,5 +361,200 @@ class BenefitUsageCalculationServiceTest {
             eq(new BigDecimal("1500")),
             eq("not_applied"),
             eq("MONTHLY_LIMIT_EXHAUSTED"));
+  }
+
+  @Test
+  void appliesJsonRuleWithLedgerFrequencyAndAvailablePerformance() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("approval-json")))
+        .thenReturn(
+            List.of(
+                new BenefitApprovalRow(
+                    "approval-json",
+                    "card-json",
+                    20_000,
+                    approvedAt,
+                    "CAFE",
+                    "merchant-id",
+                    "CAFE,RESTAURANT",
+                    "cafe-id,restaurant-id")));
+    when(mapper.findPreviousMonthSpend("card-json", "2026-07")).thenReturn(500_000);
+    when(mapper.findSimpleRulesForUserCard(eq("card-json"), any()))
+        .thenReturn(List.of(jsonRule("json-rule", jsonDefinition())));
+    when(mapper.findConfirmedUsageCounts(eq("card-json"), eq("json-offer"), any(), any(), any()))
+        .thenReturn(new BenefitUsageCounts(0, 3));
+
+    service.calculateAndPersist(
+        List.of(
+            new ApprovalInsert(
+                "approval-json",
+                "user-1",
+                "card-json",
+                null,
+                "A-1",
+                approvedAt,
+                "카페",
+                20_000,
+                "{ }")));
+
+    verify(mapper)
+        .insertConfirmedUsage(
+            any(),
+            eq("card-json"),
+            eq("json-offer"),
+            eq("json-rule"),
+            eq(null),
+            eq("approval-json"),
+            any(),
+            eq(new BigDecimal("20000")),
+            eq(new BigDecimal("2000")),
+            eq(null),
+            eq(null),
+            eq(approvedAt));
+  }
+
+  @Test
+  void failsJsonRuleClosedWhenPerformanceSnapshotOrJsonIsUnavailable() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("approval-json")))
+        .thenReturn(
+            List.of(new BenefitApprovalRow("approval-json", "card-json", 20_000, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("card-json", "2026-07")).thenReturn(null);
+    when(mapper.findSimpleRulesForUserCard(eq("card-json"), any()))
+        .thenReturn(
+            List.of(
+                jsonRule("json-rule-unavailable", jsonDefinition()),
+                jsonRule("json-rule-invalid", "{")));
+
+    service.calculateAndPersist(
+        List.of(
+            new ApprovalInsert(
+                "approval-json",
+                "user-1",
+                "card-json",
+                null,
+                "A-1",
+                approvedAt,
+                "테스트",
+                20_000,
+                "{ }")));
+
+    verify(mapper, never())
+        .insertConfirmedUsage(
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    verify(mapper, Mockito.times(2))
+        .insertCalculationOutcome(
+            any(),
+            eq("card-json"),
+            eq("approval-json"),
+            eq("json-offer"),
+            any(),
+            eq(null),
+            any(),
+            eq("KRW"),
+            eq(BigDecimal.ZERO),
+            eq(BigDecimal.ZERO),
+            eq(BigDecimal.ZERO),
+            eq("not_applied"),
+            eq("RULE_DATA_UNAVAILABLE"));
+  }
+
+  @Test
+  void rejectsJsonRuleBeforeEvaluationWhenRelationalTargetDoesNotMatch() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("approval-json")))
+        .thenReturn(
+            List.of(new BenefitApprovalRow("approval-json", "card-json", 20_000, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("card-json", "2026-07")).thenReturn(null);
+    SimpleBenefitRuleRow categoryRule =
+        new SimpleBenefitRuleRow(
+            "json-rule",
+            "json-offer",
+            "discount",
+            "percent",
+            new BigDecimal("10"),
+            null,
+            new BigDecimal("500000"),
+            null,
+            "merchant_category",
+            "cafe-id",
+            1,
+            "include",
+            null,
+            jsonDefinition(),
+            "SUPPORTED");
+    when(mapper.findSimpleRulesForUserCard(eq("card-json"), any()))
+        .thenReturn(List.of(categoryRule));
+
+    service.calculateAndPersist(
+        List.of(
+            new ApprovalInsert(
+                "approval-json",
+                "user-1",
+                "card-json",
+                null,
+                "A-1",
+                approvedAt,
+                "테스트",
+                20_000,
+                "{ }")));
+
+    verify(mapper)
+        .insertCalculationOutcome(
+            any(),
+            eq("card-json"),
+            eq("approval-json"),
+            eq("json-offer"),
+            eq("json-rule"),
+            eq(null),
+            any(),
+            eq("KRW"),
+            eq(BigDecimal.ZERO),
+            eq(BigDecimal.ZERO),
+            eq(BigDecimal.ZERO),
+            eq("not_applied"),
+            eq("TARGET_NOT_MATCHED"));
+  }
+
+  private SimpleBenefitRuleRow jsonRule(String ruleId, String definition) {
+    return new SimpleBenefitRuleRow(
+        ruleId,
+        "json-offer",
+        "discount",
+        "percent",
+        new BigDecimal("10"),
+        null,
+        new BigDecimal("500000"),
+        null,
+        "all_merchants",
+        "ALL",
+        1,
+        "include",
+        null,
+        definition,
+        "SUPPORTED");
+  }
+
+  private String jsonDefinition() {
+    return """
+        {
+          "schemaVersion":1,
+          "conditions":{
+            "all":[{
+              "type":"PREVIOUS_MONTH_SPEND",
+              "operator":"GTE",
+              "value":"500000",
+              "rejectionReason":"PERFORMANCE_NOT_MET"
+            }]
+          },
+          "reward":{
+            "benefitType":"DISCOUNT",
+            "rewardUnit":"KRW",
+            "calculation":"RATE",
+            "rate":"0.10"
+          },
+          "limits":[{"type":"DAILY_USAGE_COUNT","value":"1"}]
+        }
+        """;
   }
 }

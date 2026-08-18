@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.moca.mocabe.domain.benefit.mapper.BenefitStructuringMapper">
+    <resultMap id="rawCandidate" type="com.moca.mocabe.domain.benefit.model.RawBenefitStructuringCandidate">
+        <constructor>
+            <arg column="benefit_id" javaType="java.lang.String"/>
+            <arg column="offer_id" javaType="java.lang.String"/>
+            <arg column="title" javaType="java.lang.String"/>
+            <arg column="summary" javaType="java.lang.String"/>
+            <arg column="detail_text" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+    <select id="findRawCandidates" resultMap="rawCandidate">
+        SELECT benefit.benefit_id, offer.offer_id, benefit.title, benefit.summary, benefit.detail_text
+        FROM card_benefits benefit
+        INNER JOIN benefit_offers offer ON offer.benefit_id=benefit.benefit_id AND offer.position=1
+        WHERE benefit.record_type='benefit' AND benefit.structuring_status IN ('RAW', 'PARSE_FAILED')
+          AND offer.reward_type='other'
+        ORDER BY benefit.benefit_id
+    </select>
+    <update id="updateOffer">
+        UPDATE benefit_offers SET reward_type=#{rewardType}, value_type=#{valueType},
+            value_unit=#{rewardUnit}, calculation_mode='flat', calculation_basis='transaction_amount',
+            stacking_mode='standalone', valuation_scope='transaction', valuation_method='direct',
+            updated_at=CURRENT_TIMESTAMP(6) WHERE offer_id=#{offerId} AND reward_type='other'
+    </update>
+    <insert id="insertRule">
+        INSERT INTO benefit_rules (rule_id, offer_id, position, priority, rule_name, rule_effect,
+            stacking_mode, reward_value, reward_unit, previous_spend_min_krw, transaction_min_krw,
+            transaction_max_krw, rounding_type, rounding_unit, rule_schema_version,
+            rule_support_status, rule_definition_json, created_at, updated_at)
+        SELECT #{ruleId}, #{offerId}, 1, 100, #{ruleName}, 'grant', 'standalone',
+            #{rewardValue}, #{rewardUnit}, #{previousSpendMinKrw}, #{transactionMinKrw},
+            #{transactionMaxKrw}, 'floor', 1, 1, 'SUPPORTED', CAST(#{ruleDefinitionJson} AS JSON),
+            CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+        WHERE NOT EXISTS (SELECT 1 FROM benefit_rules WHERE offer_id=#{offerId} AND position=1)
+    </insert>
+    <insert id="insertCategoryTarget">
+        INSERT INTO benefit_rule_targets (target_id, rule_id, condition_group, match_mode, target_type,
+            merchant_category_id, merchant_id, target_code, target_name, target_source,
+            target_authority, minimum_place_confidence, created_at, updated_at)
+        SELECT UUID(), #{ruleId}, 1, 'include', 'merchant_category', category.merchant_category_id,
+            NULL, category.category_code, category.category_name, 'CARD_BENEFIT_EXPLICIT',
+            'ISSUER_CATEGORY', .950,
+            CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+        FROM merchant_categories category WHERE category.category_code=#{targetCode}
+          AND NOT EXISTS (SELECT 1 FROM benefit_rule_targets WHERE rule_id=#{ruleId}
+              AND match_mode='include' AND target_type='merchant_category'
+              AND merchant_category_id=category.merchant_category_id)
+    </insert>
+    <insert id="insertMerchantTarget">
+        INSERT INTO benefit_rule_targets (target_id, rule_id, condition_group, match_mode, target_type,
+            merchant_category_id, merchant_id, target_code, target_name, target_source,
+            target_authority, minimum_place_confidence, created_at, updated_at)
+        SELECT UUID(), #{ruleId}, 1, 'include', 'merchant', NULL, merchant.merchant_id,
+            merchant.normalized_name, merchant.name, 'MERCHANT_EXPLICIT', 'MERCHANT_EXACT', .990,
+            CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+        FROM merchants merchant WHERE merchant.normalized_name=#{targetCode}
+          AND NOT EXISTS (SELECT 1 FROM benefit_rule_targets WHERE rule_id=#{ruleId}
+              AND match_mode='include' AND target_type='merchant'
+              AND merchant_id=merchant.merchant_id)
+    </insert>
+    <insert id="insertAllMerchantsTarget">
+        INSERT INTO benefit_rule_targets (target_id, rule_id, condition_group, match_mode, target_type,
+            merchant_category_id, merchant_id, target_code, target_name, target_source,
+            target_authority, minimum_place_confidence, created_at, updated_at)
+        SELECT UUID(), #{ruleId}, 1, 'include', 'all_merchants', NULL, NULL, 'ALL', '전 가맹점',
+            'ALL_MERCHANTS', 'ALL_MERCHANTS', 0, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+        WHERE NOT EXISTS (SELECT 1 FROM benefit_rule_targets WHERE rule_id=#{ruleId}
+            AND match_mode='include' AND target_type='all_merchants')
+    </insert>
+    <insert id="insertMonthlyRewardLimitPolicy">
+        INSERT INTO benefit_limit_policies (limit_policy_id, offer_id, policy_name, limit_period,
+            limit_type, limit_unit, created_at, updated_at)
+        VALUES (#{monthlyLimitPolicyId}, #{offerId}, '자동 구조화 월 보상 한도', 'monthly',
+            'reward_amount', CASE #{rewardUnit} WHEN 'percent' THEN 'KRW' ELSE #{rewardUnit} END,
+            CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+    </insert>
+    <insert id="insertMonthlyRewardLimitTier">
+        INSERT INTO benefit_limit_tiers (limit_tier_id, limit_policy_id, position, limit_value,
+            previous_spend_min_krw, created_at, updated_at)
+        VALUES (UUID(), #{monthlyLimitPolicyId}, 1, #{monthlyRewardLimit}, #{previousSpendMinKrw},
+            CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+    </insert>
+    <update id="markStructured">
+        UPDATE card_benefits SET structuring_status='STRUCTURED', structuring_note=NULL,
+            updated_at=CURRENT_TIMESTAMP(6) WHERE benefit_id=#{benefitId}
+    </update>
+    <update id="markPartial">
+        UPDATE card_benefits SET structuring_status='PARTIAL', structuring_note=#{note},
+            updated_at=CURRENT_TIMESTAMP(6) WHERE benefit_id=#{benefitId}
+    </update>
+</mapper>

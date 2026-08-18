@@ -30,28 +30,39 @@ public class MerchantCandidateSnapshot {
         if (normalized.isEmpty()) {
             return null;
         }
-        String byName = longestPrefixMatch(nameCandidates, normalized);
+        String byName = bestMatch(nameCandidates, normalized);
         if (byName != null) {
             return byName;
         }
-        return longestPrefixMatch(aliasCandidates, normalized);
+        return bestMatch(aliasCandidates, normalized);
     }
 
-    private String longestPrefixMatch(List<MerchantNameCandidate> candidates, String normalizedApprovalName) {
+    private String bestMatch(List<MerchantNameCandidate> candidates, String normalizedApprovalName) {
         String bestMerchantId = null;
         int bestLength = 0;
         for (MerchantNameCandidate candidate : candidates) {
             // DB의 normalized_name/normalized_alias_name이 실제로는 정규화 규칙(대문자·특수문자 제거)과
             // 어긋나게 저장돼 있을 수 있으므로(예: 시드 데이터 오류), 저장값을 그대로 신뢰하지 않고
             // 비교 시점에 다시 정규화한다.
-            String candidateName = merchantNameNormalizer.normalize(candidate.normalizedName());
+            String candidateName = "regex".equalsIgnoreCase(candidate.matchType())
+                    ? candidate.normalizedName()
+                    : merchantNameNormalizer.normalize(candidate.normalizedName());
             if (!candidateName.isEmpty()
-                    && normalizedApprovalName.startsWith(candidateName)
+                    && matches(candidate.matchType(), candidateName, normalizedApprovalName)
                     && candidateName.length() > bestLength) {
                 bestLength = candidateName.length();
                 bestMerchantId = candidate.merchantId();
             }
         }
         return bestMerchantId;
+    }
+
+    private boolean matches(String matchType, String candidateName, String approvalName) {
+        return switch (matchType == null ? "prefix" : matchType.toLowerCase(java.util.Locale.ROOT)) {
+            case "exact" -> approvalName.equals(candidateName);
+            case "contains" -> approvalName.contains(candidateName);
+            case "regex" -> approvalName.matches(candidateName);
+            default -> approvalName.startsWith(candidateName);
+        };
     }
 }

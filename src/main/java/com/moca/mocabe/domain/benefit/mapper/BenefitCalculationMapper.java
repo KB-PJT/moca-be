@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.benefit.mapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
+import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,6 +25,13 @@ public interface BenefitCalculationMapper {
 
   /** 같은 보유 카드의 계산을 직렬화해 공유 월 한도의 경쟁 조건을 막는다. */
   String lockUserCardForBenefitCalculation(@Param("userCardId") String userCardId);
+
+  BenefitUsageCounts findConfirmedUsageCounts(
+      @Param("userCardId") String userCardId,
+      @Param("offerId") String offerId,
+      @Param("usageDate") LocalDate usageDate,
+      @Param("usageMonthStart") LocalDate usageMonthStart,
+      @Param("nextMonthStart") LocalDate nextMonthStart);
 
   MonthlyBenefitLimit findApplicableMonthlyRewardLimit(
       @Param("offerId") String offerId,

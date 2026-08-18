@@ -2,14 +2,19 @@ package com.moca.mocabe.domain.benefit.service;
 
 import com.moca.mocabe.domain.benefit.calculation.BasicBenefitCalculator;
 import com.moca.mocabe.domain.benefit.calculation.BenefitCalculator;
+import com.moca.mocabe.domain.benefit.calculation.BenefitRuleTargetEvaluator;
 import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationContext;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
 import com.moca.mocabe.domain.benefit.model.BenefitRule;
 import com.moca.mocabe.domain.benefit.model.BenefitRuleTarget;
+import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
+import com.moca.mocabe.domain.benefit.rule.BenefitRuleDefinition;
+import com.moca.mocabe.domain.benefit.rule.BenefitRuleDefinitionParser;
+import com.moca.mocabe.domain.benefit.rule.JsonBenefitRuleEvaluator;
 import com.moca.mocabe.domain.benefit.type.BenefitBasis;
 import com.moca.mocabe.domain.benefit.type.BenefitPromotionCondition;
 import com.moca.mocabe.domain.benefit.type.BenefitTargetMatchMode;
@@ -30,14 +35,17 @@ import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 신규 CODEF 승인에 대해 이미 구조화된 "단순" 혜택 룰을 계산하고 확정 사용 이력을 적재한다. 복합 대상, 선택 옵션, 시간 조건, 공유 한도 룰은 mapper에서
- * 제외한다. 원문 구조화가 진행 중인 상태에서 추정 혜택을 확정 이력으로 만들지 않기 위한 안전 경계다.
+ * 신규 CODEF 승인에 대해 구조화된 혜택 룰을 계산하고 확정 사용 이력을 적재한다. JSON 룰은 CODEF 승인과 내부 원장으로 확인 가능한 조건만 평가하며,
+ * 확인할 수 없는 조건은 적용으로 추정하지 않는다.
  */
 public class BenefitUsageCalculationService {
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final DateTimeFormatter YEAR_MONTH = DateTimeFormatter.ofPattern("uuuu-MM");
   private final BenefitCalculationMapper mapper;
   private final BenefitCalculator calculator = new BasicBenefitCalculator();
+  private final BenefitRuleTargetEvaluator targetEvaluator = new BenefitRuleTargetEvaluator();
+  private final BenefitRuleDefinitionParser definitionParser = new BenefitRuleDefinitionParser();
+  private final JsonBenefitRuleEvaluator jsonRuleEvaluator = new JsonBenefitRuleEvaluator();
 
   public BenefitUsageCalculationService(BenefitCalculationMapper mapper) {
     this.mapper = mapper;
@@ -75,12 +83,11 @@ public class BenefitUsageCalculationService {
             .atZone(java.time.ZoneOffset.UTC)
             .withZoneSameInstant(SEOUL)
             .toLocalDate();
-    BigDecimal previousMonthSpend =
-        BigDecimal.valueOf(
-            valueOrZero(
-                mapper.findPreviousMonthSpend(
-                    approval.userCardId(),
-                    YearMonth.from(usageDate).minusMonths(1).format(YEAR_MONTH))));
+    Integer previousMonthSpendSnapshot =
+        mapper.findPreviousMonthSpend(
+            approval.userCardId(),
+            YearMonth.from(usageDate).minusMonths(1).format(YEAR_MONTH));
+    BigDecimal previousMonthSpend = BigDecimal.valueOf(valueOrZero(previousMonthSpendSnapshot));
     Map<String, List<SimpleBenefitRuleRow>> rowsByRule = new LinkedHashMap<>();
     for (SimpleBenefitRuleRow row :
         mapper.findSimpleRulesForUserCard(approval.userCardId(), usageDate)) {
@@ -104,27 +111,37 @@ public class BenefitUsageCalculationService {
                       limitUnitFor(first))
                   .stream()
                   .reduce(BigDecimal.ZERO, BigDecimal::add);
-      BenefitRule rule =
-          toRule(
+      LocalDate usageMonthStart = usageDate.withDayOfMonth(1);
+      BenefitUsageCounts usageCounts =
+          mapper.findConfirmedUsageCounts(
+              approval.userCardId(),
+              first.offerId(),
+              usageDate,
+              usageMonthStart,
+              usageMonthStart.plusMonths(1));
+      if (usageCounts == null) {
+        usageCounts = new BenefitUsageCounts(0, 0);
+      }
+      BenefitCalculationContext context =
+          new BenefitCalculationContext(
+              BigDecimal.valueOf(approval.amount()),
+              BigDecimal.ONE,
+              previousMonthSpend,
+              approval.approvedAt(),
+              approval.merchantCategoryCode(),
+              false,
+              usageCounts.dailyCount(),
+              usageCounts.monthlyCount(),
+              true,
+              true,
+              false,
+              targetAttributes(approval, previousMonthSpendSnapshot != null));
+      BenefitCalculationResult result =
+          calculate(
               rows,
+              context,
               monthlyLimit == null ? BigDecimal.ZERO : monthlyLimit.limitValue(),
               usedMonthlyValue);
-      BenefitCalculationResult result =
-          calculator.calculate(
-              rule,
-              new BenefitCalculationContext(
-                  BigDecimal.valueOf(approval.amount()),
-                  BigDecimal.ONE,
-                  previousMonthSpend,
-                  approval.approvedAt(),
-                  approval.merchantCategoryCode(),
-                  false,
-                  0,
-                  0,
-                  true,
-                  true,
-                  false,
-                  targetAttributes(approval)));
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
         persist(approval, usageDate, first, monthlyLimit, result);
@@ -132,14 +149,59 @@ public class BenefitUsageCalculationService {
     }
   }
 
+  private BenefitCalculationResult calculate(
+      List<SimpleBenefitRuleRow> rows,
+      BenefitCalculationContext context,
+      BigDecimal monthlyLimitValue,
+      BigDecimal usedMonthlyValue) {
+    SimpleBenefitRuleRow first = rows.get(0);
+    if (first.ruleDefinitionJson() == null || first.ruleDefinitionJson().isBlank()) {
+      return calculator.calculate(toRule(rows, monthlyLimitValue, usedMonthlyValue), context);
+    }
+    Set<BenefitRuleTarget> targets =
+        rows.stream().map(this::toTarget).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    if (!targetEvaluator.matches(targets, context)) {
+      return rejected(
+          first,
+          monthlyLimitValue,
+          usedMonthlyValue,
+          com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.TARGET_NOT_MATCHED);
+    }
+    try {
+      BenefitRuleDefinition definition = definitionParser.parse(first.ruleDefinitionJson());
+      return jsonRuleEvaluator.evaluate(
+          first.ruleId(), definition, context, monthlyLimitValue, usedMonthlyValue);
+    } catch (IllegalArgumentException exception) {
+      return rejected(
+          first,
+          monthlyLimitValue,
+          usedMonthlyValue,
+          com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.RULE_DATA_UNAVAILABLE);
+    }
+  }
+
+  private BenefitCalculationResult rejected(
+      SimpleBenefitRuleRow row,
+      BigDecimal monthlyLimitValue,
+      BigDecimal usedMonthlyValue,
+      com.moca.mocabe.domain.benefit.type.BenefitRejectionReason reason) {
+    RewardUnit unit = rewardUnit(row.rewardUnit());
+    return new BenefitCalculationResult(
+        row.ruleId(),
+        benefitType(row.rewardType(), unit),
+        unit,
+        false,
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        zero(monthlyLimitValue).subtract(zero(usedMonthlyValue)).max(BigDecimal.ZERO),
+        reason);
+  }
+
   private BenefitRule toRule(
       List<SimpleBenefitRuleRow> rows, BigDecimal monthlyLimitValue, BigDecimal usedMonthlyValue) {
     SimpleBenefitRuleRow first = rows.get(0);
     String unit = normalized(first.rewardUnit());
-    RewardUnit rewardUnit =
-        "POINT".equals(unit)
-            ? RewardUnit.POINT
-            : "MILE".equals(unit) ? RewardUnit.MILE : RewardUnit.KRW;
+    RewardUnit rewardUnit = rewardUnit(unit);
     BenefitBasis basis =
         "PERCENT".equals(unit)
             ? BenefitBasis.RATE
@@ -155,7 +217,7 @@ public class BenefitUsageCalculationService {
         basis == BenefitBasis.RATE ? value.movePointLeft(2) : BigDecimal.ZERO,
         basis == BenefitBasis.RATE ? BigDecimal.ZERO : value,
         basis == BenefitBasis.PER_SPEND_UNIT ? first.rewardBasisAmount() : BigDecimal.ZERO,
-        BigDecimal.ZERO,
+        zero(first.transactionMaxKrw()),
         zero(first.transactionMinKrw()),
         zero(first.previousSpendMinKrw()),
         monthlyLimitValue,
@@ -176,18 +238,44 @@ public class BenefitUsageCalculationService {
         row.targetType(), row.targetCode());
   }
 
-  private Map<String, Set<String>> targetAttributes(BenefitApprovalRow approval) {
+  private Map<String, Set<String>> targetAttributes(
+      BenefitApprovalRow approval,
+      boolean previousMonthSpendAvailable) {
     Map<String, Set<String>> attributes = new LinkedHashMap<>();
+    java.util.LinkedHashSet<String> availableFields =
+        new java.util.LinkedHashSet<>(
+            Set.of(
+                "PAYMENT_AMOUNT",
+                "APPROVED_AT",
+                "USED_DAILY_COUNT",
+                "USED_MONTHLY_COUNT",
+                "FOREIGN_TRANSACTION"));
+    if (previousMonthSpendAvailable) {
+      availableFields.add("PREVIOUS_MONTH_SPEND");
+    }
     if (approval.merchantId() != null && !approval.merchantId().isBlank()) {
       attributes.put("merchant", Set.of(approval.merchantId()));
+      availableFields.add("MERCHANT");
+    }
+    if (approval.merchantCategoryCodes() != null
+        && !approval.merchantCategoryCodes().isBlank()) {
+      attributes.put(
+          "merchant_category_code",
+          splitValues(approval.merchantCategoryCodes()));
+      availableFields.add("MERCHANT_CATEGORY");
     }
     if (approval.merchantCategoryIds() != null && !approval.merchantCategoryIds().isBlank()) {
-      attributes.put("merchant_category",
-          java.util.Arrays.stream(approval.merchantCategoryIds().split(","))
-              .map(String::trim).filter(value -> !value.isEmpty())
-              .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+      attributes.put("merchant_category", splitValues(approval.merchantCategoryIds()));
     }
+    attributes.put("available_field", Set.copyOf(availableFields));
     return Map.copyOf(attributes);
+  }
+
+  private Set<String> splitValues(String values) {
+    return java.util.Arrays.stream(values.split(","))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 
   private void persist(
@@ -263,6 +351,13 @@ public class BenefitUsageCalculationService {
 
   private int valueOrZero(Integer value) {
     return value == null ? 0 : value;
+  }
+
+  private RewardUnit rewardUnit(String value) {
+    String unit = normalized(value);
+    return "POINT".equals(unit)
+        ? RewardUnit.POINT
+        : "MILE".equals(unit) ? RewardUnit.MILE : RewardUnit.KRW;
   }
 
   private BigDecimal zero(BigDecimal value) {

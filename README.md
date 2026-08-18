@@ -167,6 +167,9 @@ CodeRabbit으로 `main`과 `dev` 대상 Pull Request를 한국어로 자동 리�
 
 ## 카드 혜택 대상 매칭 운영
 
+카드 혜택 JSON Rule DSL, Evaluator 판정 순서, CODEF 데이터 경계와 신규 룰 추가 절차는
+[카드 혜택 JSON Rule Evaluator 운영 가이드](BENEFIT_RULE_EVALUATOR.md)를 참고합니다.
+
 카드고릴라의 `target_code`와 `target_name`은 원문 추적용으로 보존하고, 추천 계산은
 `benefit_rule_targets.merchant_category_id` 또는 `merchant_id` FK를 사용합니다. 임의의 기본
 카테고리로 보정하지 않으며, 최종 seed는 미해결 FK가 있으면 적재를 실패시킵니다.
@@ -180,6 +183,10 @@ WHERE (target_type = 'merchant_category' AND merchant_category_id IS NULL)
    OR (target_type = 'merchant' AND merchant_id IS NULL)
 GROUP BY target_type, target_code, target_name;
 ```
+
+자동 구조화 운영 배치는 기본적으로 비활성입니다. 빈 DB 통합 테스트와 감사 SQL 결과를 검토한 뒤에만
+`MOCA_BENEFIT_STRUCTURING_ENABLED=true`를 주입합니다. 활성화하면 매일 03:30(Asia/Seoul)에 안전
+후보를 반영하며, 미지원 조건은 `PARTIAL`과 `structuring_note`로 남깁니다.
 
 Kakao 장소는 `kakao_category_group_registry`와 `kakao_category_maps`의 활성 정책을 사용합니다.
 `benefit_match_policy=ALLOW`이고 최소 신뢰도를 충족한 장소만 추천 계산에 사용하며,

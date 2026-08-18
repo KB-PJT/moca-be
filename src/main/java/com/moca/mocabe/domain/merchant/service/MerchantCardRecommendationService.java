@@ -198,6 +198,10 @@ public class MerchantCardRecommendationService {
                 continue;
             }
             BigDecimal estimated = estimateValue(candidate, paymentAmount);
+            BigDecimal monthlyRemaining = monthlyRemaining(candidate);
+            if (monthlyRemaining != null) {
+                estimated = estimated.min(monthlyRemaining);
+            }
             boolean performanceMet = candidate.previousSpendMinKrw() == null
                     || candidate.previousMonthSpendKrw().compareTo(candidate.previousSpendMinKrw()) >= 0;
             BigDecimal score = strategy.score(candidate, estimated);

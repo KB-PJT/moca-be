@@ -2,6 +2,10 @@ package com.moca.mocabe.global.config;
 
 import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
+import com.moca.mocabe.domain.benefit.mapper.BenefitStructuringMapper;
+import com.moca.mocabe.domain.benefit.service.BenefitStructuringBatchService;
+import com.moca.mocabe.domain.benefit.service.BenefitStructuringPersistenceService;
+import com.moca.mocabe.domain.benefit.service.BenefitStructuringScheduler;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
 import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.mapper.CardBenefitMapper;
@@ -171,6 +175,28 @@ public class AppConfig {
     public BenefitUsageCalculationService benefitUsageCalculationService(
             BenefitCalculationMapper benefitCalculationMapper) {
         return new BenefitUsageCalculationService(benefitCalculationMapper);
+    }
+
+    @Bean
+    public BenefitStructuringPersistenceService benefitStructuringPersistenceService(
+            BenefitStructuringMapper benefitStructuringMapper) {
+        return new BenefitStructuringPersistenceService(benefitStructuringMapper);
+    }
+
+    @Bean
+    public BenefitStructuringBatchService benefitStructuringBatchService(
+            BenefitStructuringMapper benefitStructuringMapper,
+            BenefitStructuringPersistenceService persistenceService) {
+        return new BenefitStructuringBatchService(benefitStructuringMapper, persistenceService);
+    }
+
+    @Bean
+    public BenefitStructuringScheduler benefitStructuringScheduler(
+            BenefitStructuringBatchService batchService, Environment environment) {
+        return new BenefitStructuringScheduler(
+                batchService,
+                Boolean.parseBoolean(environment.getProperty(
+                        "MOCA_BENEFIT_STRUCTURING_ENABLED", "false")));
     }
 
     @Bean

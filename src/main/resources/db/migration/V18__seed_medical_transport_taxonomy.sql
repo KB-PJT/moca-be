@@ -17,7 +17,7 @@ WHERE NOT EXISTS (
 INSERT INTO merchant_categories
     (merchant_category_id, parent_id, category_code, category_name, display_order,
      is_map_visible, created_at, updated_at)
-SELECT UUID(), parent.merchant_category_id, seed.category_code, seed.category_name,
+SELECT UUID(), NULL, seed.category_code, seed.category_name,
        seed.display_order, TRUE, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
 FROM (
     SELECT 'HOSPITAL' parent_code, 'GENERAL_HOSPITAL' category_code, '종합병원' category_name, 201 display_order
@@ -33,7 +33,6 @@ FROM (
     UNION ALL SELECT 'PUBLIC_TRANSIT', 'BUS', '버스', 301
     UNION ALL SELECT 'PUBLIC_TRANSIT', 'SUBWAY', '지하철', 302
 ) seed
-JOIN merchant_categories parent ON parent.category_code = seed.parent_code
 WHERE NOT EXISTS (
     SELECT 1 FROM merchant_categories current_category
     WHERE current_category.category_code = seed.category_code
