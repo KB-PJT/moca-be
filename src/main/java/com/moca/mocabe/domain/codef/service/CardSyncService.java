@@ -642,7 +642,13 @@ public class CardSyncService implements DisposableBean {
     private int duplicate;
   }
 
-  /** 승인번호가 있으면 (카드+승인번호), 없으면 (카드+시각+금액+가맹점명)으로 중복 키를 만든다. */
+  /**
+   * 승인번호가 있으면 (카드+승인번호), 없으면 (카드+시각+금액+가맹점명)으로 중복 키를 만든다. 필드 값에
+   * 나올 수 없는 제어문자(U+0000)로 구분해, 구분자 없이 이어붙였을 때 서로 다른 값 조합이 같은 문자열로
+   * 겹치는 걸 막는다(예: amount=100+"0원할인점"과 amount=1000+"원할인점"이 같아지는 문제).
+   */
+  private static final String DEDUPE_KEY_DELIMITER = "\u0000";
+
   private String dedupeKey(
       String userCardId,
       String approvalNumber,
@@ -650,9 +656,10 @@ public class CardSyncService implements DisposableBean {
       int amount,
       String merchantName) {
     if (approvalNumber != null && !approvalNumber.isBlank()) {
-      return userCardId + "A" + approvalNumber;
+      return userCardId + DEDUPE_KEY_DELIMITER + "A" + DEDUPE_KEY_DELIMITER + approvalNumber;
     }
-    return userCardId + "B" + approvedAt + "" + amount + "" + merchantName;
+    return userCardId + DEDUPE_KEY_DELIMITER + "B" + DEDUPE_KEY_DELIMITER + approvedAt
+        + DEDUPE_KEY_DELIMITER + amount + DEDUPE_KEY_DELIMITER + merchantName;
   }
 
   private LocalDateTime toApprovedAtUtc(String usedDate, String usedTime) {
