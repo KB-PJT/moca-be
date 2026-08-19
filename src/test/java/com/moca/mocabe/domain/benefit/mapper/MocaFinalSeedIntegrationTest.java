@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
+import java.util.Map;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
@@ -91,6 +92,7 @@ class MocaFinalSeedIntegrationTest {
       assertRootCauseAudit(jdbc);
       assertMerchantCategoryMappings(jdbc);
       assertBenefitTargetForeignKeys(jdbc);
+      assertV21PreservesExistingConditionGroup(jdbc, dataSource);
 
       String ruleId = jdbc.queryForObject("SELECT rule_id FROM benefit_rules LIMIT 1", String.class);
       String categoryId =
@@ -203,13 +205,47 @@ class MocaFinalSeedIntegrationTest {
             + "ON category.merchant_category_id=target.merchant_category_id "
             + "LEFT JOIN merchants merchant ON merchant.merchant_id=target.merchant_id "
             + "WHERE (target.target_type='merchant_category' AND "
-            + "(target.merchant_category_id IS NULL OR target.merchant_id IS NOT NULL "
-            + "OR target.target_code <> category.category_code)) OR "
+            + "(target.merchant_category_id IS NULL OR category.merchant_category_id IS NULL "
+            + "OR target.merchant_id IS NOT NULL OR target.target_code <> category.category_code)) OR "
             + "(target.target_type='merchant' AND "
-            + "(target.merchant_id IS NULL OR target.merchant_category_id IS NOT NULL "
+            + "(target.merchant_id IS NULL OR merchant.merchant_id IS NULL "
+            + "OR target.merchant_category_id IS NOT NULL "
             + "OR target.target_code <> merchant.normalized_name)) OR "
             + "(target.target_type='all_merchants' AND "
             + "(target.merchant_id IS NOT NULL OR target.merchant_category_id IS NOT NULL))"));
+  }
+
+  private void assertV21PreservesExistingConditionGroup(JdbcTemplate jdbc, DataSource dataSource) {
+    Map<String, Object> source = jdbc.queryForMap(
+        "SELECT target.target_id, target.rule_id, target.match_mode, target.target_type, "
+            + "target.merchant_category_id, target.merchant_id, target.target_code, "
+            + "target.target_name, target.target_source, target.target_authority, "
+            + "target.minimum_place_confidence "
+            + "FROM benefit_rule_targets target "
+            + "INNER JOIN benefit_rules rule_data ON rule_data.rule_id=target.rule_id "
+            + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+            + "INNER JOIN card_benefits benefit ON benefit.benefit_id=offer.benefit_id "
+            + "INNER JOIN card_content_versions version ON version.content_version_id=benefit.content_version_id "
+            + "INNER JOIN cards card ON card.card_id=version.card_id "
+            + "WHERE card.gorilla_card_id='2680' AND offer.offer_name='편의점 10% 청구 할인' "
+            + "LIMIT 1");
+    String targetId = "f0000000-0000-4000-8000-000000000021";
+    jdbc.update(
+        "INSERT INTO benefit_rule_targets (target_id, rule_id, condition_group, match_mode, "
+            + "target_type, merchant_category_id, merchant_id, target_code, target_name, "
+            + "target_source, target_authority, minimum_place_confidence, created_at, updated_at) "
+            + "VALUES (?, ?, 77, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))",
+        targetId, source.get("rule_id"), source.get("match_mode"), source.get("target_type"),
+        source.get("merchant_category_id"), source.get("merchant_id"), source.get("target_code"),
+        source.get("target_name"), source.get("target_source"), source.get("target_authority"),
+        source.get("minimum_place_confidence"));
+
+    ResourceDatabasePopulator populator = new ResourceDatabasePopulator(
+        new ClassPathResource("db/migration/V21__backfill_appended_card_benefit_targets.sql"));
+    populator.execute(dataSource);
+    assertEquals(1, count(jdbc,
+        "SELECT COUNT(*) FROM benefit_rule_targets WHERE target_id='" + targetId
+            + "' AND condition_group=77"));
   }
 
   private void assertRootCauseAudit(JdbcTemplate jdbc) {
