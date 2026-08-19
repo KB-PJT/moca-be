@@ -5,7 +5,6 @@ import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
 import com.moca.mocabe.domain.benefit.mapper.BenefitStructuringMapper;
 import com.moca.mocabe.domain.benefit.service.BenefitStructuringBatchService;
 import com.moca.mocabe.domain.benefit.service.BenefitStructuringPersistenceService;
-import com.moca.mocabe.domain.benefit.service.BenefitStructuringScheduler;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
 import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.mapper.CardBenefitMapper;
@@ -188,15 +187,6 @@ public class AppConfig {
             BenefitStructuringMapper benefitStructuringMapper,
             BenefitStructuringPersistenceService persistenceService) {
         return new BenefitStructuringBatchService(benefitStructuringMapper, persistenceService);
-    }
-
-    @Bean
-    public BenefitStructuringScheduler benefitStructuringScheduler(
-            BenefitStructuringBatchService batchService, Environment environment) {
-        return new BenefitStructuringScheduler(
-                batchService,
-                Boolean.parseBoolean(environment.getProperty(
-                        "MOCA_BENEFIT_STRUCTURING_ENABLED", "false")));
     }
 
     @Bean

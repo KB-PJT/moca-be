@@ -184,9 +184,9 @@ WHERE (target_type = 'merchant_category' AND merchant_category_id IS NULL)
 GROUP BY target_type, target_code, target_name;
 ```
 
-자동 구조화 운영 배치는 기본적으로 비활성입니다. 빈 DB 통합 테스트와 감사 SQL 결과를 검토한 뒤에만
-`MOCA_BENEFIT_STRUCTURING_ENABLED=true`를 주입합니다. 활성화하면 매일 03:30(Asia/Seoul)에 안전
-후보를 반영하며, 미지원 조건은 `PARTIAL`과 `structuring_note`로 남깁니다.
+카드 혜택 구조화 결과는 자동 배치로 운영 DB에 반영하지 않습니다. parser와 구조화 batch는 검증·SQL
+생성용으로 사용하고, 결과를 리뷰한 뒤 Flyway migration 또는 seed 변경으로 명시적으로 배포합니다.
+미지원 조건은 `PARTIAL`과 `structuring_note`로 남깁니다.
 
 Kakao 장소는 `kakao_category_group_registry`와 `kakao_category_maps`의 활성 정책을 사용합니다.
 `benefit_match_policy=ALLOW`이고 최소 신뢰도를 충족한 장소만 추천 계산에 사용하며,
