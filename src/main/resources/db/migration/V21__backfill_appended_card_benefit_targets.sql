@@ -9,7 +9,9 @@ CREATE TEMPORARY TABLE seed_appended_card_targets (
     target_type VARCHAR(30) NOT NULL,
     target_code VARCHAR(100) NOT NULL,
     target_name VARCHAR(255) NOT NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
 
 INSERT INTO seed_appended_card_targets
 (gorilla_card_id, offer_name, condition_group, match_mode, target_type, target_code, target_name)
