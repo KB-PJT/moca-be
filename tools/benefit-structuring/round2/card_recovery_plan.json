@@ -1,0 +1,1602 @@
+[
+  {
+    "cardId": "2346",
+    "cardName": "BC 바로 클리어 플러스",
+    "issuer": "BC 바로카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2778",
+    "cardName": "IBK포인트3.8(신용)",
+    "issuer": "IBK기업은행",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "2482",
+    "cardName": "I-ALL",
+    "issuer": "IBK기업은행",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "1490",
+    "cardName": "IBK 무직타이거 카드(체크)",
+    "issuer": "IBK기업은행",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2817",
+    "cardName": "iM K-패스 체크카드",
+    "issuer": "iM뱅크",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "교통"
+  },
+  {
+    "cardId": "106",
+    "cardName": "굿데이카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "교통"
+  },
+  {
+    "cardId": "2685",
+    "cardName": "WE:SH Travel",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "교통"
+  },
+  {
+    "cardId": "769",
+    "cardName": "KB ALL point 카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "교통"
+  },
+  {
+    "cardId": "2852",
+    "cardName": "KB 틴업 체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "편의점"
+  },
+  {
+    "cardId": "2604",
+    "cardName": "토심이 첵첵 체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "348",
+    "cardName": "노리체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "350",
+    "cardName": "직장인보너스체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "정비"
+  },
+  {
+    "cardId": "335",
+    "cardName": "청춘대로 싱글 체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "편의점"
+  },
+  {
+    "cardId": "454",
+    "cardName": "가온 올포인트 체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "카페/디저트"
+  },
+  {
+    "cardId": "351",
+    "cardName": "스타체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2321",
+    "cardName": "모빌카드",
+    "issuer": "KG 파이낸셜",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "편의점"
+  },
+  {
+    "cardId": "2464",
+    "cardName": "zgm.휴가중카드",
+    "issuer": "NH농협카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "국내가맹점"
+  },
+  {
+    "cardId": "360",
+    "cardName": "올바른POINT체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "528",
+    "cardName": "라이언 치즈 체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "편의점"
+  },
+  {
+    "cardId": "2987",
+    "cardName": "LOCA LIKIT 2.0",
+    "issuer": "롯데카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "국내가맹점"
+  },
+  {
+    "cardId": "2330",
+    "cardName": "LOCA 365 카드",
+    "issuer": "롯데카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2975",
+    "cardName": "LOCA LIKIT 1.5",
+    "issuer": "롯데카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "국내가맹점"
+  },
+  {
+    "cardId": "2986",
+    "cardName": "삼성 iD SELECT UP 카드",
+    "issuer": "삼성카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "국내가맹점"
+  },
+  {
+    "cardId": "2563",
+    "cardName": "K-패스 삼성체크카드",
+    "issuer": "삼성카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "39",
+    "cardName": "신한카드 Deep Oil",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "편의점"
+  },
+  {
+    "cardId": "2690",
+    "cardName": "K-패스 신한카드",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2386",
+    "cardName": "티머니 Pay & GO 신한카드",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2735",
+    "cardName": "신한카드 Edu Plan+",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "학원"
+  },
+  {
+    "cardId": "2693",
+    "cardName": "K-패스 신한카드 체크",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "281",
+    "cardName": "신한카드 Deep Dream 체크",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "택시"
+  },
+  {
+    "cardId": "286",
+    "cardName": "카카오페이 신한 체크카드",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2847",
+    "cardName": "신한카드 SOL트래블 J체크",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "618",
+    "cardName": "신한카드 Hey Young 체크",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "646",
+    "cardName": "신한카드 Deep Dream 체크(미니언즈)",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "택시"
+  },
+  {
+    "cardId": "474",
+    "cardName": "카카오페이 신한 체크카드(무지)",
+    "issuer": "신한카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "교통"
+  },
+  {
+    "cardId": "2570",
+    "cardName": "카드의정석 오하CHECK",
+    "issuer": "우리카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2552",
+    "cardName": "카드의정석 EVERY CHECK",
+    "issuer": "우리카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "무실적"
+  },
+  {
+    "cardId": "2871",
+    "cardName": "우체국 LUCK-KEY 체크카드",
+    "issuer": "우체국",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "편의점"
+  },
+  {
+    "cardId": "2269",
+    "cardName": "토스뱅크 체크카드",
+    "issuer": "토스뱅크",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "어디서나 캐시백"
+  },
+  {
+    "cardId": "2657",
+    "cardName": "JADE Classic",
+    "issuer": "하나카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "택시"
+  },
+  {
+    "cardId": "2820",
+    "cardName": "원더카드 2.0 FREE+",
+    "issuer": "하나카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "2703",
+    "cardName": "JADE Prime",
+    "issuer": "하나카드",
+    "generator_ready": true,
+    "primary_status": "READY",
+    "recoverable_benefit": "택시"
+  },
+  {
+    "cardId": "2927",
+    "cardName": "BC 바로 Air Max 카드",
+    "issuer": "BC 바로카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2559",
+    "cardName": "K-패스 (신용)",
+    "issuer": "IBK기업은행",
+    "generator_ready": false,
+    "primary_status": "DAILY_USAGE_LIMIT_UNSUPPORTED",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2779",
+    "cardName": "IBK포인트(신용)",
+    "issuer": "IBK기업은행",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2674",
+    "cardName": "I-Mileage (대한항공)",
+    "issuer": "IBK기업은행",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2958",
+    "cardName": "BLISS Mileage",
+    "issuer": "IBK기업은행",
+    "generator_ready": false,
+    "primary_status": "DIRECT_OFFLINE_REVIEW_REQUIRED",
+    "recoverable_benefit": "바우처"
+  },
+  {
+    "cardId": "2941",
+    "cardName": "IBK나라사랑카드",
+    "issuer": "IBK기업은행",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2562",
+    "cardName": "K-패스(체크)",
+    "issuer": "IBK기업은행",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "카페"
+  },
+  {
+    "cardId": "2866",
+    "cardName": "I-Travel(체크)",
+    "issuer": "IBK기업은행",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2441",
+    "cardName": "KB국민 My WE:SH 카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "2964",
+    "cardName": "KB NEED Pay 카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2930",
+    "cardName": "KB YOU Prime 카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "DIRECT_OFFLINE_REVIEW_REQUIRED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "2970",
+    "cardName": "KB YOU Wish 카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "2609",
+    "cardName": "쿠팡 와우카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "NON_RULE_DETAIL",
+    "recoverable_benefit": "유의사항"
+  },
+  {
+    "cardId": "2451",
+    "cardName": "HERITAGE Smart [대한항공 마일리지형]",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "바우처"
+  },
+  {
+    "cardId": "2929",
+    "cardName": "KB Youth Club 체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "혜택 프로모션"
+  },
+  {
+    "cardId": "2691",
+    "cardName": "트래블러스 체크카드(토심이)",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2422",
+    "cardName": "노리2 체크카드(KB Pay)",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "공연/전시"
+  },
+  {
+    "cardId": "2423",
+    "cardName": "노리2 체크카드(Global)",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "공연/전시"
+  },
+  {
+    "cardId": "2905",
+    "cardName": "트래블러스 체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2556",
+    "cardName": "K-패스체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2588",
+    "cardName": "스타플러스 체크카드",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "공연/전시"
+  },
+  {
+    "cardId": "2550",
+    "cardName": "노리2 체크카드(Play)",
+    "issuer": "KB국민카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "공연/전시"
+  },
+  {
+    "cardId": "2001",
+    "cardName": "꿀카드",
+    "issuer": "MG새마을금고",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "수수료우대"
+  },
+  {
+    "cardId": "2094",
+    "cardName": "카카오페이 체크카드",
+    "issuer": "MG새마을금고",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "편의점"
+  },
+  {
+    "cardId": "2860",
+    "cardName": "라이프핏 체크카드",
+    "issuer": "MG새마을금고",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "카페"
+  },
+  {
+    "cardId": "666",
+    "cardName": "올바른 FLEX 카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "2846",
+    "cardName": "클래시 트래블카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2593",
+    "cardName": "zgm.일본여행중 카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2428",
+    "cardName": "zgm.streaming카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "DAILY_USAGE_LIMIT_UNSUPPORTED",
+    "recoverable_benefit": "카페"
+  },
+  {
+    "cardId": "2706",
+    "cardName": "zgm 할인카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "공항라운지"
+  },
+  {
+    "cardId": "2544",
+    "cardName": "zgm.play카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "생활"
+  },
+  {
+    "cardId": "2427",
+    "cardName": "zgm.the pay카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2561",
+    "cardName": "K-패스카드(체크)",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "통신"
+  },
+  {
+    "cardId": "362",
+    "cardName": "NH20해봄체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "2758",
+    "cardName": "춘식이달달체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "공항라운지"
+  },
+  {
+    "cardId": "2727",
+    "cardName": "NH트래블리체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "캐시백"
+  },
+  {
+    "cardId": "676",
+    "cardName": "올리 POINT 체크",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "368",
+    "cardName": "NH올원체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "DIRECT_OFFLINE_REVIEW_REQUIRED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "1765",
+    "cardName": "올바른 NEW HAVE체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2620",
+    "cardName": "NH 무럭이 체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "364",
+    "cardName": "국민행복체크카드(비씨)",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "국민행복"
+  },
+  {
+    "cardId": "499",
+    "cardName": "체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "생활"
+  },
+  {
+    "cardId": "367",
+    "cardName": "내일배움체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "여행/숙박"
+  },
+  {
+    "cardId": "370",
+    "cardName": "BAZIC(베이직)체크카드",
+    "issuer": "NH농협카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "2626",
+    "cardName": "네이버페이 머니카드",
+    "issuer": "네이버페이",
+    "generator_ready": false,
+    "primary_status": "PAYMENT_CHANNEL_UNSUPPORTED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2261",
+    "cardName": "LOCA LIKIT 1.2",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "2632",
+    "cardName": "디지로카 London",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "2707",
+    "cardName": "디지로카 Las Vegas",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2786",
+    "cardName": "힐튼 아너스 아멕스 프리미엄",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2262",
+    "cardName": "LOCA LIKIT Eat",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "PAYMENT_CHANNEL_UNSUPPORTED",
+    "recoverable_benefit": "일반음식점"
+  },
+  {
+    "cardId": "2263",
+    "cardName": "LOCA LIKIT Play",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "주유소"
+  },
+  {
+    "cardId": "404",
+    "cardName": "롯데 국민행복 체크카드",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "교육/육아"
+  },
+  {
+    "cardId": "403",
+    "cardName": "롯데체크카드",
+    "issuer": "롯데카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "49",
+    "cardName": "삼성카드 & MILEAGE PLATINUM (스카이패스)",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2885",
+    "cardName": "삼성 iD SELECT ALL 카드",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2915",
+    "cardName": "THE iD. 1st",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "프리미엄"
+  },
+  {
+    "cardId": "51",
+    "cardName": "삼성카드 taptap O",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2886",
+    "cardName": "삼성 iD SELECT ON 카드",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2676",
+    "cardName": "삼성 iD GLOBAL 카드",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "수수료우대"
+  },
+  {
+    "cardId": "1909",
+    "cardName": "THE 1 (스카이패스)",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "공항"
+  },
+  {
+    "cardId": "2376",
+    "cardName": "삼성 iD SIMPLE 카드",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "2235",
+    "cardName": "삼성 iD ON 카드",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "선택형"
+  },
+  {
+    "cardId": "458",
+    "cardName": "네이버페이 taptap",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "DIRECT_OFFLINE_REVIEW_REQUIRED",
+    "recoverable_benefit": "선택형"
+  },
+  {
+    "cardId": "2988",
+    "cardName": "트라이플러스 삼성카드",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "394",
+    "cardName": "삼성체크카드 & CASHBACK",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "393",
+    "cardName": "삼성체크카드 & POINT",
+    "issuer": "삼성카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "13",
+    "cardName": "신한카드 Mr.Life",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "병원/약국"
+  },
+  {
+    "cardId": "2759",
+    "cardName": "신한카드 처음(ANNIVERSE)",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "생활"
+  },
+  {
+    "cardId": "2835",
+    "cardName": "신한카드 Discount Plan+",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "생활"
+  },
+  {
+    "cardId": "2950",
+    "cardName": "신한카드 Simple Plan+",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2666",
+    "cardName": "신한카드 Point Plan",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "466",
+    "cardName": "신한카드 Air One",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2258",
+    "cardName": "#Pay 신한카드",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "NON_RULE_DETAIL",
+    "recoverable_benefit": "유의사항"
+  },
+  {
+    "cardId": "8",
+    "cardName": "신한카드 The CLASSIC-Y",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "면세점"
+  },
+  {
+    "cardId": "2532",
+    "cardName": "신한카드 Globus",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "수수료우대"
+  },
+  {
+    "cardId": "716",
+    "cardName": "메리어트 본보이™ 더 베스트 신한카드",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "호텔"
+  },
+  {
+    "cardId": "15",
+    "cardName": "신한카드 The CLASSIC+",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "면세점"
+  },
+  {
+    "cardId": "2731",
+    "cardName": "신한카드 Point Plan+",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2831",
+    "cardName": "알리익스프레스 신한카드",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "쇼핑"
+  },
+  {
+    "cardId": "2855",
+    "cardName": "Haru(Hoshino Resorts)",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외이용"
+  },
+  {
+    "cardId": "16",
+    "cardName": "신한카드 RPM+ Platinum#",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "프리미엄"
+  },
+  {
+    "cardId": "993",
+    "cardName": "신한카드 The BEST+",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "골프"
+  },
+  {
+    "cardId": "2667",
+    "cardName": "신한카드 SOL트래블 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2933",
+    "cardName": "신한카드 나라사랑카드 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2977",
+    "cardName": "신한카드 SOL트립앤J 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2492",
+    "cardName": "신한카드 플리 체크(산리오캐릭터즈)",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "391",
+    "cardName": "신한카드 하이패스(전용) 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "하이패스"
+  },
+  {
+    "cardId": "2890",
+    "cardName": "신한카드 Point Plan 체크 캐릭터형(짱구)",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "생활"
+  },
+  {
+    "cardId": "2889",
+    "cardName": "신한카드 처음 체크(냐한남자)",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "도서"
+  },
+  {
+    "cardId": "2893",
+    "cardName": "신한카드 Pick I 체크 캐릭터형(한교동)",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외이용"
+  },
+  {
+    "cardId": "2528",
+    "cardName": "신한카드 Pick E 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외이용"
+  },
+  {
+    "cardId": "2527",
+    "cardName": "신한카드 Pick I 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외이용"
+  },
+  {
+    "cardId": "2887",
+    "cardName": "신한카드 처음 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "도서"
+  },
+  {
+    "cardId": "303",
+    "cardName": "GS칼텍스 신한카드 경차사랑 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "보험"
+  },
+  {
+    "cardId": "2922",
+    "cardName": "신한카드 SOL글로벌 체크",
+    "issuer": "신한카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2310",
+    "cardName": "PAYCO 포인트 카드",
+    "issuer": "엔에이치엔페이코",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2980",
+    "cardName": "카드의정석2 SUPER",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "2553",
+    "cardName": "카드의정석 EVERY MILE SKYPASS",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2687",
+    "cardName": "카드의정석 SHOPPING+",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "EXCLUSIONS_UNSUPPORTED",
+    "recoverable_benefit": "카페"
+  },
+  {
+    "cardId": "2848",
+    "cardName": "카드의정석2",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "2898",
+    "cardName": "우리카드 MILE&POINT",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "2902",
+    "cardName": "the OPUS silver",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "공항"
+  },
+  {
+    "cardId": "2613",
+    "cardName": "ALL 우리카드 Infinite",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "공항라운지"
+  },
+  {
+    "cardId": "2700",
+    "cardName": "위비트래블 체크카드",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "2742",
+    "cardName": "카드의정석 EVERYDAY CHECK",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "325",
+    "cardName": "그랑블루 체크카드",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "2760",
+    "cardName": "카드의정석 칼퇴 CHECK",
+    "issuer": "우리카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "푸드"
+  },
+  {
+    "cardId": "2519",
+    "cardName": "개이득 체크카드",
+    "issuer": "우체국",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2976",
+    "cardName": "우체국 MY-TYPE 체크카드",
+    "issuer": "우체국",
+    "generator_ready": false,
+    "primary_status": "DIRECT_OFFLINE_REVIEW_REQUIRED",
+    "recoverable_benefit": "캐시백"
+  },
+  {
+    "cardId": "2227",
+    "cardName": "영리한 PLUS 체크카드",
+    "issuer": "우체국",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "571",
+    "cardName": "어디서나 체크카드",
+    "issuer": "우체국",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "쇼핑"
+  },
+  {
+    "cardId": "435",
+    "cardName": "카카오뱅크 프렌즈 체크카드",
+    "issuer": "카카오뱅크",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "혜택 프로모션"
+  },
+  {
+    "cardId": "2910",
+    "cardName": "카카오뱅크 스마트 하이패스카드",
+    "issuer": "카카오뱅크",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "하이패스"
+  },
+  {
+    "cardId": "2421",
+    "cardName": "카카오뱅크 개인사업자 체크카드",
+    "issuer": "카카오뱅크",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "생활"
+  },
+  {
+    "cardId": "686",
+    "cardName": "카카오뱅크 mini카드",
+    "issuer": "카카오뱅크",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "2749",
+    "cardName": "ONE 체크카드",
+    "issuer": "케이뱅크",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "669",
+    "cardName": "케이뱅크 플러스 체크카드",
+    "issuer": "케이뱅크",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "436",
+    "cardName": "케이뱅크 X KT멤버십더블혜택 체크카드",
+    "issuer": "케이뱅크",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "수수료우대"
+  },
+  {
+    "cardId": "2961",
+    "cardName": "트래블로그+(플러스) 신용카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "수수료우대"
+  },
+  {
+    "cardId": "2237",
+    "cardName": "하나 스카이패스 아멕스 플래티늄 카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "공항라운지"
+  },
+  {
+    "cardId": "2904",
+    "cardName": "토스뱅크 하나카드 Day",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "생활"
+  },
+  {
+    "cardId": "2934",
+    "cardName": "하나 나라사랑카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "실적조건 없음"
+  },
+  {
+    "cardId": "2432",
+    "cardName": "네이버페이 머니 하나 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "선택형"
+  },
+  {
+    "cardId": "2394",
+    "cardName": "트래블로그 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2750",
+    "cardName": "달달 하나 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "DIRECT_OFFLINE_REVIEW_REQUIRED",
+    "recoverable_benefit": "수수료우대"
+  },
+  {
+    "cardId": "382",
+    "cardName": "카카오페이 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "선택형"
+  },
+  {
+    "cardId": "2682",
+    "cardName": "K-패스 하나 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "대중교통"
+  },
+  {
+    "cardId": "690",
+    "cardName": "모두의 일상 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "DIRECT_OFFLINE_REVIEW_REQUIRED",
+    "recoverable_benefit": "해외"
+  },
+  {
+    "cardId": "749",
+    "cardName": "VIVA X 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2775",
+    "cardName": "카카오페이 트래블로그 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "해외이용"
+  },
+  {
+    "cardId": "2740",
+    "cardName": "트래블GO 체크카드",
+    "issuer": "하나카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2663",
+    "cardName": "American Express® Gold Card Edition2",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "프리미엄 서비스"
+  },
+  {
+    "cardId": "2881",
+    "cardName": "알파벳카드S",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "PAYMENT_CHANNEL_UNSUPPORTED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2711",
+    "cardName": "대한항공카드 300",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2967",
+    "cardName": "알파벳카드B",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "PAYMENT_CHANNEL_UNSUPPORTED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2969",
+    "cardName": "알파벳카드R",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "INFORMATION_ONLY",
+    "recoverable_benefit": "프리미엄 서비스"
+  },
+  {
+    "cardId": "2878",
+    "cardName": "알파벳카드D",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "PAYMENT_CHANNEL_UNSUPPORTED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2712",
+    "cardName": "대한항공카드 the First Edition2",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2880",
+    "cardName": "알파벳카드O",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2646",
+    "cardName": "현대카드ZERO Edition3(할인형)",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2879",
+    "cardName": "알파벳카드H",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2710",
+    "cardName": "대한항공카드 120",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2709",
+    "cardName": "대한항공카드 060",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "대한항공"
+  },
+  {
+    "cardId": "2669",
+    "cardName": "현대카드 M",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "NON_RULE_DETAIL",
+    "recoverable_benefit": "유의사항"
+  },
+  {
+    "cardId": "2692",
+    "cardName": "현대카드 Summit",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2662",
+    "cardName": "American Express® Green Card Edition2",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "프리미엄 서비스"
+  },
+  {
+    "cardId": "2882",
+    "cardName": "알파벳카드T",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2794",
+    "cardName": "네이버 현대카드 Edition2",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "NON_RULE_DETAIL",
+    "recoverable_benefit": "유의사항"
+  },
+  {
+    "cardId": "2844",
+    "cardName": "현대카드 ZERO Up(할인형)",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "할인"
+  },
+  {
+    "cardId": "2938",
+    "cardName": "현대카드MY BUSINESS M F&B",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2664",
+    "cardName": "American Express The Platinum Card®Edition2",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "프리미엄 서비스"
+  },
+  {
+    "cardId": "2942",
+    "cardName": "에너지플러스 현대카드",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "주유"
+  },
+  {
+    "cardId": "407",
+    "cardName": "현대카드M CHECK",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "408",
+    "cardName": "현대카드X CHECK",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "MERCHANT_NOT_MAPPED",
+    "recoverable_benefit": "모든가맹점"
+  },
+  {
+    "cardId": "2197",
+    "cardName": "현대카드M CHECK-경차전용카드(유류세 환급)",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "기타"
+  },
+  {
+    "cardId": "2430",
+    "cardName": "SC제일은행-현대카드 M CHECK",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "적립"
+  },
+  {
+    "cardId": "2982",
+    "cardName": "현대카드 체크(포인트형)",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "국내외가맹점"
+  },
+  {
+    "cardId": "2431",
+    "cardName": "SC제일은행-현대카드 X CHECK",
+    "issuer": "현대카드",
+    "generator_ready": false,
+    "primary_status": "TARGET_NOT_MAPPED",
+    "recoverable_benefit": "캐시백"
+  }
+]

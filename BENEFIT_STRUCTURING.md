@@ -50,10 +50,40 @@ FK를 찾지 못하면 전체 변경을 롤백하며 `STRUCTURED`로 표시하�
 
 ## 현재 결과
 
-Golden fixture 1,206건 중 48개 혜택(34개 카드)이 안전 자동 구조화 후보로 선택된다. 기존 수동
-구조화와 중복을 제외하면 신규 룰 33개가 생성되고, 빈 MySQL 8에서 전체 추천 가능 카드는
-17장에서 38장으로 증가한다. 여기에는 명확한 category와 `ALL_MERCHANTS` 단순 비율 혜택이
-포함된다.
+Golden fixture 1,206건 중 62개 혜택(42개 카드)이 안전 자동 구조화 후보로 선택된다(2026-08
+2차 확장 기준; 최초 버전은 48개 혜택/34개 카드였다). 이번 확장은 다음을 추가했다.
+
+- `merchant_categories.category_code`와 실제로 일치하지 않던 5개 category 코드
+  (`PUBLIC_TRANSIT`/`TAXI` → `TRANSPORTATION`, `THEME_PARK` → `LEISURE`,
+  `ACADEMY` → `EDUCATION`, `AUTO_MAINTENANCE` → `AUTOMOTIVE`) 버그를 수정했다. 이 코드들은
+  target 행이 생성되지 않는 무효 구조화였다.
+- `FIXED` reward basis(정액 할인·캐시백·포인트·마일리지)를 `RATE`와 함께 지원한다.
+- `maximumBenefitBaseAmount`(거래 인정금액 상한)를 기존 `benefit_rules.transaction_max_krw`
+  컬럼에 채운다. 이 컬럼은 이미 `BasicBenefitCalculator`/`findSimpleRulesForUserCard`가
+  소비하고 있어 계산 로직 변경 없이 활성화했다.
+- `PERFORMANCE_TIER`가 아닌 단일 월 보상 한도(`monthlyLimitValue`)를
+  `benefit_limit_policies`(`monthly`/`reward_amount`) + `benefit_limit_tiers`로 저장한다.
+- 카드 원문에 명시된 CGV·GS25·CU·스타벅스 등 33개 기존 merchant master 브랜드를 감지해
+  `merchant` target(OR condition group)을 생성하는 경로를 추가했다. 다만 현재 데이터에서는
+  merchant 매칭에 성공한 29개 혜택이 모두 `EXCLUSIONS`/일·월 횟수 한도와 동시에 걸려 있어
+  이번 라운드에서 신규 READY로 전환된 카드는 아직 없다. exclusion/count-limit parser가
+  추가되면 이 target 인프라가 바로 사용된다.
+
+일·월 "횟수" 한도(`DAILY_USAGE_LIMIT`/`MONTHLY_USAGE_LIMIT`)는 LEGACY(관계형) 계산 경로가
+표현할 수 없다. `BenefitUsageCalculationService#toRule`은 LEGACY rule의 `dailyUsageLimit`/
+`monthlyUsageLimit`을 항상 0으로 고정하며, `findSimpleRulesForUserCard`는 `monthly`/
+`reward_amount` 모양이 아닌 `benefit_limit_policies`가 하나라도 있으면 그 rule 전체를 후보에서
+제외한다. 횟수 한도는 JSON Rule DSL(`rule_definition_json`, `rule_support_status=SUPPORTED`)로만
+표현 가능하며, 이 저장소 환경은 Maven Central·Docker Hub 접근이 차단돼 있어 `./gradlew test`나
+Testcontainers 기반 통합 테스트로 JSON 생성 결과를 검증할 수 없었다. 따라서 이번 라운드는
+검증 불가능한 JSON 생성을 시도하지 않고 관계형(LEGACY) 경로로 안전하게 표현 가능한 부분만
+확장했다. 남은 작업은 `tools/benefit-structuring/round2/`를 참고한다.
+
+빈 MySQL 8 기준 이전 결과는 17장에서 38장으로 증가였다(수동 구조화 17장 + 자동 34장의 합집합).
+이번 커밋은 자동 구조화 카드 수를 34 → 42로 늘렸지만, 수동 구조화 카드와의 최종 합집합(READY
+총합)은 `src/main/resources/db/audit/card-recommendation-root-cause-audit.sql`을 실제 MySQL
+8에서 실행해야 확정된다. 이 환경은 Docker Hub·APT 저장소 접근이 차단돼 있어 이번 세션에서는
+그 최종 수치를 직접 측정하지 못했다.
 
 ## 90% coverage 분석
 
