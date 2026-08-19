@@ -182,9 +182,44 @@ class ReportQueryServiceTest {
 
     assertEquals(1, response.cards().get(0).currentTier());
     assertEquals(2, response.cards().get(0).nextTier());
+    assertEquals(300_000, response.cards().get(0).currentTierTargetAmount());
+    assertEquals(true, response.cards().get(0).isCurrentTierAchieved());
+    assertEquals(500_000L, response.cards().get(0).nextTierTargetAmount());
     assertEquals(118_000, response.cards().get(0).remainingAmountToNextTier());
     assertEquals(3, response.cards().get(0).tiers().size());
     assertEquals(500_000, response.cards().get(0).tiers().get(1).targetAmount());
+  }
+
+  @Test
+  void calculatesTierSemanticsBelowFirstAndAtHighestTier() {
+    when(reportMapper.findPerformanceCards(USER_ID, "2026-07"))
+        .thenReturn(
+            List.of(
+                new PerformanceCardRow("below", "미달 카드", null, 499_999, 1_000_000, 0),
+                new PerformanceCardRow("highest", "최고 구간 카드", null, 1_000_000, 1_000_000, 2)));
+    when(reportMapper.findPerformanceTiers(USER_ID))
+        .thenReturn(
+            List.of(
+                new PerformanceTierRow("below", 1, 500_000),
+                new PerformanceTierRow("below", 2, 1_000_000),
+                new PerformanceTierRow("highest", 1, 200_000),
+                new PerformanceTierRow("highest", 2, 1_000_000)));
+
+    PerformanceCardsReportResponse response = service.getPerformanceCards(USER_ID, "2026-07");
+
+    var below = response.cards().get(0);
+    assertEquals(0, below.currentTier());
+    assertEquals(false, below.isCurrentTierAchieved());
+    assertEquals(1, below.nextTier());
+    assertEquals(500_000L, below.nextTierTargetAmount());
+    assertEquals(1, below.remainingAmountToNextTier());
+    var highest = response.cards().get(1);
+    assertEquals(2, highest.currentTier());
+    assertEquals(1_000_000L, highest.currentTierTargetAmount());
+    assertEquals(true, highest.isCurrentTierAchieved());
+    assertEquals(null, highest.nextTier());
+    assertEquals(null, highest.nextTierTargetAmount());
+    assertEquals(0, highest.remainingAmountToNextTier());
   }
 
   @Test
