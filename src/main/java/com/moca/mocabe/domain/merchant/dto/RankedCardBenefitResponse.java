@@ -12,4 +12,5 @@ public record RankedCardBenefitResponse(
         Integer currentTier, Integer nextTier, BigDecimal currentTierTargetAmount,
         boolean isCurrentTierAchieved, BigDecimal remainingAmountToNextTier,
         BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw, BigDecimal monthlyRemainingKrw,
-        boolean performanceMet, List<RecommendationReasonResponse> recommendationReasons) { }
+        boolean performanceMet, List<RecommendationReasonResponse> recommendationReasons,
+        List<BenefitTierResponse> tiers) { }

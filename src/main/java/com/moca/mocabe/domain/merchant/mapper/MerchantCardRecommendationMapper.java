@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.merchant.mapper;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitRuleRow;
 import com.moca.mocabe.domain.merchant.model.MerchantDetailRow;
 import com.moca.mocabe.domain.merchant.model.MerchantCategoryLineageRow;
+import com.moca.mocabe.domain.merchant.model.MerchantBenefitTierRow;
 import java.time.LocalDate;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -32,4 +33,7 @@ public interface MerchantCardRecommendationMapper {
     List<MerchantCardBenefitRuleRow> findOwnedCardBenefitRulesForMerchants(
             @Param("userId") String userId, @Param("merchantIds") List<String> merchantIds,
             @Param("usageDate") LocalDate usageDate, @Param("performanceMonth") String performanceMonth);
+
+    List<MerchantBenefitTierRow> findBenefitTiersForOffers(
+            @Param("offerIds") List<String> offerIds);
 }

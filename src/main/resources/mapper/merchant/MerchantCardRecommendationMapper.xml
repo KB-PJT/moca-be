@@ -233,4 +233,30 @@
         ORDER BY merchant.merchant_id, uc.display_order, uc.user_card_id, r.priority DESC,
                  r.rule_id, t.condition_group, t.match_mode, t.target_id
     </select>
+
+    <resultMap id="benefitTierRowMap" type="com.moca.mocabe.domain.merchant.model.MerchantBenefitTierRow">
+        <constructor>
+            <arg column="offer_id" javaType="java.lang.String"/>
+            <arg column="position" javaType="java.lang.Integer"/>
+            <arg column="required_previous_spend_krw" javaType="java.math.BigDecimal"/>
+            <arg column="monthly_limit_krw" javaType="java.math.BigDecimal"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 현재 실적 조건으로 필터링하지 않고 offer에 연결된 전체 tier를 반환한다. -->
+    <select id="findBenefitTiersForOffers" resultMap="benefitTierRowMap">
+        SELECT policy.offer_id, tier.position,
+               tier.previous_spend_min_krw AS required_previous_spend_krw,
+               tier.limit_value AS monthly_limit_krw
+        FROM benefit_limit_policies policy
+        INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
+        WHERE policy.limit_period = 'monthly'
+          AND policy.limit_type = 'reward_amount'
+          AND policy.limit_unit = 'KRW'
+          AND policy.offer_id IN
+        <foreach collection="offerIds" item="offerId" open="(" separator="," close=")">
+            #{offerId}
+        </foreach>
+        ORDER BY policy.offer_id, tier.previous_spend_min_krw, tier.current_spend_min_krw, tier.position
+    </select>
 </mapper>

@@ -5,11 +5,13 @@ import com.moca.mocabe.domain.merchant.dto.MerchantCardRecommendationBatchRespon
 import com.moca.mocabe.domain.merchant.dto.MerchantSummaryResponse;
 import com.moca.mocabe.domain.merchant.dto.RecommendationReasonResponse;
 import com.moca.mocabe.domain.merchant.dto.RankedCardBenefitResponse;
+import com.moca.mocabe.domain.merchant.dto.BenefitTierResponse;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCardRecommendationMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.model.KakaoPlace;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitRuleRow;
+import com.moca.mocabe.domain.merchant.model.MerchantBenefitTierRow;
 import com.moca.mocabe.domain.merchant.model.MerchantDetailRow;
 import com.moca.mocabe.domain.merchant.model.ResolvedKakaoCategory;
 import com.moca.mocabe.domain.merchant.recommendation.CardBenefitEligibilityEvaluator;
@@ -214,6 +216,7 @@ public class MerchantCardRecommendationService {
                 bestByCard.put(candidate.userCardId(), scored);
             }
         }
+        Map<String, List<BenefitTierResponse>> tiersByOffer = benefitTiersByOffer(candidates);
         List<ScoredCandidate> sorted = new ArrayList<>(bestByCard.values());
         sorted.sort(Comparator.comparing(ScoredCandidate::score).reversed());
         List<RankedCardBenefitResponse> result = new ArrayList<>();
@@ -221,7 +224,9 @@ public class MerchantCardRecommendationService {
             ScoredCandidate item = sorted.get(index);
             MerchantCardBenefitCandidate candidate = item.candidate();
             BigDecimal remainingPreviousSpend = remainingPreviousSpend(candidate);
-            BenefitTierProgress tierProgress = tierProgress(candidate, candidates);
+            List<BenefitTierResponse> tiers = candidate.offerId() == null
+                    ? List.of() : tiersByOffer.getOrDefault(candidate.offerId(), List.of());
+            BenefitTierProgress tierProgress = tierProgress(candidate, candidates, tiers);
             BigDecimal monthlyRemaining = monthlyRemaining(candidate);
             result.add(new RankedCardBenefitResponse(index + 1, candidate.userCardId(), candidate.cardName(),
                     candidate.issuerName(), candidate.cardImageUrl(), candidate.offerName(), candidate.rewardType(),
@@ -233,7 +238,7 @@ public class MerchantCardRecommendationService {
                     candidate.monthlyLimitKrw(), candidate.monthlyUsedKrw(), monthlyRemaining,
                     item.performanceMet(),
                     recommendationReasons(candidate, item.performanceMet(), remainingPreviousSpend,
-                            monthlyRemaining)));
+                            monthlyRemaining), tiers));
         }
         return List.copyOf(result);
     }
@@ -292,8 +297,56 @@ public class MerchantCardRecommendationService {
      * 카드 전체 실적 구간이 아니라, 현재 가맹점에 매칭된 동일 offer의 룰 구간만 사용한다.
      * 선택된 룰의 실적 기준이 현재 구간이고, 달성 뒤에는 다음 구간까지 남은 금액을 반환한다.
      */
+    private Map<String, List<BenefitTierResponse>> benefitTiersByOffer(
+            List<MerchantCardBenefitCandidate> candidates) {
+        List<String> offerIds = candidates.stream().map(MerchantCardBenefitCandidate::offerId)
+                .filter(Objects::nonNull).distinct().toList();
+        if (offerIds.isEmpty()) {
+            return Map.of();
+        }
+        List<MerchantBenefitTierRow> rows = recommendationMapper.findBenefitTiersForOffers(offerIds);
+        if (rows == null || rows.isEmpty()) {
+            return Map.of();
+        }
+        return rows.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        MerchantBenefitTierRow::offerId,
+                        java.util.stream.Collectors.collectingAndThen(
+                                java.util.stream.Collectors.mapping(
+                                        row -> new BenefitTierResponse(row.position(),
+                                                row.requiredPreviousSpendKrw(), row.monthlyLimitKrw()),
+                                        java.util.stream.Collectors.toList()),
+                                values -> values.stream()
+                                        .sorted(java.util.Comparator.comparing(
+                                                BenefitTierResponse::tier,
+                                                java.util.Comparator.nullsLast(Integer::compareTo)))
+                                        .toList())));
+    }
+
     private BenefitTierProgress tierProgress(MerchantCardBenefitCandidate candidate,
-                                             List<MerchantCardBenefitCandidate> candidates) {
+                                             List<MerchantCardBenefitCandidate> candidates,
+                                             List<BenefitTierResponse> allTiers) {
+        if (!allTiers.isEmpty()) {
+            BigDecimal spend = candidate.previousMonthSpendKrw() == null
+                    ? BigDecimal.ZERO : candidate.previousMonthSpendKrw();
+            int achievedIndex = -1;
+            for (int index = 0; index < allTiers.size(); index++) {
+                BigDecimal target = allTiers.get(index).requiredPreviousSpendKrw();
+                if (target != null && spend.compareTo(target) >= 0) {
+                    achievedIndex = index;
+                }
+            }
+            int currentTier = achievedIndex < 0 ? 0 : allTiers.get(achievedIndex).tier();
+            int nextIndex = achievedIndex + 1;
+            BenefitTierResponse next = nextIndex < allTiers.size() ? allTiers.get(nextIndex) : null;
+            BenefitTierResponse current = achievedIndex < 0 ? null : allTiers.get(achievedIndex);
+            BigDecimal target = current == null ? (next == null ? null : next.requiredPreviousSpendKrw())
+                    : current.requiredPreviousSpendKrw();
+            BigDecimal remaining = next == null ? BigDecimal.ZERO
+                    : next.requiredPreviousSpendKrw().subtract(spend).max(BigDecimal.ZERO);
+            return new BenefitTierProgress(currentTier, next == null ? null : next.tier(), target,
+                    current != null, remaining);
+        }
         if (candidate.previousSpendMinKrw() == null) {
             return BenefitTierProgress.withoutPerformanceRequirement();
         }

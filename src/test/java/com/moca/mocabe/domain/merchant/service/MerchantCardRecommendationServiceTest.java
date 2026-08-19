@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCardRecommendationMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate;
+import com.moca.mocabe.domain.merchant.model.MerchantBenefitTierRow;
 import com.moca.mocabe.domain.merchant.model.MerchantDetailRow;
 import com.moca.mocabe.domain.merchant.model.MerchantCategoryLineageRow;
 import com.moca.mocabe.domain.merchant.model.KakaoCategoryResolutionRule;
@@ -195,15 +196,21 @@ class MerchantCardRecommendationServiceTest {
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.any())).thenReturn(tiers);
+        when(mapper.findBenefitTiersForOffers(List.of("offer-tier"))).thenReturn(List.of(
+                new MerchantBenefitTierRow("offer-tier", 2, new BigDecimal("500000"), new BigDecimal("10000")),
+                new MerchantBenefitTierRow("offer-tier", 1, new BigDecimal("200000"), new BigDecimal("5000"))));
 
         var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
                 .recommendedCard();
 
         assertEquals(1, card.currentTier());
         assertEquals(2, card.nextTier());
-        assertEquals(new BigDecimal("300000"), card.currentTierTargetAmount());
-        assertEquals(false, card.isCurrentTierAchieved());
-        assertEquals(new BigDecimal("55000"), card.remainingAmountToNextTier());
+        assertEquals(new BigDecimal("200000"), card.currentTierTargetAmount());
+        assertEquals(true, card.isCurrentTierAchieved());
+        assertEquals(new BigDecimal("255000"), card.remainingAmountToNextTier());
+        assertEquals(2, card.tiers().size());
+        assertEquals(1, card.tiers().get(0).tier());
+        assertEquals(new BigDecimal("200000"), card.tiers().get(0).requiredPreviousSpendKrw());
     }
 
     @Test
@@ -251,6 +258,31 @@ class MerchantCardRecommendationServiceTest {
         assertNull(card.currentTierTargetAmount());
         assertEquals(true, card.isCurrentTierAchieved());
         assertEquals(BigDecimal.ZERO, card.remainingAmountToNextTier());
+    }
+
+    @Test
+    @DisplayName("tier 메타데이터가 없는 기존 후보도 후보 목록에서 다음 구간을 계산한다")
+    void fallsBackToCandidateTiersWhenMetadataIsUnavailable() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        List<MerchantCardBenefitCandidate> candidates = List.of(
+                candidate("card-fallback", "구간 카드", "discount", "percent", "10", null,
+                        "300000", "245000", "1", null, null, 1),
+                candidate("card-fallback", "구간 카드", "discount", "percent", "10", null,
+                        "500000", "245000", "1", null, null, 2));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(candidates);
+
+        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
+                .recommendedCard();
+
+        assertEquals(1, card.currentTier());
+        assertEquals(2, card.nextTier());
+        assertEquals(new BigDecimal("300000"), card.currentTierTargetAmount());
+        assertEquals(false, card.isCurrentTierAchieved());
+        assertEquals(new BigDecimal("55000"), card.remainingAmountToNextTier());
     }
 
     @Test
