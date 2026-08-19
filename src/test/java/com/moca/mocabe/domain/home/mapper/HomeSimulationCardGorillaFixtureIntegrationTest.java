@@ -101,12 +101,16 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
     }
 
     @Test
-    @DisplayName("V1부터 V20까지 적용한 MySQL 스키마에 fixture를 적재한다")
-    void loadsFixtureAgainstCurrentSchema() {
+    @DisplayName("전체 migration을 적용한 MySQL 스키마에 fixture를 적재한다")
+    void loadsFixtureAgainstCurrentSchema() throws Exception {
         Integer migrationCount =
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE",
                         Integer.class);
+        Integer expectedMigrationCount =
+                new PathMatchingResourcePatternResolver()
+                        .getResources("classpath:db/migration/V*.sql")
+                        .length;
         Integer userCount =
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM users WHERE user_id = ?", Integer.class, USER_ID);
@@ -114,7 +118,9 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                 jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM user_cards WHERE user_id = ?", Integer.class, USER_ID);
 
-        assertEquals(20, migrationCount);
+        // V21~V23(혜택 구조화)이 추가된 뒤에도 매번 하드코딩한 카운트를 갱신하지 않도록
+        // classpath의 실제 V*.sql 파일 수와 비교한다.
+        assertEquals(expectedMigrationCount, migrationCount);
         assertEquals(1, userCount);
         assertEquals(4, cardCount);
     }

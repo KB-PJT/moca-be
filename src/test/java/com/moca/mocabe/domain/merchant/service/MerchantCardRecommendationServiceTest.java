@@ -154,8 +154,31 @@ class MerchantCardRecommendationServiceTest {
                 .recommendedCard();
 
         assertEquals(true, card.performanceMet());
+        assertEquals(BigDecimal.ZERO, card.estimatedValueKrw());
         assertEquals(BigDecimal.ZERO, card.monthlyRemainingKrw());
         assertEquals(false, card.recommendationReasons().get(3).satisfied());
+    }
+
+    @Test
+    @DisplayName("예상 혜택은 남은 월 금액 한도를 초과하지 않는다")
+    void capsEstimatedValueAtRemainingMonthlyLimit() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        MerchantCardBenefitCandidate limited = new MerchantCardBenefitCandidate(
+                "merchant-1", "이마트", "MART", "마트", "card-limited", "한도 카드",
+                "카드사", null, "마트 할인", "discount", "percent", new BigDecimal("10"),
+                null, null, null, BigDecimal.ZERO, BigDecimal.ONE,
+                new BigDecimal("5000"), new BigDecimal("4500"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(limited));
+
+        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
+                .recommendedCard();
+
+        assertEquals(new BigDecimal("500"), card.estimatedValueKrw());
+        assertEquals(new BigDecimal("500"), card.monthlyRemainingKrw());
     }
 
     @Test

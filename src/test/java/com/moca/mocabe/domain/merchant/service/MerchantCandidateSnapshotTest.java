@@ -80,6 +80,19 @@ class MerchantCandidateSnapshotTest {
     }
 
     @Test
+    @DisplayName("별칭의 exact, contains, regex 매칭 정책을 적용한다")
+    void appliesAliasMatchTypes() {
+        MerchantCandidateSnapshot snapshot = snapshot(List.of(), List.of(
+                new MerchantNameCandidate("exact", "CJCGV", "exact"),
+                new MerchantNameCandidate("contains", "스타벅스", "contains"),
+                new MerchantNameCandidate("regex", "GS[0-9]{2}", "regex")));
+
+        assertEquals("exact", snapshot.resolveMerchantId("CJ CGV"));
+        assertEquals("contains", snapshot.resolveMerchantId("서울스타벅스강남"));
+        assertEquals("regex", snapshot.resolveMerchantId("GS25"));
+    }
+
+    @Test
     @DisplayName("이름이 비면 null을 반환한다")
     void returnsNullForBlankName() {
         MerchantCandidateSnapshot snapshot = snapshot(
