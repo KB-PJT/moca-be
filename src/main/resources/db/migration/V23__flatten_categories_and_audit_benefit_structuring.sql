@@ -69,7 +69,9 @@ CREATE TEMPORARY TABLE benefit_merchant_master_seed (
     category_code VARCHAR(50) NOT NULL,
     merchant_name VARCHAR(150) NOT NULL,
     has_physical_location BOOLEAN NOT NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
 
 INSERT INTO benefit_merchant_master_seed
     (category_code, merchant_name, has_physical_location)
@@ -250,7 +252,9 @@ WHERE offer.offer_name = '전 가맹점 기본적립 0.2%'
 CREATE TEMPORARY TABLE nh_point_extra_merchant_seed (
     condition_group SMALLINT UNSIGNED NOT NULL,
     merchant_name VARCHAR(150) NOT NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
 
 INSERT INTO nh_point_extra_merchant_seed (condition_group, merchant_name)
 VALUES
