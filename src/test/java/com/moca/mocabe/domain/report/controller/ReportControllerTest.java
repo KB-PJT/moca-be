@@ -49,7 +49,7 @@ class ReportControllerTest {
     when(reportQueryService.getPerformanceCards(USER_ID, "2026-07"))
         .thenReturn(new PerformanceCardsReportResponse("2026-07", List.of()));
     when(reportQueryService.getMissedBenefits(USER_ID, "2026-07", "card-1"))
-        .thenReturn(new MissedBenefitsReportResponse("2026-07", null, 0, List.of()));
+        .thenReturn(new MissedBenefitsReportResponse("2026-07", null, 0, 0, 0, 0, List.of()));
 
     mockMvc
         .perform(get("/reports/benefits/summary").param("yearMonth", "2026-07"))

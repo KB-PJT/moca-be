@@ -7,4 +7,7 @@ public record MissedBenefitsReportResponse(
     String yearMonth,
     ReportUserCardResponse userCard,
     long totalMissedBenefitAmount,
+    long approvalCount,
+    long outcomeCount,
+    long usageCount,
     List<MissedBenefitItemResponse> benefits) { }

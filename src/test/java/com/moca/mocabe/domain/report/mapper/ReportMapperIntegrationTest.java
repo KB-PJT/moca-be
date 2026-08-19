@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.MissedBenefitRow;
+import com.moca.mocabe.domain.report.model.MissedBenefitDataCounts;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -200,6 +201,11 @@ class ReportMapperIntegrationTest {
         500000L, mapper.findPerformanceCard(USER, USER_CARD, "2026-07").currentTierTargetAmount());
     assertEquals(1, mapper.findPerformanceCards(USER, "2026-07").size());
     assertEquals(2, mapper.findPerformanceTiers(USER).size());
+    MissedBenefitDataCounts counts =
+        mapper.findMissedBenefitDataCounts(USER, USER_CARD, "2026-07");
+    assertEquals(1, counts.approvalCount());
+    assertEquals(1, counts.outcomeCount());
+    assertEquals(1, counts.usageCount());
   }
 
   @Test

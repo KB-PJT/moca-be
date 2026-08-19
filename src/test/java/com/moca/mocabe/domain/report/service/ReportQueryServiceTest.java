@@ -16,6 +16,7 @@ import com.moca.mocabe.domain.report.mapper.ReportMapper;
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
 import com.moca.mocabe.domain.report.model.MissedBenefitRow;
+import com.moca.mocabe.domain.report.model.MissedBenefitDataCounts;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
 import com.moca.mocabe.domain.report.model.PerformanceTierRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
@@ -69,12 +70,17 @@ class ReportQueryServiceTest {
     when(reportMapper.findPerformanceCard(USER_ID, CARD_ID, "2026-07")).thenReturn(card);
     when(reportMapper.findMonthlyRemainingBenefits(USER_ID, CARD_ID, "2026-07"))
         .thenReturn(List.of(new MissedBenefitRow("rule-1", "카페 할인", "DISCOUNT", 3_000, 5_000)));
+    when(reportMapper.findMissedBenefitDataCounts(USER_ID, CARD_ID, "2026-07"))
+        .thenReturn(new MissedBenefitDataCounts(4, 2, 1));
 
     MissedBenefitsReportResponse response = service.getMissedBenefits(USER_ID, "2026-07", CARD_ID);
 
     assertEquals(2_000, response.totalMissedBenefitAmount());
     assertEquals(2_000, response.benefits().get(0).remainingAmount());
     assertEquals("KRW", response.benefits().get(0).unit());
+    assertEquals(4, response.approvalCount());
+    assertEquals(2, response.outcomeCount());
+    assertEquals(1, response.usageCount());
   }
 
   @Test

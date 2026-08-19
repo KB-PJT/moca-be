@@ -2228,7 +2228,7 @@ components:
     MissedBenefitsReportResponse:
       description: '지정한 보유카드의 기준 월 미사용 월 혜택 한도 요약입니다.'
       type: object
-      required: [yearMonth, userCard, totalMissedBenefitAmount, benefits]
+      required: [yearMonth, userCard, totalMissedBenefitAmount, approvalCount, outcomeCount, usageCount, benefits]
       properties:
         yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' , description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'}
         userCard: { $ref: '#/components/schemas/ReportUserCardResponse' }
@@ -2236,6 +2236,9 @@ components:
           type: integer
           format: int64
           description: 전월 실적과 카드 옵션에 따라 적용 가능한 월 한도에서 확정 사용액을 차감한 잔여액 합계
+        approvalCount: { type: integer, format: int64, description: '기준 월 카드 승인 건수입니다.' }
+        outcomeCount: { type: integer, format: int64, description: '기준 월 혜택 계산 outcome 건수입니다. 승인 후 계산 파이프라인 진입 여부 확인에 사용합니다.' }
+        usageCount: { type: integer, format: int64, description: '기준 월 확정 혜택 사용 원장 건수입니다.' }
         benefits:
           description: '조건에 해당하는 혜택 목록입니다. 내역이 없으면 빈 배열입니다.'
           type: array
