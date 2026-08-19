@@ -226,6 +226,37 @@ class ReportMapperIntegrationTest {
   }
 
   @Test
+  void capsAggregatedOutcomeAmountAtTheMonthlyLimit() {
+    jdbc.update(
+        "INSERT INTO card_payment_approvals"
+            + " (approval_id,user_id,user_card_id,merchant_id,approved_at,merchant_name,amount,"
+            + "approval_status,source_payload,created_at) VALUES"
+            + " ('dd000000-0000-4000-8000-000000000002',?,?,?,'2026-07-18 05:30:00',"
+            + "'스타벅스',70000,'approved',JSON_OBJECT(),UTC_TIMESTAMP(6))",
+        USER,
+        USER_CARD,
+        MERCHANT);
+    jdbc.update(
+        "INSERT INTO user_benefit_calculation_outcomes"
+            + " (outcome_id,user_card_id,approval_id,offer_id,rule_id,limit_policy_id,usage_date,"
+            + "reward_unit,expected_reward_value,applied_reward_value,missed_reward_value,"
+            + "outcome_status,rejection_reason) VALUES"
+            + " ('fe000000-0000-4000-8000-000000000002',?,?,?,?,?,'2026-07-18','KRW',7000,"
+            + "7000,0,'applied','NONE')",
+        USER_CARD,
+        "dd000000-0000-4000-8000-000000000002",
+        OFFER,
+        RULE,
+        POLICY);
+
+    MissedBenefitRow row =
+        mapper.findMonthlyRemainingBenefits(USER, USER_CARD, "2026-07").get(0);
+
+    assertEquals(5_000L, row.usedAmount());
+    assertEquals(0L, row.limitAmount() - row.usedAmount());
+  }
+
+  @Test
   void fallsBackToRepresentativeSpendWhenCardHasNoPerformanceTiers() {
     String cardWithoutTier = "33000000-0000-4000-8000-000000000002";
     String versionWithoutTier = "44000000-0000-4000-8000-000000000002";
