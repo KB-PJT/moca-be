@@ -17,6 +17,7 @@ import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
 import com.moca.mocabe.domain.report.model.MissedBenefitRow;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
+import com.moca.mocabe.domain.report.model.PerformanceTierRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.global.exception.report.InvalidReportQueryException;
@@ -156,6 +157,7 @@ class ReportQueryServiceTest {
     assertEquals(3, summary.cards().size());
     assertEquals(4, cards.cards().size());
     assertEquals(0, cards.cards().get(2).achievementRate());
+    assertEquals(List.of(), cards.cards().get(0).tiers());
   }
 
   @Test
@@ -163,12 +165,44 @@ class ReportQueryServiceTest {
     when(reportMapper.findPerformanceCards(USER_ID, "2026-07"))
         .thenReturn(
             List.of(new PerformanceCardRow(CARD_ID, "카드", null, 382_000, 500_000, 1, 2, 1)));
+    when(reportMapper.findPerformanceTiers(USER_ID))
+        .thenReturn(
+            List.of(
+                new PerformanceTierRow(CARD_ID, 1, 300_000),
+                new PerformanceTierRow(CARD_ID, 2, 500_000),
+                new PerformanceTierRow(CARD_ID, 3, 700_000)));
 
     PerformanceCardsReportResponse response = service.getPerformanceCards(USER_ID, "2026-07");
 
     assertEquals(1, response.cards().get(0).currentTier());
     assertEquals(2, response.cards().get(0).nextTier());
     assertEquals(118_000, response.cards().get(0).remainingAmountToNextTier());
+    assertEquals(3, response.cards().get(0).tiers().size());
+    assertEquals(500_000, response.cards().get(0).tiers().get(1).targetAmount());
+  }
+
+  @Test
+  void keepsPerformanceTiersGroupedAndOrderedPerCard() {
+    when(reportMapper.findPerformanceCards(USER_ID, "2026-07"))
+        .thenReturn(
+            List.of(
+                new PerformanceCardRow("card-a", "A", null, 420_000, 500_000, 1),
+                new PerformanceCardRow("card-b", "B", null, 150_000, 200_000, 2)));
+    when(reportMapper.findPerformanceTiers(USER_ID))
+        .thenReturn(
+            List.of(
+                new PerformanceTierRow("card-a", 1, 300_000),
+                new PerformanceTierRow("card-b", 1, 200_000),
+                new PerformanceTierRow("card-a", 2, 500_000),
+                new PerformanceTierRow("card-a", 3, 700_000)));
+
+    PerformanceCardsReportResponse response = service.getPerformanceCards(USER_ID, "2026-07");
+
+    assertEquals(List.of(1, 2, 3), response.cards().get(0).tiers().stream()
+        .map(tier -> tier.tier()).toList());
+    assertEquals(List.of(1), response.cards().get(1).tiers().stream()
+        .map(tier -> tier.tier()).toList());
+    assertEquals(200_000, response.cards().get(1).tiers().get(0).targetAmount());
   }
 
   @Test

@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
 import com.moca.mocabe.domain.report.model.MissedBenefitRow;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
+import com.moca.mocabe.domain.report.model.PerformanceTierRow;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -36,4 +37,6 @@ public interface ReportMapper {
 
   List<PerformanceCardRow> findPerformanceCards(
       @Param("userId") String userId, @Param("yearMonth") String yearMonth);
+
+  List<PerformanceTierRow> findPerformanceTiers(@Param("userId") String userId);
 }
