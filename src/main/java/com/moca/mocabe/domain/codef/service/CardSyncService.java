@@ -307,7 +307,8 @@ public class CardSyncService implements DisposableBean {
       List<ApprovalInsert> insertedApprovals =
           approvalIngestStore.insertAllReturningInserted(inserts);
       inserted = insertedApprovals.size();
-      benefitUsageCalculationService.calculateAndPersist(insertedApprovals);
+      // 신규 승인뿐 아니라 이번 기간에 이미 저장된 승인도 같은 멱등 계산 경로로 보강한다.
+      benefitUsageCalculationService.calculateAndPersistForPeriod(userId, fromUtc, toUtc);
     } else {
       inserted = approvalIngestStore.insertAll(inserts);
     }

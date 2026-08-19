@@ -45,6 +45,17 @@
                  mc.category_code, m.merchant_id
     </select>
 
+    <!-- CODEF 재동기화 시 이미 저장된 승인도 outcome 누락을 보강할 수 있도록 승인 ID를 기간으로 조회한다. -->
+    <select id="findApprovalIdsForPeriod" resultType="string">
+        SELECT approval_id
+        FROM card_payment_approvals
+        WHERE user_id = #{userId}
+          AND approval_status = 'approved'
+          AND approved_at &gt;= #{fromUtc}
+          AND approved_at &lt; #{toUtc}
+        ORDER BY approved_at, approval_id
+    </select>
+
     <resultMap id="simpleRuleRow" type="com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow">
         <constructor>
             <arg column="rule_id" javaType="java.lang.String"/>

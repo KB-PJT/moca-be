@@ -17,6 +17,11 @@ public interface BenefitCalculationMapper {
   List<BenefitApprovalRow> findApprovalsForCalculation(
       @Param("approvalIds") List<String> approvalIds);
 
+  List<String> findApprovalIdsForPeriod(
+      @Param("userId") String userId,
+      @Param("fromUtc") LocalDateTime fromUtc,
+      @Param("toUtc") LocalDateTime toUtc);
+
   List<SimpleBenefitRuleRow> findSimpleRulesForUserCard(
       @Param("userCardId") String userCardId, @Param("usageDate") LocalDate usageDate);
 

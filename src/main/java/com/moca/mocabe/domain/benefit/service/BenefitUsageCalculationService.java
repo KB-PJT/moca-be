@@ -23,6 +23,7 @@ import com.moca.mocabe.domain.benefit.type.RewardUnit;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -65,9 +66,25 @@ public class BenefitUsageCalculationService {
     if (mapper == null || insertedApprovals == null || insertedApprovals.isEmpty()) {
       return;
     }
-    List<BenefitApprovalRow> approvals =
-        mapper.findApprovalsForCalculation(
-            insertedApprovals.stream().map(ApprovalInsert::approvalId).toList());
+    calculateApprovalIds(insertedApprovals.stream().map(ApprovalInsert::approvalId).toList());
+  }
+
+  /** 승인 동기화 전에 이미 저장된 승인까지 같은 계산 경로로 보강한다. */
+  @Transactional
+  public void calculateAndPersistForPeriod(
+      String userId, LocalDateTime fromUtc, LocalDateTime toUtc) {
+    if (mapper == null) {
+      return;
+    }
+    List<String> approvalIds = mapper.findApprovalIdsForPeriod(userId, fromUtc, toUtc);
+    if (approvalIds == null || approvalIds.isEmpty()) {
+      return;
+    }
+    calculateApprovalIds(approvalIds);
+  }
+
+  private void calculateApprovalIds(List<String> approvalIds) {
+    List<BenefitApprovalRow> approvals = mapper.findApprovalsForCalculation(approvalIds);
     for (BenefitApprovalRow approval : approvals) {
       calculateApproval(approval);
     }

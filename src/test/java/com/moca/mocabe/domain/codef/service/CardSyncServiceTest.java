@@ -179,7 +179,7 @@ class CardSyncServiceTest {
     service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
 
     verify(approvalIngestStore).insertAllReturningInserted(any());
-    verify(calculationService).calculateAndPersist(List.of());
+    verify(calculationService).calculateAndPersistForPeriod(eq(USER_ID), any(), any());
   }
 
   @Test
