@@ -215,6 +215,17 @@ class ReportMapperIntegrationTest {
   }
 
   @Test
+  void usesAppliedCalculationOutcomeWhenUsageLedgerIsMissing() {
+    jdbc.update("DELETE FROM user_benefit_usages WHERE user_card_id = ?", USER_CARD);
+
+    MissedBenefitRow row =
+        mapper.findMonthlyRemainingBenefits(USER, USER_CARD, "2026-07").get(0);
+
+    assertEquals(1_500L, row.usedAmount());
+    assertEquals(3_500L, row.limitAmount() - row.usedAmount());
+  }
+
+  @Test
   void fallsBackToRepresentativeSpendWhenCardHasNoPerformanceTiers() {
     String cardWithoutTier = "33000000-0000-4000-8000-000000000002";
     String versionWithoutTier = "44000000-0000-4000-8000-000000000002";
