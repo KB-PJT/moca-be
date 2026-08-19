@@ -2294,7 +2294,7 @@ components:
           description: '보유카드 목록입니다. 해당 카드가 없으면 빈 배열입니다.'
           type: array
           items: { $ref: '#/components/schemas/PerformanceCardResponse' }
-        PerformanceCardResponse:
+    PerformanceCardResponse:
       description: '보유카드 한 장의 기준 월 실적 달성 현황입니다.'
       type: object
       required: [userCardId, cardName, currentPerformanceAmount, currentTierTargetAmount,
