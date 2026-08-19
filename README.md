@@ -36,7 +36,7 @@ src/main/resources
 
 ## 로컬 실행 준비
 
-1. JDK 17을 사용합니다. 저장소의 `.java-version` 값도 17입니다.
+1. JDK 17을 사용합니다.
 2. Tomcat 9에 WAR를 배포할 수 있어야 합니다.
 3. 다음 명령으로 빌드합니다.
 
@@ -166,9 +166,6 @@ CodeRabbit으로 `main`과 `dev` 대상 Pull Request를 한국어로 자동 리�
 현재 Swagger 문서는 Spring Boot 자동 설정 없이 정적 OpenAPI 계약을 사용합니다. REST API를 추가하거나 변경하면 `src/main/resources/openapi/openapi.yaml`도 함께 수정해야 합니다.
 
 ## 카드 혜택 대상 매칭 운영
-
-카드 혜택 JSON Rule DSL, Evaluator 판정 순서, CODEF 데이터 경계와 신규 룰 추가 절차는
-[카드 혜택 JSON Rule Evaluator 운영 가이드](BENEFIT_RULE_EVALUATOR.md)를 참고합니다.
 
 카드고릴라의 `target_code`와 `target_name`은 원문 추적용으로 보존하고, 추천 계산은
 `benefit_rule_targets.merchant_category_id` 또는 `merchant_id` FK를 사용합니다. 임의의 기본
