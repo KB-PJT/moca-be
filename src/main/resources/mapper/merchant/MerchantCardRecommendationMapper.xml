@@ -73,16 +73,9 @@
     </resultMap>
 
     <select id="findCategoryLineageIds" resultType="java.lang.String">
-        WITH RECURSIVE category_lineage AS (
-            SELECT category.merchant_category_id, category.parent_id
-            FROM merchant_categories category
-            WHERE category.merchant_category_id = #{merchantCategoryId}
-            UNION ALL
-            SELECT parent.merchant_category_id, parent.parent_id
-            FROM merchant_categories parent
-            INNER JOIN category_lineage child ON child.parent_id = parent.merchant_category_id
-        )
-        SELECT merchant_category_id FROM category_lineage
+        SELECT category.merchant_category_id
+        FROM merchant_categories category
+        WHERE category.merchant_category_id = #{merchantCategoryId}
     </select>
 
     <resultMap id="merchantCategoryLineageMap"
@@ -93,22 +86,13 @@
         </constructor>
     </resultMap>
     <select id="findCategoryLineages" resultMap="merchantCategoryLineageMap">
-        WITH RECURSIVE category_lineage AS (
-            SELECT merchant.merchant_id, category.merchant_category_id, category.parent_id
-            FROM merchants merchant
-            INNER JOIN merchant_categories category
-                ON category.merchant_category_id = merchant.merchant_category_id
-            WHERE merchant.merchant_id IN
-            <foreach collection="merchantIds" item="merchantId" open="(" separator="," close=")">
-                #{merchantId}
-            </foreach>
-            UNION ALL
-            SELECT child.merchant_id, parent.merchant_category_id, parent.parent_id
-            FROM merchant_categories parent
-            INNER JOIN category_lineage child ON child.parent_id = parent.merchant_category_id
-        )
-        SELECT merchant_id, merchant_category_id FROM category_lineage
-        ORDER BY merchant_id, merchant_category_id
+        SELECT merchant.merchant_id, merchant.merchant_category_id
+        FROM merchants merchant
+        WHERE merchant.merchant_id IN
+        <foreach collection="merchantIds" item="merchantId" open="(" separator="," close=")">
+            #{merchantId}
+        </foreach>
+        ORDER BY merchant.merchant_id, merchant.merchant_category_id
     </select>
 
     <!-- Mapper는 보유 카드의 룰과 대상 데이터를 조회만 한다. 적용 가능 여부는 도메인에서 판정한다. -->
