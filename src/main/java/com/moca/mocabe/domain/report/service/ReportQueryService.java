@@ -178,19 +178,24 @@ public class ReportQueryService {
     List<PerformanceCardResponse> cards =
         reportMapper.findPerformanceCards(userId, format(yearMonth)).stream()
             .map(
-                row ->
-                    new PerformanceCardResponse(
+                row -> {
+                  List<PerformanceTierResponse> tiers =
+                      tiersByCard.getOrDefault(row.userCardId(), List.of());
+                  TierProgress progress = resolveTierProgress(row, tiers);
+                  return new PerformanceCardResponse(
                         row.userCardId(),
                         row.cardName(),
                         row.cardImageUrl(),
                         row.currentPerformanceAmount(),
-                        row.currentTierTargetAmount(),
-                        achievementRate(row),
-                        row.currentTier(),
-                        row.nextTier(),
-                        isAchieved(row),
-                        remainingToTarget(row),
-                        tiersByCard.getOrDefault(row.userCardId(), List.of())))
+                        progress.currentTierTargetAmount(),
+                        progress.achievementRate(),
+                        progress.currentTier(),
+                        progress.nextTier(),
+                        progress.currentTierAchieved(),
+                        progress.remainingAmountToNextTier(),
+                        progress.nextTierTargetAmount(),
+                        tiers);
+                })
             .toList();
     return new PerformanceCardsReportResponse(format(yearMonth), cards);
   }
@@ -258,4 +263,52 @@ public class ReportQueryService {
   private long remainingToTarget(PerformanceCardRow row) {
     return Math.max(0, row.currentTierTargetAmount() - row.currentPerformanceAmount());
   }
+
+  private TierProgress resolveTierProgress(
+      PerformanceCardRow row, List<PerformanceTierResponse> tiers) {
+    if (tiers.isEmpty()) {
+      return new TierProgress(
+          row.currentTier(),
+          row.currentTierTargetAmount(),
+          row.nextTier(),
+          null,
+          isAchieved(row),
+          remainingToTarget(row),
+          achievementRate(row));
+    }
+    int achievedIndex = -1;
+    for (int index = 0; index < tiers.size(); index++) {
+      if (row.currentPerformanceAmount() >= tiers.get(index).targetAmount()) {
+        achievedIndex = index;
+      }
+    }
+    PerformanceTierResponse current = achievedIndex < 0 ? null : tiers.get(achievedIndex);
+    int nextIndex = achievedIndex + 1;
+    PerformanceTierResponse next = nextIndex < tiers.size() ? tiers.get(nextIndex) : null;
+    long targetForProgress = next == null
+        ? current == null ? 0 : current.targetAmount()
+        : next.targetAmount();
+    int rate = targetForProgress <= 0 ? 0
+        : (int) Math.min(100,
+            row.currentPerformanceAmount() * 100 / targetForProgress);
+    return new TierProgress(
+        current == null ? 0 : current.tier(),
+        current == null ? 0 : current.targetAmount(),
+        next == null ? null : next.tier(),
+        next == null ? null : next.targetAmount(),
+        current != null,
+        next == null
+            ? 0
+            : Math.max(0, next.targetAmount() - row.currentPerformanceAmount()),
+        rate);
+  }
+
+  private record TierProgress(
+      int currentTier,
+      long currentTierTargetAmount,
+      Integer nextTier,
+      Long nextTierTargetAmount,
+      boolean currentTierAchieved,
+      long remainingAmountToNextTier,
+      int achievementRate) { }
 }

@@ -2313,17 +2313,19 @@ components:
       description: '보유카드 한 장의 기준 월 실적 달성 현황입니다.'
       type: object
       required: [userCardId, cardName, currentPerformanceAmount, currentTierTargetAmount,
-                 achievementRate, currentTier, isCurrentTierAchieved, remainingAmountToNextTier, tiers]
+                 achievementRate, currentTier, isCurrentTierAchieved, remainingAmountToNextTier,
+                 nextTierTargetAmount, tiers]
       properties:
         userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
         cardName: { type: string , description: '카드 상품명입니다.'}
         cardImageUrl: { type: string, format: uri, nullable: true , description: '카드 이미지 URL입니다. 이미지가 없으면 null입니다.'}
         currentPerformanceAmount: { type: integer, format: int64 , description: '기준 월의 현재 인정 실적 금액입니다. 단위는 원입니다.'}
-        currentTierTargetAmount: { type: integer, format: int64, description: 다음 실적 구간의 최소 금액이며, 실적 구간이 없으면 카드 대표 실적 기준 금액 }
-        achievementRate: { type: integer, minimum: 0, maximum: 100 , description: '목표 실적 대비 현재 인정 실적의 달성률입니다. 단위는 정수 백분율입니다.'}
+        currentTierTargetAmount: { type: integer, format: int64, description: '현재 달성한 currentTier의 기준 금액입니다. 첫 구간 미달이면 0입니다.' }
+        achievementRate: { type: integer, minimum: 0, maximum: 100 , description: 'nextTier가 있으면 nextTier 목표, 없으면 currentTier 목표를 기준으로 한 진행률입니다. 단위는 정수 백분율입니다.'}
         currentTier: { type: integer, minimum: 0, description: 현재 실적이 속한 카드 콘텐츠 실적 구간 번호이며, 구간 데이터가 없거나 첫 구간 미만이면 0 }
         nextTier: { type: integer, nullable: true, description: 다음으로 달성할 카드 콘텐츠 실적 구간 번호이며, 최고 구간이면 null }
-        isCurrentTierAchieved: { type: boolean , description: '현재 실적 구간 달성 여부입니다.'}
+        nextTierTargetAmount: { type: integer, format: int64, nullable: true, description: 'nextTier를 달성하기 위한 기준 금액이며, 다음 구간이 없으면 null입니다.' }
+        isCurrentTierAchieved: { type: boolean , description: 'currentTier가 실제로 달성된 상태인지 여부입니다. 첫 구간 미달이면 false입니다.'}
         remainingAmountToNextTier: { type: integer, format: int64 , description: '다음 실적 구간까지 필요한 금액입니다. 단위는 원입니다.'}
         tiers:
           type: array
