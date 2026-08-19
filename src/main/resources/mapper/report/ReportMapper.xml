@@ -285,4 +285,32 @@
           AND uc.is_active = TRUE
         ORDER BY uc.display_order ASC, uc.user_card_id ASC
     </select>
+
+    <resultMap id="performanceTierRowMap" type="com.moca.mocabe.domain.report.model.PerformanceTierRow">
+        <constructor>
+            <arg column="user_card_id" javaType="java.lang.String"/>
+            <arg column="tier" javaType="_int"/>
+            <arg column="target_amount" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findPerformanceTiers" resultMap="performanceTierRowMap">
+        SELECT uc.user_card_id,
+               tier.tier_number AS tier,
+               CAST(tier.minimum_spend_krw AS SIGNED) AS target_amount
+        FROM user_cards uc
+        INNER JOIN cards c ON c.card_id = uc.card_id
+        INNER JOIN card_content_versions cv ON cv.card_id = c.card_id
+        INNER JOIN card_performance_tiers tier ON tier.content_version_id = cv.content_version_id
+        WHERE uc.user_id = #{userId}
+          AND uc.is_active = TRUE
+          AND NOT EXISTS (
+              SELECT 1 FROM card_content_versions newer
+              WHERE newer.card_id = cv.card_id
+                AND (newer.last_seen_at &gt; cv.last_seen_at
+                     OR (newer.last_seen_at = cv.last_seen_at
+                         AND newer.content_version_id &gt; cv.content_version_id))
+          )
+        ORDER BY uc.display_order ASC, uc.user_card_id ASC, tier.tier_number ASC
+    </select>
 </mapper>

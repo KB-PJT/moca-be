@@ -199,6 +199,7 @@ class ReportMapperIntegrationTest {
     assertEquals(
         500000L, mapper.findPerformanceCard(USER, USER_CARD, "2026-07").currentTierTargetAmount());
     assertEquals(1, mapper.findPerformanceCards(USER, "2026-07").size());
+    assertEquals(2, mapper.findPerformanceTiers(USER).size());
   }
 
   @Test

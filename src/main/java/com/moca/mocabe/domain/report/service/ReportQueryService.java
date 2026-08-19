@@ -11,11 +11,13 @@ import com.moca.mocabe.domain.report.dto.PerformanceCardResponse;
 import com.moca.mocabe.domain.report.dto.PerformanceCardsReportResponse;
 import com.moca.mocabe.domain.report.dto.PerformanceSummaryCardResponse;
 import com.moca.mocabe.domain.report.dto.PerformanceSummaryReportResponse;
+import com.moca.mocabe.domain.report.dto.PerformanceTierResponse;
 import com.moca.mocabe.domain.report.dto.ReportUserCardResponse;
 import com.moca.mocabe.domain.report.mapper.ReportMapper;
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
+import com.moca.mocabe.domain.report.model.PerformanceTierRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
 import com.moca.mocabe.global.exception.report.InvalidReportQueryException;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
@@ -28,6 +30,8 @@ import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Locale;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -151,6 +155,17 @@ public class ReportQueryService {
       String userId, String requestedYearMonth) {
     requireUser(userId);
     YearMonth yearMonth = parseYearMonth(requestedYearMonth);
+    Map<String, List<PerformanceTierResponse>> tiersByCard =
+        reportMapper.findPerformanceTiers(userId).stream()
+            .collect(Collectors.groupingBy(
+                PerformanceTierRow::userCardId,
+                Collectors.mapping(
+                    tier -> new PerformanceTierResponse(tier.tier(), tier.targetAmount()),
+                    Collectors.collectingAndThen(
+                        Collectors.toList(),
+                        values -> values.stream()
+                            .sorted(java.util.Comparator.comparingInt(PerformanceTierResponse::tier))
+                            .toList()))));
     List<PerformanceCardResponse> cards =
         reportMapper.findPerformanceCards(userId, format(yearMonth)).stream()
             .map(
@@ -165,7 +180,8 @@ public class ReportQueryService {
                         row.currentTier(),
                         row.nextTier(),
                         isAchieved(row),
-                        remainingToTarget(row)))
+                        remainingToTarget(row),
+                        tiersByCard.getOrDefault(row.userCardId(), List.of())))
             .toList();
     return new PerformanceCardsReportResponse(format(yearMonth), cards);
   }

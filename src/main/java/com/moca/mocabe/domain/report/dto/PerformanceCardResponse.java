@@ -1,5 +1,7 @@
 package com.moca.mocabe.domain.report.dto;
 
+import java.util.List;
+
 /** 카드별 실적 현황 응답이다. 현재 스키마에는 실적 tier가 없어 0/null로 반환한다. */
 public record PerformanceCardResponse(
     String userCardId,
@@ -11,4 +13,5 @@ public record PerformanceCardResponse(
     int currentTier,
     Integer nextTier,
     boolean isCurrentTierAchieved,
-    long remainingAmountToNextTier) { }
+    long remainingAmountToNextTier,
+    List<PerformanceTierResponse> tiers) { }

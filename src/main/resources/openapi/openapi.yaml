@@ -2294,11 +2294,11 @@ components:
           description: '보유카드 목록입니다. 해당 카드가 없으면 빈 배열입니다.'
           type: array
           items: { $ref: '#/components/schemas/PerformanceCardResponse' }
-    PerformanceCardResponse:
+        PerformanceCardResponse:
       description: '보유카드 한 장의 기준 월 실적 달성 현황입니다.'
       type: object
       required: [userCardId, cardName, currentPerformanceAmount, currentTierTargetAmount,
-                 achievementRate, currentTier, isCurrentTierAchieved, remainingAmountToNextTier]
+                 achievementRate, currentTier, isCurrentTierAchieved, remainingAmountToNextTier, tiers]
       properties:
         userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
         cardName: { type: string , description: '카드 상품명입니다.'}
@@ -2310,6 +2310,17 @@ components:
         nextTier: { type: integer, nullable: true, description: 다음으로 달성할 카드 콘텐츠 실적 구간 번호이며, 최고 구간이면 null }
         isCurrentTierAchieved: { type: boolean , description: '현재 실적 구간 달성 여부입니다.'}
         remainingAmountToNextTier: { type: integer, format: int64 , description: '다음 실적 구간까지 필요한 금액입니다. 단위는 원입니다.'}
+        tiers:
+          type: array
+          description: '카드 콘텐츠에 정의된 전체 실적 구간입니다. 각 targetAmount는 해당 구간 시작 금액이며 구간 정보가 없으면 빈 배열입니다.'
+          items: { $ref: '#/components/schemas/PerformanceTierResponse' }
+    PerformanceTierResponse:
+      description: '카드의 월 실적 구간입니다.'
+      type: object
+      required: [tier, targetAmount]
+      properties:
+        tier: { type: integer, minimum: 1, description: '실적 구간 번호입니다.' }
+        targetAmount: { type: integer, format: int64, minimum: 0, description: '실적 구간 시작 금액입니다. 단위는 원입니다.' }
     CardLinkApiResponse:
       description: 'CardLink API의 공통 성공 응답입니다.'
       type: object
