@@ -89,7 +89,9 @@ WHERE (seed.target_type = 'all_merchants'
         AND target.target_code = seed.target_code
   );
 
--- 같은 condition_group의 include는 AND이므로 서로 대체 가능한 브랜드는 각 OR 그룹으로 정규화한다.
+-- 기존 데이터가 이미 다른 condition_group을 사용하고 있을 수 있다.
+-- UNIQUE(rule_id, condition_group, match_mode, target_type, target_code) 충돌을 피하기 위해
+-- seed 대상만 임시 그룹으로 이동한 뒤 원하는 그룹으로 확정한다.
 UPDATE benefit_rule_targets target
 INNER JOIN benefit_rules rule ON rule.rule_id = target.rule_id
 INNER JOIN benefit_offers offer ON offer.offer_id = rule.offer_id
@@ -102,7 +104,22 @@ INNER JOIN seed_appended_card_targets seed
    AND seed.match_mode = target.match_mode
    AND seed.target_type = target.target_type
    AND seed.target_code = target.target_code
-SET target.condition_group = seed.condition_group;
+SET target.condition_group = 60000;
+
+UPDATE benefit_rule_targets target
+INNER JOIN benefit_rules rule ON rule.rule_id = target.rule_id
+INNER JOIN benefit_offers offer ON offer.offer_id = rule.offer_id
+INNER JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+INNER JOIN card_content_versions version ON version.content_version_id = benefit.content_version_id
+INNER JOIN cards card ON card.card_id = version.card_id
+INNER JOIN seed_appended_card_targets seed
+    ON seed.gorilla_card_id = card.gorilla_card_id
+   AND seed.offer_name = offer.offer_name
+   AND seed.match_mode = target.match_mode
+   AND seed.target_type = target.target_type
+   AND seed.target_code = target.target_code
+SET target.condition_group = seed.condition_group
+WHERE target.condition_group >= 60000;
 
 DROP TEMPORARY TABLE seed_appended_card_targets;
 
