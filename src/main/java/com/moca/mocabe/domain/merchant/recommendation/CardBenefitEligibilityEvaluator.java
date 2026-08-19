@@ -69,6 +69,8 @@ public class CardBenefitEligibilityEvaluator {
         return switch (row.targetType()) {
             case "all_merchants" -> true;
             case "merchant" -> merchantId != null && merchantId.equals(row.targetMerchantId());
+            // 카테고리는 V23에서 평탄화된 canonical category만 사용한다. 상위 카테고리
+            // 확장은 특정 업종 혜택이 다른 업종으로 번지는 false positive를 만들 수 있다.
             case "merchant_category" -> categoryLineageIds.contains(row.targetMerchantCategoryId())
                     && (!applyConfidence || placeConfidence == null
                     || placeConfidence.compareTo(row.minimumPlaceConfidence()) >= 0);

@@ -15,17 +15,17 @@ class CardBenefitEligibilityEvaluatorTest {
     private final CardBenefitEligibilityEvaluator evaluator = new CardBenefitEligibilityEvaluator();
 
     @Test
-    @DisplayName("하위 카테고리는 상위 카테고리 혜택을 신뢰도 경계부터 적용한다")
-    void appliesParentCategoryFromMinimumConfidence() {
+    @DisplayName("서로 다른 canonical 카테고리의 혜택은 교차 추천하지 않는다")
+    void rejectsCrossCategoryBenefit() {
         MerchantCardBenefitRuleRow row = row(
-                "rule-1", "include", "merchant_category", "parent-category", null,
+                "rule-1", "include", "merchant_category", "convenience-store", null,
                 new BigDecimal("0.850"), "grant", "discount", "percent",
                 BigDecimal.TEN, null, null, false, false);
 
         assertEquals(1, evaluate(List.of(row), null,
-                List.of("child-category", "parent-category"), "0.850").size());
+                List.of("convenience-store"), "0.850").size());
         assertEquals(0, evaluate(List.of(row), null,
-                List.of("child-category", "parent-category"), "0.849").size());
+                List.of("online-shopping"), "0.999").size());
     }
 
     @Test
@@ -41,6 +41,18 @@ class CardBenefitEligibilityEvaluatorTest {
 
         assertEquals(0, evaluate(rows, "merchant-1", List.of(), null).size());
         assertEquals(0, evaluate(rows, "merchant-2", List.of(), null).size());
+    }
+
+    @Test
+    @DisplayName("같은 편의점 카테고리라도 특정 가맹점 혜택은 다른 가맹점에 적용하지 않는다")
+    void rejectsSameCategoryDifferentMerchant() {
+        MerchantCardBenefitRuleRow row = row(
+                "cu-only", "include", "merchant", null, "cu-merchant",
+                BigDecimal.ZERO, "grant", "discount", "percent", BigDecimal.TEN,
+                null, null, false, false);
+
+        assertEquals(1, evaluate(List.of(row), "cu-merchant", List.of("convenience-store"), null).size());
+        assertEquals(0, evaluate(List.of(row), "gs25-merchant", List.of("convenience-store"), null).size());
     }
 
     @Test
