@@ -16,6 +16,7 @@ import com.moca.mocabe.domain.report.dto.ReportUserCardResponse;
 import com.moca.mocabe.domain.report.mapper.ReportMapper;
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
+import com.moca.mocabe.domain.report.model.MissedBenefitDataCounts;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
 import com.moca.mocabe.domain.report.model.PerformanceTierRow;
 import com.moca.mocabe.domain.user.mapper.UserMapper;
@@ -125,10 +126,18 @@ public class ReportQueryService {
             .filter(row -> row.remainingAmount() > 0)
             .toList();
     long remaining = benefits.stream().mapToLong(MissedBenefitItemResponse::remainingAmount).sum();
+    MissedBenefitDataCounts counts = reportMapper.findMissedBenefitDataCounts(
+        userId, userCardId, format(yearMonth));
+    if (counts == null) {
+      counts = MissedBenefitDataCounts.empty();
+    }
     return new MissedBenefitsReportResponse(
         format(yearMonth),
         new ReportUserCardResponse(card.userCardId(), card.cardName(), null),
         remaining,
+        counts.approvalCount(),
+        counts.outcomeCount(),
+        counts.usageCount(),
         benefits);
   }
 

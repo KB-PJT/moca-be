@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.report.mapper;
 import com.moca.mocabe.domain.report.model.BenefitTypeAmountRow;
 import com.moca.mocabe.domain.report.model.CategoryBenefitRow;
 import com.moca.mocabe.domain.report.model.MissedBenefitRow;
+import com.moca.mocabe.domain.report.model.MissedBenefitDataCounts;
 import com.moca.mocabe.domain.report.model.PerformanceCardRow;
 import com.moca.mocabe.domain.report.model.PerformanceTierRow;
 import java.time.LocalDateTime;
@@ -26,6 +27,11 @@ public interface ReportMapper {
       @Param("limit") int limit);
 
   List<MissedBenefitRow> findMonthlyRemainingBenefits(
+      @Param("userId") String userId,
+      @Param("userCardId") String userCardId,
+      @Param("yearMonth") String yearMonth);
+
+  MissedBenefitDataCounts findMissedBenefitDataCounts(
       @Param("userId") String userId,
       @Param("userCardId") String userCardId,
       @Param("yearMonth") String yearMonth);

@@ -233,6 +233,39 @@
                  limits.title ASC
     </select>
 
+    <resultMap id="missedBenefitDataCountsMap" type="com.moca.mocabe.domain.report.model.MissedBenefitDataCounts">
+        <constructor>
+            <arg column="approval_count" javaType="_long"/>
+            <arg column="outcome_count" javaType="_long"/>
+            <arg column="usage_count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 리포트 결과가 비어 있을 때 승인·계산·사용 원장 중 어느 단계에서 끊겼는지 확인할 수 있는 진단 건수다. -->
+    <select id="findMissedBenefitDataCounts" resultMap="missedBenefitDataCountsMap">
+        SELECT
+            (SELECT COUNT(*)
+             FROM card_payment_approvals approval
+             WHERE approval.user_id = #{userId}
+               AND approval.user_card_id = #{userCardId}
+               AND approval.approved_at &gt;= CONCAT(#{yearMonth}, '-01')
+               AND approval.approved_at &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+            ) AS approval_count,
+            (SELECT COUNT(*)
+             FROM user_benefit_calculation_outcomes outcome
+             WHERE outcome.user_card_id = #{userCardId}
+               AND outcome.usage_date &gt;= CONCAT(#{yearMonth}, '-01')
+               AND outcome.usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+            ) AS outcome_count,
+            (SELECT COUNT(*)
+             FROM user_benefit_usages usage_row
+             WHERE usage_row.user_card_id = #{userCardId}
+               AND usage_row.usage_status = 'confirmed'
+               AND usage_row.usage_date &gt;= CONCAT(#{yearMonth}, '-01')
+               AND usage_row.usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
+            ) AS usage_count
+    </select>
+
     <resultMap id="performanceCardRowMap" type="com.moca.mocabe.domain.report.model.PerformanceCardRow">
         <constructor>
             <arg column="user_card_id" javaType="java.lang.String"/>
