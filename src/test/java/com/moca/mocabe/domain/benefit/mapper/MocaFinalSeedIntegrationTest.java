@@ -53,6 +53,8 @@ class MocaFinalSeedIntegrationTest {
       assertGeneratedGoldenCases(jdbc);
       assertMerchantAliases(jdbc);
       assertRootCauseAudit(jdbc);
+      assertMerchantCategoryMappings(jdbc);
+      assertBenefitTargetForeignKeys(jdbc);
       printStructuringAudit(jdbc);
       int firstRunTargetCount = count(jdbc, "SELECT COUNT(*) FROM benefit_rule_targets");
 
@@ -87,6 +89,8 @@ class MocaFinalSeedIntegrationTest {
       assertGeneratedGoldenCases(jdbc);
       assertMerchantAliases(jdbc);
       assertRootCauseAudit(jdbc);
+      assertMerchantCategoryMappings(jdbc);
+      assertBenefitTargetForeignKeys(jdbc);
 
       String ruleId = jdbc.queryForObject("SELECT rule_id FROM benefit_rules LIMIT 1", String.class);
       String categoryId =
@@ -166,6 +170,46 @@ class MocaFinalSeedIntegrationTest {
                 + "WHERE normalized_alias_name IN "
                 + "('GS25','지에스25','GS리테일GS25','스타벅스커피','스타벅스코리아',"
                 + "'STARBUCKS','씨지브이','CJCGV')"));
+  }
+
+  private void assertMerchantCategoryMappings(JdbcTemplate jdbc) {
+    String expected = "SELECT COUNT(*) FROM merchants merchant "
+        + "INNER JOIN merchant_categories category "
+        + "ON category.merchant_category_id=merchant.merchant_category_id "
+        + "WHERE (merchant.normalized_name IN ('무신사') "
+        + "AND category.category_code <> 'ONLINE_SHOPPING') OR "
+        + "(merchant.normalized_name IN ('CU','GS25','세븐일레븐','이마트24') "
+        + "AND category.category_code <> 'CONVENIENCE_STORE') OR "
+        + "(merchant.normalized_name IN ('스타벅스','투썸플레이스') "
+        + "AND category.category_code <> 'CAFE') OR "
+        + "(merchant.normalized_name IN ('CGV','롯데시네마','메가박스') "
+        + "AND category.category_code <> 'MOVIE')";
+    assertEquals(0, count(jdbc, expected));
+    assertEquals(0, count(jdbc,
+        "SELECT COUNT(*) FROM merchants WHERE merchant_category_id IS NULL"));
+    assertEquals(0, count(jdbc,
+        "SELECT COUNT(*) FROM (SELECT normalized_name FROM merchants "
+            + "GROUP BY normalized_name HAVING COUNT(*) > 1) duplicate_merchants"));
+    assertEquals(0, count(jdbc,
+        "SELECT COUNT(*) FROM (SELECT normalized_alias_name FROM merchant_aliases "
+            + "GROUP BY normalized_alias_name HAVING COUNT(DISTINCT merchant_id) > 1) "
+            + "conflicting_aliases"));
+  }
+
+  private void assertBenefitTargetForeignKeys(JdbcTemplate jdbc) {
+    assertEquals(0, count(jdbc,
+        "SELECT COUNT(*) FROM benefit_rule_targets target "
+            + "LEFT JOIN merchant_categories category "
+            + "ON category.merchant_category_id=target.merchant_category_id "
+            + "LEFT JOIN merchants merchant ON merchant.merchant_id=target.merchant_id "
+            + "WHERE (target.target_type='merchant_category' AND "
+            + "(target.merchant_category_id IS NULL OR target.merchant_id IS NOT NULL "
+            + "OR target.target_code <> category.category_code)) OR "
+            + "(target.target_type='merchant' AND "
+            + "(target.merchant_id IS NULL OR target.merchant_category_id IS NOT NULL "
+            + "OR target.target_code <> merchant.normalized_name)) OR "
+            + "(target.target_type='all_merchants' AND "
+            + "(target.merchant_id IS NOT NULL OR target.merchant_category_id IS NOT NULL))"));
   }
 
   private void assertRootCauseAudit(JdbcTemplate jdbc) {
