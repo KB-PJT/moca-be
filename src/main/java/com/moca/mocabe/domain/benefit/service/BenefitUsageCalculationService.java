@@ -80,8 +80,8 @@ public class BenefitUsageCalculationService {
     if (approvalIds == null || approvalIds.isEmpty()) {
       return;
     }
-    // outcome이 이미 있더라도 최신 전월/당월 실적 기준으로 재계산할 수 있도록
-    // 기존 계산 산출물을 먼저 제거한다. 승인 자체는 유지한다.
+    // 현재 월 결과만 최신 전월/당월 실적 기준으로 재계산한다.
+    // 지난달 이전 리포트는 확정값으로 보존하고 승인 자체도 유지한다.
     mapper.deleteCalculationOutcomes(approvalIds);
     mapper.deleteBenefitUsages(approvalIds);
     calculateApprovalIds(approvalIds);
