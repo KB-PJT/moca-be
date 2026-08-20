@@ -338,6 +338,9 @@
             WHERE owned_card.user_id = #{userId}
               AND approval.approved_at &gt;= #{fromUtc}
               AND approval.approved_at &lt; #{toUtc}
+              <if test="userCardId != null">
+                  AND approval.user_card_id = #{userCardId}
+              </if>
             ORDER BY approval.approved_at DESC, approval.approval_id DESC
             LIMIT #{limit}
         ), usage_summary AS (

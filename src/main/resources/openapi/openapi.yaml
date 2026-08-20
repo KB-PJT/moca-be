@@ -161,6 +161,7 @@ paths:
         혜택이 적용되지 않았거나 계산 결과가 없는 승인도 제외하지 않습니다.
         `calculationStatus`로 적용·부분 적용·미적용·미계산을 구분하며, 혜택이 없으면 혜택 관련 필드는 null 또는 0입니다.
         yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하고, limit을 생략하면 최대 5건을 반환합니다.
+        userCardId를 지정하면 사용자가 보유한 해당 카드의 내역으로 제한하며, 생략하면 모든 보유카드를 조회합니다.
         승인내역이 없으면 `history`는 빈 배열입니다.
       operationId: getHomeRecentHistory
       security:
@@ -176,6 +177,11 @@ paths:
             minimum: 1
             maximum: 5
             default: 5
+        - name: userCardId
+          in: query
+          required: false
+          description: 특정 보유카드로 내역을 제한합니다. 생략하면 모든 보유카드를 조회합니다.
+          schema: { type: string, format: uuid }
       responses:
         '200':
           description: 최근 전체 결제 내역

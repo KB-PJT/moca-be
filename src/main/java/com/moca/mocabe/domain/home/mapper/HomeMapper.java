@@ -18,10 +18,14 @@ public interface HomeMapper {
   /** 선택 옵션과 실적에 따라 제공된 지정 월 한도 중 사용하지 않은 원화 혜택을 합산한다. */
   Long sumMissedBenefitAmount(@Param("userId") String userId, @Param("yearMonth") String yearMonth);
 
-  /** 지정한 서울 월 범위에 발생한 전체 결제 승인을 혜택 적용 여부와 함께 최신순으로 조회한다. */
+  /**
+   * 지정한 서울 월 범위에 발생한 전체 결제 승인을 혜택 적용 여부와 함께 최신순으로 조회한다.
+   * userCardId를 지정하면 사용자가 보유한 해당 카드의 내역으로 제한한다.
+   */
   List<RecentHistoryRow> findRecentHistory(
       @Param("userId") String userId,
       @Param("fromUtc") LocalDateTime fromUtc,
       @Param("toUtc") LocalDateTime toUtc,
-      @Param("limit") int limit);
+      @Param("limit") int limit,
+      @Param("userCardId") String userCardId);
 }
