@@ -30,6 +30,13 @@
         WHERE ubu.usage_status = 'confirmed'
           AND bo.reward_type IN ('discount', 'cashback', 'points')
           AND uc.user_id = #{userId}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM user_benefit_calculation_outcomes partial_outcome
+              WHERE partial_outcome.approval_id = ubu.approval_id
+                AND partial_outcome.rule_id = ubu.rule_id
+                AND partial_outcome.outcome_status = 'partially_applied'
+          )
         UNION ALL
         SELECT outcome.outcome_id, approval.merchant_name, approval.approved_at,
                approval.amount, CAST(outcome.applied_reward_value AS SIGNED),

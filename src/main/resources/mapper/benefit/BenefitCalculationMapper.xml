@@ -56,6 +56,19 @@
         ORDER BY approved_at, approval_id
     </select>
 
+    <!-- 재동기화 시 이전 계산 결과를 제거한 뒤 최신 실적 기준으로 다시 계산한다. -->
+    <delete id="deleteCalculationOutcomes">
+        DELETE FROM user_benefit_calculation_outcomes
+        WHERE approval_id IN
+        <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+    </delete>
+
+    <delete id="deleteBenefitUsages">
+        DELETE FROM user_benefit_usages
+        WHERE approval_id IN
+        <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+    </delete>
+
     <resultMap id="simpleRuleRow" type="com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow">
         <constructor>
             <arg column="rule_id" javaType="java.lang.String"/>

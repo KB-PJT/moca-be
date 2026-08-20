@@ -22,6 +22,10 @@ public interface BenefitCalculationMapper {
       @Param("fromUtc") LocalDateTime fromUtc,
       @Param("toUtc") LocalDateTime toUtc);
 
+  void deleteCalculationOutcomes(@Param("approvalIds") List<String> approvalIds);
+
+  void deleteBenefitUsages(@Param("approvalIds") List<String> approvalIds);
+
   List<SimpleBenefitRuleRow> findSimpleRulesForUserCard(
       @Param("userCardId") String userCardId, @Param("usageDate") LocalDate usageDate);
 
