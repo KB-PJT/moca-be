@@ -40,9 +40,10 @@ public class HomeController {
     @GetMapping("/recent-history")
     public ResponseEntity<ApiResponse<RecentHistoryResponse>> getRecentHistory(
             @RequestParam(name = "yearMonth", required = false) String yearMonth,
-            @RequestParam(name = "limit", defaultValue = "5") int limit) {
+            @RequestParam(name = "limit", defaultValue = "5") int limit,
+            @RequestParam(name = "userCardId", required = false) String userCardId) {
         String userId = currentUserProvider.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success(
-                homeQueryService.getRecentHistory(userId, yearMonth, limit)));
+                homeQueryService.getRecentHistory(userId, yearMonth, limit, userCardId)));
     }
 }

@@ -30,7 +30,8 @@ class HomeMapperIntegrationTest {
                 UNKNOWN_USER_ID,
                 LocalDateTime.of(2026, 6, 30, 15, 0),
                 LocalDateTime.of(2026, 7, 31, 15, 0),
-                5)
+                5,
+                null)
             .isEmpty());
   }
 

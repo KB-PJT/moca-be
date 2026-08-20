@@ -123,11 +123,12 @@ class HomeQueryServiceTest {
             org.mockito.ArgumentMatchers.eq(USER_ID),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.eq(5)))
+            org.mockito.ArgumentMatchers.eq(5),
+            org.mockito.ArgumentMatchers.isNull()))
         .thenReturn(List.of());
 
     assertEquals(
-        List.of(), homeQueryService.getRecentHistory(USER_ID, "2026-07", 5).getHistory());
+        List.of(), homeQueryService.getRecentHistory(USER_ID, "2026-07", 5, null).getHistory());
   }
 
   @Test
@@ -138,11 +139,29 @@ class HomeQueryServiceTest {
             org.mockito.ArgumentMatchers.eq(USER_ID),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.eq(5)))
+            org.mockito.ArgumentMatchers.eq(5),
+            org.mockito.ArgumentMatchers.isNull()))
         .thenReturn(null);
 
     assertEquals(
-        List.of(), homeQueryService.getRecentHistory(USER_ID, "2026-07", 5).getHistory());
+        List.of(), homeQueryService.getRecentHistory(USER_ID, "2026-07", 5, null).getHistory());
+  }
+
+  @Test
+  @DisplayName("userCardId를 지정하면 해당 보유카드 조건으로 매퍼를 호출한다")
+  void filtersRecentHistoryByUserCardId() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+    when(homeMapper.findRecentHistory(
+            org.mockito.ArgumentMatchers.eq(USER_ID),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(5),
+            org.mockito.ArgumentMatchers.eq("card-1")))
+        .thenReturn(List.of());
+
+    assertEquals(
+        List.of(),
+        homeQueryService.getRecentHistory(USER_ID, "2026-07", 5, "card-1").getHistory());
   }
 
   @Test
@@ -166,7 +185,7 @@ class HomeQueryServiceTest {
         () -> homeQueryService.getCards(USER_ID, "2026-07", "RANDOM"));
     assertThrows(
         InvalidHomeQueryException.class,
-        () -> homeQueryService.getRecentHistory(USER_ID, "2026-07", 6));
+        () -> homeQueryService.getRecentHistory(USER_ID, "2026-07", 6, null));
   }
 
   @Test
@@ -192,11 +211,12 @@ class HomeQueryServiceTest {
             org.mockito.ArgumentMatchers.eq(USER_ID),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.eq(5)))
+            org.mockito.ArgumentMatchers.eq(5),
+            org.mockito.ArgumentMatchers.isNull()))
         .thenReturn(List.of(recentBenefit));
 
     HomeCardsResponse cards = homeQueryService.getCards(USER_ID, "2026-07", "AUTO");
-    RecentHistoryResponse history = homeQueryService.getRecentHistory(USER_ID, "2026-07", 5);
+    RecentHistoryResponse history = homeQueryService.getRecentHistory(USER_ID, "2026-07", 5, null);
 
     assertEquals(8200, cards.getCards().get(0).getSummary().getAvailableBenefitAmount());
     assertEquals(76, cards.getCards().get(0).getSummary().getPerformanceRate());
