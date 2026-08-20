@@ -56,7 +56,7 @@ public class JsonBenefitRuleEvaluator {
     BenefitRule rule = toRule(ruleId, definition, monthlyLimitValue, usedMonthlyValue);
     RuleConditionResult conditionResult = evaluateConditions(definition.conditions(), context);
     if (conditionResult.decision() != RuleConditionDecision.MATCHED) {
-      return rejected(rule, conditionResult.rejectionReason());
+      return rejected(rule, context, conditionResult.rejectionReason());
     }
     return calculator.calculate(rule, context);
   }
@@ -169,13 +169,18 @@ public class JsonBenefitRuleEvaluator {
         Set.of());
   }
 
-  private BenefitCalculationResult rejected(BenefitRule rule, BenefitRejectionReason reason) {
+  private BenefitCalculationResult rejected(
+      BenefitRule rule, BenefitCalculationContext context, BenefitRejectionReason reason) {
+    BigDecimal expectedReward = BigDecimal.ZERO;
+    if (reason == BenefitRejectionReason.PERFORMANCE_NOT_MET) {
+      expectedReward = calculator.calculate(rule, context).rawRewardValue();
+    }
     return new BenefitCalculationResult(
         rule.ruleId(),
         rule.benefitType(),
         rule.rewardUnit(),
         false,
-        BigDecimal.ZERO,
+        expectedReward,
         BigDecimal.ZERO,
         rule.monthlyLimitValue().subtract(rule.usedMonthlyValue()).max(BigDecimal.ZERO),
         reason);
