@@ -307,11 +307,14 @@ public class CardSyncService implements DisposableBean {
       List<ApprovalInsert> insertedApprovals =
           approvalIngestStore.insertAllReturningInserted(inserts);
       inserted = insertedApprovals.size();
-      benefitUsageCalculationService.calculateAndPersist(insertedApprovals);
     } else {
       inserted = approvalIngestStore.insertAll(inserts);
     }
     int upsertedPerformances = performanceSnapshotStore.upsertAll(performanceUpserts);
+    if (benefitUsageCalculationService.isEnabled()) {
+      // 전월 실적 스냅샷을 먼저 반영한 뒤 신규·기존 승인 모두 같은 멱등 계산 경로로 보강한다.
+      benefitUsageCalculationService.calculateAndPersistForPeriod(userId, fromUtc, toUtc);
+    }
     LOGGER.info(
         String.format(
             "승인내역 동기화 결과 period=%s~%s units=%d connectedIds=%d codefFetchMs=%d fetched=%d"

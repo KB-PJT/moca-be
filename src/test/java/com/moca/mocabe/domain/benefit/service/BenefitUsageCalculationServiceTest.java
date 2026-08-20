@@ -33,10 +33,42 @@ class BenefitUsageCalculationServiceTest {
 
     service.calculateAndPersist(List.of());
     service.calculateAndPersist(null);
+    noop.calculateAndPersistForPeriod(
+        "user-1", LocalDateTime.parse("2026-08-01T00:00:00"),
+        LocalDateTime.parse("2026-09-01T00:00:00"));
 
     verify(mapper, never()).findApprovalsForCalculation(any());
     org.junit.jupiter.api.Assertions.assertFalse(noop.isEnabled());
     org.junit.jupiter.api.Assertions.assertTrue(service.isEnabled());
+  }
+
+  @Test
+  void skipsPeriodBackfillWhenThereAreNoStoredApprovals() {
+    when(mapper.findApprovalIdsForPeriod(eq("user-1"), any(LocalDateTime.class), any(LocalDateTime.class)))
+        .thenReturn(List.of());
+
+    service.calculateAndPersistForPeriod(
+        "user-1", LocalDateTime.parse("2026-08-01T00:00:00"),
+        LocalDateTime.parse("2026-09-01T00:00:00"));
+
+    verify(mapper, never()).findApprovalsForCalculation(any());
+  }
+
+  @Test
+  void periodBackfillHandlesNullIdsAndProcessesExistingApprovalIds() {
+    when(mapper.findApprovalIdsForPeriod(eq("user-1"), any(LocalDateTime.class), any(LocalDateTime.class)))
+        .thenReturn(null)
+        .thenReturn(List.of("approval-1"));
+    when(mapper.findApprovalsForCalculation(List.of("approval-1"))).thenReturn(List.of());
+
+    service.calculateAndPersistForPeriod(
+        "user-1", LocalDateTime.parse("2026-08-01T00:00:00"),
+        LocalDateTime.parse("2026-09-01T00:00:00"));
+    service.calculateAndPersistForPeriod(
+        "user-1", LocalDateTime.parse("2026-08-01T00:00:00"),
+        LocalDateTime.parse("2026-09-01T00:00:00"));
+
+    verify(mapper).findApprovalsForCalculation(List.of("approval-1"));
   }
 
   @Test
