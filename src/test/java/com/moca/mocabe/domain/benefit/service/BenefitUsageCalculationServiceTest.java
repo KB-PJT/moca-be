@@ -12,6 +12,7 @@ import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
 import com.moca.mocabe.domain.benefit.model.BenefitRule;
 import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
+import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
@@ -298,9 +299,9 @@ class BenefitUsageCalculationServiceTest {
                     "all_merchants",
                     "ALL",
                     1)));
-    when(mapper.findApplicableMonthlyRewardLimit(
-            eq("offer-1"), any(), eq(new BigDecimal("300000")), any(), eq("KRW")))
-        .thenReturn(new MonthlyBenefitLimit("policy-1", "cafe-shared", new BigDecimal("5000")));
+    when(mapper.findMonthlyRewardLimitCandidates(eq("offer-1"), any(), eq("KRW")))
+        .thenReturn(List.of(new BenefitLimitTierCandidate("policy-1", "cafe-shared",
+            new BigDecimal("5000"), new BigDecimal("300000"), BigDecimal.ZERO)));
     when(mapper.findConfirmedMonthlyRewardsForUpdate(
             eq("card-1"), eq("policy-1"), eq("cafe-shared"), any(), any(), eq("KRW")))
         .thenReturn(List.of(new BigDecimal("4000")));
@@ -310,9 +311,7 @@ class BenefitUsageCalculationServiceTest {
             new ApprovalInsert(
                 "approval-1", "user-1", "card-1", null, "A-1", approvedAt, "테스트", 15_000, "{ }")));
 
-    verify(mapper).findApplicableMonthlyRewardLimit(
-        eq("offer-1"), any(), eq(new BigDecimal("300000")),
-        eq(new BigDecimal("450000")), eq("KRW"));
+    verify(mapper).findMonthlyRewardLimitCandidates(eq("offer-1"), any(), eq("KRW"));
 
     verify(mapper).lockUserCardForBenefitCalculation("card-1");
     verify(mapper)
@@ -368,9 +367,9 @@ class BenefitUsageCalculationServiceTest {
                     "all_merchants",
                     "ALL",
                     1)));
-    when(mapper.findApplicableMonthlyRewardLimit(
-            eq("offer-1"), any(), eq(new BigDecimal("300000")), any(), eq("KRW")))
-        .thenReturn(new MonthlyBenefitLimit("policy-1", null, new BigDecimal("5000")));
+    when(mapper.findMonthlyRewardLimitCandidates(eq("offer-1"), any(), eq("KRW")))
+        .thenReturn(List.of(new BenefitLimitTierCandidate("policy-1", null,
+            new BigDecimal("5000"), new BigDecimal("300000"), BigDecimal.ZERO)));
     when(mapper.findConfirmedMonthlyRewardsForUpdate(
             eq("card-1"), eq("policy-1"), eq(null), any(), any(), eq("KRW")))
         .thenReturn(List.of(new BigDecimal("5000")));

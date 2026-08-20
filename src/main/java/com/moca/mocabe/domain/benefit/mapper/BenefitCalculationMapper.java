@@ -1,7 +1,7 @@
 package com.moca.mocabe.domain.benefit.mapper;
 
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
-import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
+import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
 import java.math.BigDecimal;
@@ -45,11 +45,9 @@ public interface BenefitCalculationMapper {
       @Param("usageMonthStart") LocalDate usageMonthStart,
       @Param("nextMonthStart") LocalDate nextMonthStart);
 
-  MonthlyBenefitLimit findApplicableMonthlyRewardLimit(
+  List<BenefitLimitTierCandidate> findMonthlyRewardLimitCandidates(
       @Param("offerId") String offerId,
       @Param("usageDate") LocalDate usageDate,
-      @Param("previousMonthSpend") BigDecimal previousMonthSpend,
-      @Param("currentMonthSpend") BigDecimal currentMonthSpend,
       @Param("limitUnit") String limitUnit);
 
   /** 현재 정책 또는 같은 shared_group_key에 이미 사용된 당월 보상값을 잠금 조회한다. */

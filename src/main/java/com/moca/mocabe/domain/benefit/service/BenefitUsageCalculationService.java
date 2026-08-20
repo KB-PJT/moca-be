@@ -47,6 +47,7 @@ public class BenefitUsageCalculationService {
   private final BenefitRuleTargetEvaluator targetEvaluator = new BenefitRuleTargetEvaluator();
   private final BenefitRuleDefinitionParser definitionParser = new BenefitRuleDefinitionParser();
   private final JsonBenefitRuleEvaluator jsonRuleEvaluator = new JsonBenefitRuleEvaluator();
+  private final BenefitLimitTierSelector tierSelector = new BenefitLimitTierSelector();
 
   public BenefitUsageCalculationService(BenefitCalculationMapper mapper) {
     this.mapper = mapper;
@@ -121,8 +122,10 @@ public class BenefitUsageCalculationService {
     for (List<SimpleBenefitRuleRow> rows : rowsByRule.values()) {
       SimpleBenefitRuleRow first = rows.get(0);
       MonthlyBenefitLimit monthlyLimit =
-          mapper.findApplicableMonthlyRewardLimit(
-              first.offerId(), usageDate, previousMonthSpend, currentMonthSpend, limitUnitFor(first));
+      tierSelector.select(
+              mapper.findMonthlyRewardLimitCandidates(first.offerId(), usageDate, limitUnitFor(first)),
+              previousMonthSpend,
+              currentMonthSpend);
       BigDecimal usedMonthlyValue =
           monthlyLimit == null
               ? BigDecimal.ZERO
@@ -173,6 +176,7 @@ public class BenefitUsageCalculationService {
       }
     }
   }
+
 
   private BenefitCalculationResult calculate(
       List<SimpleBenefitRuleRow> rows,
