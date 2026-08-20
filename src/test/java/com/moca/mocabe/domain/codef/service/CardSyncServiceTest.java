@@ -13,6 +13,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.dto.SyncMyCardsResponse;
@@ -43,6 +44,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
 
 class CardSyncServiceTest {
@@ -179,7 +181,18 @@ class CardSyncServiceTest {
     service.sync(USER_ID, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3));
 
     verify(approvalIngestStore).insertAllReturningInserted(any());
-    verify(calculationService).calculateAndPersistForPeriod(eq(USER_ID), any(), any());
+    verify(calculationService)
+        .calculateAndPersistForPeriod(
+            eq(USER_ID),
+            eq(LocalDateTime.of(2026, 7, 31, 15, 0)),
+            eq(LocalDateTime.of(2026, 8, 3, 15, 0)));
+    InOrder order = inOrder(performanceSnapshotStore, calculationService);
+    order.verify(performanceSnapshotStore).upsertAll(any());
+    order.verify(calculationService)
+        .calculateAndPersistForPeriod(
+            eq(USER_ID),
+            eq(LocalDateTime.of(2026, 7, 31, 15, 0)),
+            eq(LocalDateTime.of(2026, 8, 3, 15, 0)));
   }
 
   @Test
