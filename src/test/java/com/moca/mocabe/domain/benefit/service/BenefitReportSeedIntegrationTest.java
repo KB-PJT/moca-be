@@ -59,6 +59,7 @@ class BenefitReportSeedIntegrationTest {
 
       JdbcTemplate jdbc = new JdbcTemplate(dataSource);
       removePointPlanCheckStructure(jdbc);
+      insertPointPlanSiblingStructure(jdbc);
       Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
       supplementSolPlanCurrentSpendTiers(jdbc);
       insertUser(jdbc);
@@ -79,6 +80,8 @@ class BenefitReportSeedIntegrationTest {
         assertPointPlanCheckStructure(jdbc, cards.get(4), calculationMapper);
 
         new BenefitUsageCalculationService(calculationMapper).calculateAndPersist(augustApprovals);
+        new BenefitUsageCalculationService(calculationMapper)
+            .calculateAndPersist(insertAdditionalPointPlanBrandApprovals(jdbc, cards.get(4)));
         ApprovalInsert performanceNotMet = insertPointPlanPerformanceNotMetApproval(jdbc, cards.get(4));
         new BenefitUsageCalculationService(calculationMapper)
             .calculateAndPersist(List.of(performanceNotMet));
@@ -128,6 +131,26 @@ class BenefitReportSeedIntegrationTest {
         benefitId);
   }
 
+  private void insertPointPlanSiblingStructure(JdbcTemplate jdbc) {
+    jdbc.update("INSERT INTO benefit_offers (offer_id,benefit_id,offer_name,position,priority,"
+            + "reward_type,value_type,calculation_mode,calculation_basis,stacking_mode,"
+            + "valuation_scope,valuation_method,created_at,updated_at) "
+            + "VALUES ('24000000-0000-4000-8000-000000000001',"
+            + "'4da2cd93-b8e1-585c-bae4-7118aef652f8','sibling offer',2,0,'other',"
+            + "'other','other','other','standalone','transaction','not_valued',"
+            + "UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))");
+    jdbc.update("INSERT INTO benefit_rules (rule_id,offer_id,position,priority,rule_name,"
+            + "rule_effect,stacking_mode,reward_value,reward_unit,created_at,updated_at) "
+            + "VALUES ('24000000-0000-4000-8000-000000000002',"
+            + "'24000000-0000-4000-8000-000000000001',1,0,'sibling rule','grant',"
+            + "'standalone',1,'point',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))");
+    jdbc.update("INSERT INTO benefit_limit_policies (limit_policy_id,offer_id,policy_name,"
+            + "limit_period,limit_type,limit_unit,created_at,updated_at) "
+            + "VALUES ('24000000-0000-4000-8000-000000000003',"
+            + "'24000000-0000-4000-8000-000000000001','sibling policy','monthly',"
+            + "'reward_amount','point',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))");
+  }
+
   private void assertPointPlanCheckStructure(
       JdbcTemplate jdbc, SeedCard card, BenefitCalculationMapper calculationMapper) {
     assertEquals("02222c8f-d28a-5edc-969c-faa153fd7806",
@@ -137,12 +160,33 @@ class BenefitReportSeedIntegrationTest {
         + "INNER JOIN card_content_versions version "
         + "ON version.content_version_id=benefit.content_version_id "
         + "WHERE version.card_id=? AND benefit.record_type='benefit'", card.cardId()));
-    assertEquals(1, count(jdbc, "SELECT COUNT(*) FROM benefit_offers offer "
+    assertEquals(3, count(jdbc, "SELECT COUNT(*) FROM benefit_offers offer "
         + "INNER JOIN benefit_rules rule_data ON rule_data.offer_id=offer.offer_id "
         + "INNER JOIN benefit_rule_targets target ON target.rule_id=rule_data.rule_id "
         + "WHERE offer.benefit_id='4da2cd93-b8e1-585c-bae4-7118aef652f8' "
+        + "AND offer.position=1 AND rule_data.position=1 "
+        + "AND target.target_type='merchant' "
+        + "AND target.target_code IN ('CU','GS25','세븐일레븐')"));
+    assertEquals(List.of("CU", "GS25", "세븐일레븐"), jdbc.queryForList(
+        "SELECT target.target_code FROM benefit_rule_targets target "
+            + "INNER JOIN benefit_rules rule_data ON rule_data.rule_id=target.rule_id "
+            + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+            + "WHERE offer.benefit_id='4da2cd93-b8e1-585c-bae4-7118aef652f8' "
+            + "AND offer.position=1 AND rule_data.position=1 "
+            + "AND target.target_type='merchant' ORDER BY target.condition_group",
+        String.class));
+    assertEquals(0, count(jdbc, "SELECT COUNT(*) FROM benefit_rule_targets target "
+        + "INNER JOIN benefit_rules rule_data ON rule_data.rule_id=target.rule_id "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+        + "WHERE offer.benefit_id='4da2cd93-b8e1-585c-bae4-7118aef652f8' "
+        + "AND offer.position=1 AND rule_data.position=1 "
         + "AND target.target_type='merchant_category' "
         + "AND target.target_code='CONVENIENCE_STORE'"));
+    assertEquals(0, count(jdbc, "SELECT COUNT(*) FROM benefit_rule_targets "
+        + "WHERE rule_id='24000000-0000-4000-8000-000000000002'"));
+    assertEquals("sibling policy", jdbc.queryForObject(
+        "SELECT policy_name FROM benefit_limit_policies "
+            + "WHERE limit_policy_id='24000000-0000-4000-8000-000000000003'", String.class));
     assertFalse(calculationMapper.findSimpleRulesForUserCard(
         card.userCardId(), java.time.LocalDate.of(2026, 8, 10)).isEmpty());
   }
@@ -153,17 +197,39 @@ class BenefitReportSeedIntegrationTest {
         + "WHERE user_card_id=? AND performance_month='2026-07'", card.userCardId());
     String approvalId = "23000000-0000-4000-8000-000000000099";
     LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 20, 3, 0);
-    String merchantId = convenienceStoreMerchantId(jdbc);
+    String merchantId = merchantId(jdbc, "CU");
     insertApproval(jdbc, approvalId, card, approvedAt, 20_000, merchantId);
     return new ApprovalInsert(approvalId, USER_ID, card.userCardId(), null,
         "AUG-POINT-NOT-MET", approvedAt, "CU", 20_000, "{}");
   }
 
+  private List<ApprovalInsert> insertAdditionalPointPlanBrandApprovals(
+      JdbcTemplate jdbc, SeedCard card) {
+    List<ApprovalInsert> approvals = new ArrayList<>();
+    List<String> merchants = List.of("GS25", "세븐일레븐", "이마트24");
+    for (int index = 0; index < merchants.size(); index++) {
+      String merchantName = merchants.get(index);
+      String approvalId = String.format("25000000-0000-4000-8000-%012d", index + 1);
+      LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 11 + index, 3, 0);
+      insertApproval(jdbc, approvalId, card, approvedAt, 20_000,
+          merchantId(jdbc, merchantName));
+      approvals.add(new ApprovalInsert(approvalId, USER_ID, card.userCardId(), null,
+          "AUG-POINT-" + index, approvedAt, merchantName, 20_000, "{}"));
+    }
+    return approvals;
+  }
+
   private void assertPointPlanCheckCalculationAndReport(
       JdbcTemplate jdbc, BenefitHistoryResponse report, SeedCard card) {
-    assertEquals(1, count(jdbc, "SELECT COUNT(*) FROM user_benefit_usages usage_data "
+    assertEquals(3, count(jdbc, "SELECT COUNT(*) FROM user_benefit_usages usage_data "
         + "WHERE usage_data.user_card_id=? AND usage_data.reward_original_unit='point' "
         + "AND usage_data.reward_original_value=1000", card.userCardId()));
+    assertEquals(0, count(jdbc, "SELECT COUNT(*) FROM user_benefit_usages usage_data "
+        + "INNER JOIN card_payment_approvals approval "
+        + "ON approval.approval_id=usage_data.approval_id "
+        + "INNER JOIN merchants merchant ON merchant.merchant_id=approval.merchant_id "
+        + "WHERE usage_data.user_card_id=? AND merchant.normalized_name='이마트24'",
+        card.userCardId()));
     assertEquals(1, count(jdbc, "SELECT COUNT(*) FROM user_benefit_calculation_outcomes outcome "
         + "WHERE outcome.user_card_id=? AND outcome.outcome_status='not_applied' "
         + "AND outcome.rejection_reason='PERFORMANCE_NOT_MET' "
@@ -207,9 +273,12 @@ class BenefitReportSeedIntegrationTest {
         offerId, java.time.LocalDate.of(2026, 8, 10), "point");
     BenefitLimitTierSelector selector = new BenefitLimitTierSelector();
 
-    MonthlyBenefitLimit below = selector.select(candidates, money(400_000), money(299_999));
-    MonthlyBenefitLimit middle = selector.select(candidates, money(400_000), money(300_000));
-    MonthlyBenefitLimit high = selector.select(candidates, money(400_000), money(500_000));
+    MonthlyBenefitLimit below =
+        selector.select(candidates, money(400_000), money(299_999)).limit();
+    MonthlyBenefitLimit middle =
+        selector.select(candidates, money(400_000), money(300_000)).limit();
+    MonthlyBenefitLimit high =
+        selector.select(candidates, money(400_000), money(500_000)).limit();
     assertEquals(0, below.limitValue().compareTo(money(50_000)));
     assertEquals(0, middle.limitValue().compareTo(money(60_000)));
     assertEquals(0, high.limitValue().compareTo(money(70_000)));
@@ -285,7 +354,7 @@ class BenefitReportSeedIntegrationTest {
       String approvalId = String.format("23000000-0000-4000-8000-%012d", index + 1);
       LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5 + index, 3, 0);
       int amount = index == 4 ? 20_000 : 100_000;
-      String merchantId = index == 4 ? convenienceStoreMerchantId(jdbc) : null;
+      String merchantId = index == 4 ? merchantId(jdbc, "CU") : null;
       insertApproval(jdbc, approvalId, card, approvedAt, amount, merchantId);
       approvals.add(new ApprovalInsert(approvalId, USER_ID, card.userCardId(), null,
           "AUG-" + index, approvedAt, index == 4 ? "CU" : "일반 가맹점", amount, "{}"));
@@ -301,17 +370,20 @@ class BenefitReportSeedIntegrationTest {
   private void insertApproval(
       JdbcTemplate jdbc, String approvalId, SeedCard card, LocalDateTime approvedAt,
       int amount, String merchantId) {
+    String merchantName = merchantId == null ? "일반 가맹점" : jdbc.queryForObject(
+        "SELECT name FROM merchants WHERE merchant_id=?", String.class, merchantId);
     jdbc.update("INSERT INTO card_payment_approvals "
             + "(approval_id,user_id,user_card_id,approval_number,approved_at,merchant_name,merchant_id,amount,"
             + "approval_status,source_payload,created_at) "
             + "VALUES (?,?,?,?,?,?,?,?,'approved','{}',UTC_TIMESTAMP(6))",
         approvalId, USER_ID, card.userCardId(), approvalId, approvedAt,
-        merchantId == null ? "일반 가맹점" : "CU", merchantId, amount);
+        merchantName, merchantId, amount);
   }
 
-  private String convenienceStoreMerchantId(JdbcTemplate jdbc) {
+  private String merchantId(JdbcTemplate jdbc, String merchantName) {
     return jdbc.queryForObject(
-        "SELECT merchant_id FROM merchants WHERE normalized_name='CU' LIMIT 1", String.class);
+        "SELECT merchant_id FROM merchants WHERE normalized_name=? LIMIT 1",
+        String.class, merchantName);
   }
 
   private SqlSession sqlSession(DataSource dataSource) throws Exception {

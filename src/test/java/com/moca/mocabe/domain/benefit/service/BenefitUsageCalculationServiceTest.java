@@ -400,6 +400,36 @@ class BenefitUsageCalculationServiceTest {
   }
 
   @Test
+  @DisplayName("JSON 조건에 실적이 없어도 월 한도 tier 실적 미달을 놓친 혜택으로 기록한다")
+  void recordsTierPerformanceFailureBeforeMonthlyLimitExhaustion() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("approval-tier")))
+        .thenReturn(List.of(
+            new BenefitApprovalRow("approval-tier", "card-tier", 20_000, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("card-tier", "2026-07")).thenReturn(250_000);
+    when(mapper.findSimpleRulesForUserCard(eq("card-tier"), any()))
+        .thenReturn(List.of(new SimpleBenefitRuleRow(
+            "rule-tier", "offer-tier", "points", "point", new BigDecimal("5"),
+            null, null, null, "all_merchants", "ALL", 1, "include", null,
+            jsonDefinitionWithoutPerformance(), "SUPPORTED")));
+    when(mapper.findMonthlyRewardLimitCandidates(eq("offer-tier"), any(), eq("point")))
+        .thenReturn(List.of(new BenefitLimitTierCandidate(
+            "policy-tier", null, new BigDecimal("3000"),
+            new BigDecimal("300000"), BigDecimal.ZERO)));
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "approval-tier", "user-1", "card-tier", null, "A-TIER", approvedAt,
+        "CU", 20_000, "{}")));
+
+    verify(mapper, never()).insertConfirmedUsage(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    verify(mapper).insertCalculationOutcome(
+        any(), eq("card-tier"), eq("approval-tier"), eq("offer-tier"), eq("rule-tier"),
+        eq(null), any(), eq("POINT"), eq(new BigDecimal("1000")), eq(BigDecimal.ZERO),
+        eq(new BigDecimal("1000")), eq("not_applied"), eq("PERFORMANCE_NOT_MET"));
+  }
+
+  @Test
   void appliesJsonRuleWithLedgerFrequencyAndAvailablePerformance() {
     LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
     when(mapper.findApprovalsForCalculation(List.of("approval-json")))
@@ -590,6 +620,22 @@ class BenefitUsageCalculationServiceTest {
             "rate":"0.10"
           },
           "limits":[{"type":"DAILY_USAGE_COUNT","value":"1"}]
+        }
+        """;
+  }
+
+  private String jsonDefinitionWithoutPerformance() {
+    return """
+        {
+          "schemaVersion":1,
+          "conditions":{"all":[],"any":[],"none":[]},
+          "reward":{
+            "benefitType":"POINT",
+            "rewardUnit":"POINT",
+            "calculation":"RATE",
+            "rate":"0.05"
+          },
+          "limits":[]
         }
         """;
   }

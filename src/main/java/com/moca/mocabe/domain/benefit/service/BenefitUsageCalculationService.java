@@ -7,6 +7,7 @@ import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationContext;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
+import com.moca.mocabe.domain.benefit.model.BenefitLimitTierSelection;
 import com.moca.mocabe.domain.benefit.model.BenefitRule;
 import com.moca.mocabe.domain.benefit.model.BenefitRuleTarget;
 import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
@@ -121,11 +122,12 @@ public class BenefitUsageCalculationService {
     }
     for (List<SimpleBenefitRuleRow> rows : rowsByRule.values()) {
       SimpleBenefitRuleRow first = rows.get(0);
-      MonthlyBenefitLimit monthlyLimit =
-      tierSelector.select(
+      BenefitLimitTierSelection tierSelection =
+          tierSelector.select(
               mapper.findMonthlyRewardLimitCandidates(first.offerId(), usageDate, limitUnitFor(first)),
               previousMonthSpend,
               currentMonthSpend);
+      MonthlyBenefitLimit monthlyLimit = tierSelection.limit();
       BigDecimal usedMonthlyValue =
           monthlyLimit == null
               ? BigDecimal.ZERO
@@ -170,11 +172,26 @@ public class BenefitUsageCalculationService {
               context,
               monthlyLimit == null ? BigDecimal.ZERO : monthlyLimit.limitValue(),
               usedMonthlyValue);
+      if (tierSelection.status() == BenefitLimitTierSelection.Status.PERFORMANCE_NOT_MET) {
+        result = performanceNotMet(result);
+      }
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
         persist(approval, usageDate, first, monthlyLimit, result);
       }
     }
+  }
+
+  private BenefitCalculationResult performanceNotMet(BenefitCalculationResult calculated) {
+    return new BenefitCalculationResult(
+        calculated.ruleId(),
+        calculated.benefitType(),
+        calculated.rewardUnit(),
+        false,
+        calculated.rawRewardValue(),
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.PERFORMANCE_NOT_MET);
   }
 
 

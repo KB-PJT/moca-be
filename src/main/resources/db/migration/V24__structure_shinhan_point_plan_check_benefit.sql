@@ -18,7 +18,10 @@ WHERE card.gorilla_card_id = '2890'
   AND benefit.position = 5
   AND benefit.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
   AND NOT EXISTS (
-      SELECT 1 FROM benefit_offers existing WHERE existing.benefit_id = benefit.benefit_id
+      SELECT 1
+      FROM benefit_offers existing
+      WHERE existing.benefit_id = benefit.benefit_id
+        AND existing.position = 1
   );
 
 UPDATE benefit_offers offer
@@ -62,29 +65,53 @@ FROM benefit_offers offer
 WHERE offer.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
   AND offer.position = 1
   AND NOT EXISTS (
-      SELECT 1 FROM benefit_rules existing WHERE existing.offer_id = offer.offer_id
+      SELECT 1
+      FROM benefit_rules existing
+      WHERE existing.offer_id = offer.offer_id
+        AND existing.position = 1
   );
+
+DELETE target
+FROM benefit_rule_targets target
+INNER JOIN benefit_rules rule_data ON rule_data.rule_id = target.rule_id
+INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+WHERE offer.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
+  AND offer.position = 1
+  AND rule_data.position = 1
+  AND target.match_mode = 'include'
+  AND target.target_type = 'merchant_category'
+  AND target.target_code = 'CONVENIENCE_STORE';
 
 INSERT INTO benefit_rule_targets
     (target_id, rule_id, condition_group, match_mode, target_type,
      merchant_category_id, merchant_id, target_code, target_name,
      target_source, target_authority, minimum_place_confidence, created_at, updated_at)
-SELECT UUID(), rule_data.rule_id, 1, 'include', 'merchant_category',
-       category.merchant_category_id, NULL, category.category_code, category.category_name,
-       'CARD_BENEFIT_EXPLICIT', 'ISSUER_CATEGORY', 0.950,
+SELECT UUID(), rule_data.rule_id, merchant_seed.condition_group, 'include', 'merchant',
+       NULL, merchant.merchant_id, merchant.normalized_name, merchant.name,
+       'CARD_BENEFIT_EXPLICIT', 'MERCHANT_EXACT', 0.990,
        UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
 FROM benefit_rules rule_data
 INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
-INNER JOIN merchant_categories category
-    ON category.category_code = 'CONVENIENCE_STORE'
+INNER JOIN (
+    SELECT 1 AS condition_group,
+           _utf8mb4'CU' COLLATE utf8mb4_unicode_ci AS merchant_name
+    UNION ALL
+    SELECT 2, _utf8mb4'GS25' COLLATE utf8mb4_unicode_ci
+    UNION ALL
+    SELECT 3, _utf8mb4'세븐일레븐' COLLATE utf8mb4_unicode_ci
+) merchant_seed ON 1 = 1
+INNER JOIN merchants merchant ON merchant.normalized_name = merchant_seed.merchant_name
 WHERE offer.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
+  AND offer.position = 1
+  AND rule_data.position = 1
   AND NOT EXISTS (
-      SELECT 1 FROM benefit_rule_targets existing
+      SELECT 1
+      FROM benefit_rule_targets existing
       WHERE existing.rule_id = rule_data.rule_id
-        AND existing.condition_group = 1
+        AND existing.condition_group = merchant_seed.condition_group
         AND existing.match_mode = 'include'
-        AND existing.target_type = 'merchant_category'
-        AND existing.merchant_category_id = category.merchant_category_id
+        AND existing.target_type = 'merchant'
+        AND existing.merchant_id = merchant.merchant_id
   );
 
 INSERT INTO benefit_limit_policies
@@ -94,11 +121,12 @@ SELECT UUID(), offer.offer_id, '편의점 포인트 월 통합 적립 한도',
        'monthly', 'reward_amount', 'point', NULL, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
 FROM benefit_offers offer
 WHERE offer.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
+  AND offer.position = 1
   AND NOT EXISTS (
-      SELECT 1 FROM benefit_limit_policies existing
+      SELECT 1
+      FROM benefit_limit_policies existing
       WHERE existing.offer_id = offer.offer_id
-        AND existing.limit_period = 'monthly'
-        AND existing.limit_type = 'reward_amount'
+        AND existing.policy_name = '편의점 포인트 월 통합 적립 한도'
   );
 
 INSERT INTO benefit_limit_tiers
@@ -109,8 +137,11 @@ SELECT UUID(), policy.limit_policy_id, 1, 3000, 200000, NULL,
 FROM benefit_limit_policies policy
 INNER JOIN benefit_offers offer ON offer.offer_id = policy.offer_id
 WHERE offer.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
+  AND offer.position = 1
+  AND policy.policy_name = '편의점 포인트 월 통합 적립 한도'
   AND NOT EXISTS (
-      SELECT 1 FROM benefit_limit_tiers existing
+      SELECT 1
+      FROM benefit_limit_tiers existing
       WHERE existing.limit_policy_id = policy.limit_policy_id
   );
 
