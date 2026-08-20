@@ -32,7 +32,8 @@
           AND uc.user_id = #{userId}
         UNION ALL
         SELECT outcome.outcome_id, approval.merchant_name, approval.approved_at,
-               approval.amount, 0, CAST(outcome.missed_reward_value AS SIGNED),
+               approval.amount, CAST(outcome.applied_reward_value AS SIGNED),
+               CAST(outcome.missed_reward_value AS SIGNED),
                CASE WHEN LOWER(outcome.reward_unit) = 'mile' THEN 'MILEAGE'
                     WHEN LOWER(outcome.reward_unit) = 'point' THEN 'POINT'
                     WHEN bo.reward_type = 'discount' THEN 'DISCOUNT'
@@ -41,7 +42,9 @@
                COALESCE(bo.offer_name, cb.title), outcome.user_card_id,
                CONCAT_WS(' ', COALESCE(cv.name, uc.card_name_from_codef),
                          NULLIF(TRIM(uc.card_no), '')),
-               'NOT_APPLIED', outcome.rejection_reason,
+               CASE WHEN outcome.outcome_status = 'partially_applied'
+                    THEN 'PARTIALLY_APPLIED' ELSE 'NOT_APPLIED' END,
+               outcome.rejection_reason,
                CAST(rule.previous_spend_min_krw AS SIGNED),
                CAST(COALESCE(snapshot.current_spend_amount, 0) AS SIGNED),
                outcome.limit_policy_id, outcome.usage_date, NULL, NULL
@@ -59,7 +62,7 @@
           AND NOT EXISTS (SELECT 1 FROM card_content_versions newer WHERE newer.card_id = cv.card_id
               AND (newer.last_seen_at &gt; cv.last_seen_at OR (newer.last_seen_at = cv.last_seen_at AND newer.content_version_id &gt; cv.content_version_id)))
         WHERE uc.user_id = #{userId}
-          AND outcome.outcome_status = 'not_applied'
+          AND outcome.outcome_status IN ('not_applied', 'partially_applied')
           AND bo.reward_type IN ('discount', 'cashback', 'points')
         UNION ALL
         SELECT approval.approval_id, approval.merchant_name, approval.approved_at,
@@ -83,7 +86,6 @@
           AND NOT EXISTS (
               SELECT 1 FROM user_benefit_calculation_outcomes outcome
               WHERE outcome.approval_id = approval.approval_id
-                AND outcome.outcome_status IN ('not_applied', 'partially_applied')
           )
     </sql>
     <resultMap id="historyRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryRow">
