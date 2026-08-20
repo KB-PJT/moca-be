@@ -1,6 +1,7 @@
 package com.moca.mocabe.global.config;
 
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
+import com.moca.mocabe.domain.notification.service.DeviceService;
 import com.moca.mocabe.domain.user.service.UserDomainService;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeClient;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeExchanger;
@@ -131,8 +132,9 @@ public class AuthConfig {
     @Bean
     public AuthApplicationService authApplicationService(UserDomainService userDomainService,
             GoogleAuthorizationCodeExchanger googleAuthorizationCodeExchanger,
-            OpaqueTokenService opaqueTokenService) {
-        return new AuthApplicationService(userDomainService, googleAuthorizationCodeExchanger, opaqueTokenService);
+            OpaqueTokenService opaqueTokenService, DeviceService deviceService) {
+        return new AuthApplicationService(userDomainService, googleAuthorizationCodeExchanger, opaqueTokenService,
+                deviceService);
     }
 
     @Bean

@@ -891,8 +891,16 @@ paths:
       description: |
         access token 또는 refresh cookie에 연결된 Redis 세션을 폐기하고 refresh cookie를 만료시킵니다.
         유효한 세션이 없어도 클라이언트가 로컬 인증 상태를 정리할 수 있도록 성공 응답을 반환합니다.
+        요청 body에 fcmToken을 함께 보내면 access token으로 확인한 소유자 명의의 디바이스 매핑만 비활성화하여
+        로그아웃 이후 이전 계정으로 알림이 전송되지 않도록 합니다. access token이 없거나 무효하면, 또는
+        fcmToken이 다른 사용자 명의라면 디바이스 매핑은 그대로 두고 세션 폐기만 진행합니다.
       operationId: logout
       security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LogoutRequest' }
       responses:
         '200':
           description: 로그아웃 성공
@@ -1588,6 +1596,16 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    LogoutRequest:
+      description: 로그아웃과 함께 해제할 FCM 디바이스 토큰을 선택적으로 전달합니다.
+      type: object
+      properties:
+        fcmToken:
+          type: string
+          maxLength: 2048
+          description: |
+            로그아웃하는 기기의 Firebase 디바이스 토큰입니다. 생략하면 세션 폐기만 수행하고 디바이스 매핑은
+            비활성화하지 않습니다.
     RegisterDeviceRequest:
       description: 인증 사용자에게 연결할 Firebase Cloud Messaging 디바이스 정보입니다.
       type: object

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,6 +49,39 @@ class DeviceServiceTest {
         DeviceMapper mapper = org.mockito.Mockito.mock(DeviceMapper.class);
         new DeviceService(mapper).deactivate("user", "device");
         verify(mapper).deactivate("device", "user");
+    }
+
+    @Test
+    @DisplayName("토큰 소유자와 일치하면 fcmToken 기준으로 기기를 비활성화한다")
+    void deactivatesDeviceByTokenWhenOwnerMatches() {
+        DeviceMapper mapper = org.mockito.Mockito.mock(DeviceMapper.class);
+        when(mapper.findByToken("token")).thenReturn(new UserDevice("device", "user", "token", "WEB"));
+
+        new DeviceService(mapper).deactivateByToken("user", "token");
+
+        verify(mapper).deactivate("device", "user");
+    }
+
+    @Test
+    @DisplayName("다른 사용자 명의의 fcmToken은 비활성화하지 않는다")
+    void skipsDeactivationWhenTokenBelongsToOtherUser() {
+        DeviceMapper mapper = org.mockito.Mockito.mock(DeviceMapper.class);
+        when(mapper.findByToken("token")).thenReturn(new UserDevice("device", "other-user", "token", "WEB"));
+
+        new DeviceService(mapper).deactivateByToken("user", "token");
+
+        verify(mapper, never()).deactivate(any(), any());
+    }
+
+    @Test
+    @DisplayName("등록되지 않은 fcmToken은 비활성화하지 않는다")
+    void skipsDeactivationWhenTokenUnknown() {
+        DeviceMapper mapper = org.mockito.Mockito.mock(DeviceMapper.class);
+        when(mapper.findByToken("token")).thenReturn(null);
+
+        new DeviceService(mapper).deactivateByToken("user", "token");
+
+        verify(mapper, never()).deactivate(any(), any());
     }
 
     private RegisterDeviceRequest request() {
