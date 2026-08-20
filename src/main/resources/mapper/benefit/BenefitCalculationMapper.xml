@@ -61,12 +61,14 @@
         DELETE FROM user_benefit_calculation_outcomes
         WHERE approval_id IN
         <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+          AND usage_date &gt;= DATE_FORMAT(CONVERT_TZ(UTC_TIMESTAMP(), 'UTC', 'Asia/Seoul'), '%Y-%m-01')
     </delete>
 
     <delete id="deleteBenefitUsages">
         DELETE FROM user_benefit_usages
         WHERE approval_id IN
         <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+          AND usage_date &gt;= DATE_FORMAT(CONVERT_TZ(UTC_TIMESTAMP(), 'UTC', 'Asia/Seoul'), '%Y-%m-01')
     </delete>
 
     <resultMap id="simpleRuleRow" type="com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow">
