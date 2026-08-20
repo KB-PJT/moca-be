@@ -158,6 +158,12 @@
         WHERE user_card_id = #{userCardId} AND performance_month = #{performanceMonth}
     </select>
 
+    <select id="findCurrentMonthSpend" resultType="int">
+        SELECT current_spend_amount
+        FROM user_card_performance_snapshots
+        WHERE user_card_id = #{userCardId} AND performance_month = #{performanceMonth}
+    </select>
+
     <select id="lockUserCardForBenefitCalculation" resultType="string">
         SELECT user_card_id
         FROM user_cards
@@ -183,8 +189,9 @@
           AND (p.valid_from IS NULL OR p.valid_from &lt;= #{usageDate})
           AND (p.valid_to IS NULL OR p.valid_to &gt;= #{usageDate})
           AND (t.previous_spend_min_krw IS NULL OR t.previous_spend_min_krw &lt;= #{previousMonthSpend})
-          AND t.current_spend_min_krw IS NULL
-        ORDER BY COALESCE(t.previous_spend_min_krw, 0) DESC, t.position DESC
+          AND (t.current_spend_min_krw IS NULL OR t.current_spend_min_krw &lt;= #{currentMonthSpend})
+        ORDER BY COALESCE(t.previous_spend_min_krw, 0) DESC,
+                 COALESCE(t.current_spend_min_krw, 0) DESC, t.position DESC
         LIMIT 1
     </select>
 

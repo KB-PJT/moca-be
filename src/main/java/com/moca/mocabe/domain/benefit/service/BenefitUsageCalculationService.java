@@ -105,6 +105,10 @@ public class BenefitUsageCalculationService {
             approval.userCardId(),
             YearMonth.from(usageDate).minusMonths(1).format(YEAR_MONTH));
     BigDecimal previousMonthSpend = BigDecimal.valueOf(valueOrZero(previousMonthSpendSnapshot));
+    Integer currentMonthSpendSnapshot =
+        mapper.findCurrentMonthSpend(
+            approval.userCardId(), YearMonth.from(usageDate).format(YEAR_MONTH));
+    BigDecimal currentMonthSpend = BigDecimal.valueOf(valueOrZero(currentMonthSpendSnapshot));
     Map<String, List<SimpleBenefitRuleRow>> rowsByRule = new LinkedHashMap<>();
     for (SimpleBenefitRuleRow row :
         mapper.findSimpleRulesForUserCard(approval.userCardId(), usageDate)) {
@@ -114,7 +118,7 @@ public class BenefitUsageCalculationService {
       SimpleBenefitRuleRow first = rows.get(0);
       MonthlyBenefitLimit monthlyLimit =
           mapper.findApplicableMonthlyRewardLimit(
-              first.offerId(), usageDate, previousMonthSpend, limitUnitFor(first));
+              first.offerId(), usageDate, previousMonthSpend, currentMonthSpend, limitUnitFor(first));
       BigDecimal usedMonthlyValue =
           monthlyLimit == null
               ? BigDecimal.ZERO

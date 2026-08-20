@@ -282,6 +282,7 @@ class BenefitUsageCalculationServiceTest {
         .thenReturn(
             List.of(new BenefitApprovalRow("approval-1", "card-1", 15_000, approvedAt, null)));
     when(mapper.findPreviousMonthSpend("card-1", "2026-07")).thenReturn(300_000);
+    when(mapper.findCurrentMonthSpend("card-1", "2026-08")).thenReturn(450_000);
     when(mapper.findSimpleRulesForUserCard(eq("card-1"), any()))
         .thenReturn(
             List.of(
@@ -298,7 +299,7 @@ class BenefitUsageCalculationServiceTest {
                     "ALL",
                     1)));
     when(mapper.findApplicableMonthlyRewardLimit(
-            eq("offer-1"), any(), eq(new BigDecimal("300000")), eq("KRW")))
+            eq("offer-1"), any(), eq(new BigDecimal("300000")), any(), eq("KRW")))
         .thenReturn(new MonthlyBenefitLimit("policy-1", "cafe-shared", new BigDecimal("5000")));
     when(mapper.findConfirmedMonthlyRewardsForUpdate(
             eq("card-1"), eq("policy-1"), eq("cafe-shared"), any(), any(), eq("KRW")))
@@ -308,6 +309,10 @@ class BenefitUsageCalculationServiceTest {
         List.of(
             new ApprovalInsert(
                 "approval-1", "user-1", "card-1", null, "A-1", approvedAt, "테스트", 15_000, "{ }")));
+
+    verify(mapper).findApplicableMonthlyRewardLimit(
+        eq("offer-1"), any(), eq(new BigDecimal("300000")),
+        eq(new BigDecimal("450000")), eq("KRW"));
 
     verify(mapper).lockUserCardForBenefitCalculation("card-1");
     verify(mapper)
@@ -364,7 +369,7 @@ class BenefitUsageCalculationServiceTest {
                     "ALL",
                     1)));
     when(mapper.findApplicableMonthlyRewardLimit(
-            eq("offer-1"), any(), eq(new BigDecimal("300000")), eq("KRW")))
+            eq("offer-1"), any(), eq(new BigDecimal("300000")), any(), eq("KRW")))
         .thenReturn(new MonthlyBenefitLimit("policy-1", null, new BigDecimal("5000")));
     when(mapper.findConfirmedMonthlyRewardsForUpdate(
             eq("card-1"), eq("policy-1"), eq(null), any(), any(), eq("KRW")))

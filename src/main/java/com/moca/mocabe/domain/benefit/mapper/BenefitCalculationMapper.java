@@ -28,6 +28,9 @@ public interface BenefitCalculationMapper {
   Integer findPreviousMonthSpend(
       @Param("userCardId") String userCardId, @Param("performanceMonth") String performanceMonth);
 
+  Integer findCurrentMonthSpend(
+      @Param("userCardId") String userCardId, @Param("performanceMonth") String performanceMonth);
+
   /** 같은 보유 카드의 계산을 직렬화해 공유 월 한도의 경쟁 조건을 막는다. */
   String lockUserCardForBenefitCalculation(@Param("userCardId") String userCardId);
 
@@ -42,6 +45,7 @@ public interface BenefitCalculationMapper {
       @Param("offerId") String offerId,
       @Param("usageDate") LocalDate usageDate,
       @Param("previousMonthSpend") BigDecimal previousMonthSpend,
+      @Param("currentMonthSpend") BigDecimal currentMonthSpend,
       @Param("limitUnit") String limitUnit);
 
   /** 현재 정책 또는 같은 shared_group_key에 이미 사용된 당월 보상값을 잠금 조회한다. */
