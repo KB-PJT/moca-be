@@ -156,10 +156,14 @@ class JsonBenefitRuleEvaluatorTest {
             allRejected.reward(),
             List.of());
 
-    assertEquals(
-        BenefitRejectionReason.PERFORMANCE_NOT_MET,
+    BenefitCalculationResult performanceRejected =
         evaluator.evaluate("all", allRejected, context(allAvailable(), 0, 0),
-            BigDecimal.ZERO, BigDecimal.ZERO).rejectionReason());
+            BigDecimal.ZERO, BigDecimal.ZERO);
+    assertEquals(BenefitRejectionReason.PERFORMANCE_NOT_MET,
+        performanceRejected.rejectionReason());
+    assertFalse(performanceRejected.applicable());
+    assertEquals(new BigDecimal("1000"), performanceRejected.rawRewardValue());
+    assertEquals(BigDecimal.ZERO, performanceRejected.appliedRewardValue());
     assertEquals(
         BenefitRejectionReason.PERFORMANCE_NOT_MET,
         evaluator.evaluate("any", anyRejected, context(allAvailable(), 0, 0),

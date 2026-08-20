@@ -167,8 +167,8 @@ class BenefitHistoryMapperIntegrationTest {
         "INSERT INTO user_benefit_calculation_outcomes"
             + " (outcome_id,user_card_id,approval_id,offer_id,rule_id,usage_date,reward_unit,"
             + "expected_reward_value,applied_reward_value,missed_reward_value,outcome_status,"
-            + "rejection_reason) VALUES (?,?,?,?,?,'2026-07-20','KRW',1800,0,1800,"
-            + "'not_applied','MONTHLY_LIMIT_EXHAUSTED')",
+            + "rejection_reason) VALUES (?,?,?,?,?,'2026-07-20','KRW',1800,500,1300,"
+            + "'partially_applied','MONTHLY_LIMIT_EXHAUSTED')",
         LIMIT_OUTCOME,
         USER_CARD,
         LIMIT_APPROVAL,
@@ -205,8 +205,9 @@ class BenefitHistoryMapperIntegrationTest {
     assertEquals(120000L, performanceOutcome.getPreviousMonthSpendAmount());
     assertEquals("이마트", performanceOutcome.getMerchantName());
     BenefitHistoryRow limitOutcome = find(rows, LIMIT_OUTCOME);
-    assertEquals("NOT_APPLIED", limitOutcome.getCalculationStatus());
-    assertEquals(1800L, limitOutcome.getMissedBenefitAmount());
+    assertEquals("PARTIALLY_APPLIED", limitOutcome.getCalculationStatus());
+    assertEquals(500L, limitOutcome.getBenefitAmount());
+    assertEquals(1300L, limitOutcome.getMissedBenefitAmount());
     assertEquals("MONTHLY_LIMIT_EXHAUSTED", limitOutcome.getRejectionReason());
     assertEquals("테스트 카드 1234********5678", find(rows, USAGE).getCardName());
     assertEquals(1500L, find(rows, USAGE).getBenefitAmount());

@@ -56,6 +56,21 @@
         ORDER BY approved_at, approval_id
     </select>
 
+    <!-- 재동기화 시 이전 계산 결과를 제거한 뒤 최신 실적 기준으로 다시 계산한다. -->
+    <delete id="deleteCalculationOutcomes">
+        DELETE FROM user_benefit_calculation_outcomes
+        WHERE approval_id IN
+        <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+          AND usage_date &gt;= DATE_FORMAT(CONVERT_TZ(UTC_TIMESTAMP(), 'UTC', 'Asia/Seoul'), '%Y-%m-01')
+    </delete>
+
+    <delete id="deleteBenefitUsages">
+        DELETE FROM user_benefit_usages
+        WHERE approval_id IN
+        <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
+          AND usage_date &gt;= DATE_FORMAT(CONVERT_TZ(UTC_TIMESTAMP(), 'UTC', 'Asia/Seoul'), '%Y-%m-01')
+    </delete>
+
     <resultMap id="simpleRuleRow" type="com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow">
         <constructor>
             <arg column="rule_id" javaType="java.lang.String"/>
@@ -158,6 +173,12 @@
         WHERE user_card_id = #{userCardId} AND performance_month = #{performanceMonth}
     </select>
 
+    <select id="findCurrentMonthSpend" resultType="int">
+        SELECT current_spend_amount
+        FROM user_card_performance_snapshots
+        WHERE user_card_id = #{userCardId} AND performance_month = #{performanceMonth}
+    </select>
+
     <select id="lockUserCardForBenefitCalculation" resultType="string">
         SELECT user_card_id
         FROM user_cards
@@ -165,15 +186,18 @@
         FOR UPDATE
     </select>
 
-    <resultMap id="monthlyBenefitLimit" type="com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit">
+    <resultMap id="monthlyBenefitLimitCandidate" type="com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate">
         <constructor>
             <arg column="limit_policy_id" javaType="java.lang.String"/>
             <arg column="shared_group_key" javaType="java.lang.String"/>
             <arg column="limit_value" javaType="java.math.BigDecimal"/>
+            <arg column="previous_spend_min_krw" javaType="java.math.BigDecimal"/>
+            <arg column="current_spend_min_krw" javaType="java.math.BigDecimal"/>
         </constructor>
     </resultMap>
-    <select id="findApplicableMonthlyRewardLimit" resultMap="monthlyBenefitLimit">
-        SELECT p.limit_policy_id, p.shared_group_key, t.limit_value
+    <select id="findMonthlyRewardLimitCandidates" resultMap="monthlyBenefitLimitCandidate">
+        SELECT p.limit_policy_id, p.shared_group_key, t.limit_value,
+               t.previous_spend_min_krw, t.current_spend_min_krw
         FROM benefit_limit_policies p
         INNER JOIN benefit_limit_tiers t ON t.limit_policy_id = p.limit_policy_id
         WHERE p.offer_id = #{offerId}
@@ -182,10 +206,7 @@
           AND p.limit_unit = #{limitUnit}
           AND (p.valid_from IS NULL OR p.valid_from &lt;= #{usageDate})
           AND (p.valid_to IS NULL OR p.valid_to &gt;= #{usageDate})
-          AND (t.previous_spend_min_krw IS NULL OR t.previous_spend_min_krw &lt;= #{previousMonthSpend})
-          AND t.current_spend_min_krw IS NULL
-        ORDER BY COALESCE(t.previous_spend_min_krw, 0) DESC, t.position DESC
-        LIMIT 1
+        ORDER BY t.position
     </select>
 
     <select id="findConfirmedMonthlyRewardsForUpdate" resultType="java.math.BigDecimal">

@@ -1,7 +1,7 @@
 package com.moca.mocabe.domain.benefit.mapper;
 
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
-import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
+import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
 import java.math.BigDecimal;
@@ -22,10 +22,17 @@ public interface BenefitCalculationMapper {
       @Param("fromUtc") LocalDateTime fromUtc,
       @Param("toUtc") LocalDateTime toUtc);
 
+  void deleteCalculationOutcomes(@Param("approvalIds") List<String> approvalIds);
+
+  void deleteBenefitUsages(@Param("approvalIds") List<String> approvalIds);
+
   List<SimpleBenefitRuleRow> findSimpleRulesForUserCard(
       @Param("userCardId") String userCardId, @Param("usageDate") LocalDate usageDate);
 
   Integer findPreviousMonthSpend(
+      @Param("userCardId") String userCardId, @Param("performanceMonth") String performanceMonth);
+
+  Integer findCurrentMonthSpend(
       @Param("userCardId") String userCardId, @Param("performanceMonth") String performanceMonth);
 
   /** 같은 보유 카드의 계산을 직렬화해 공유 월 한도의 경쟁 조건을 막는다. */
@@ -38,10 +45,9 @@ public interface BenefitCalculationMapper {
       @Param("usageMonthStart") LocalDate usageMonthStart,
       @Param("nextMonthStart") LocalDate nextMonthStart);
 
-  MonthlyBenefitLimit findApplicableMonthlyRewardLimit(
+  List<BenefitLimitTierCandidate> findMonthlyRewardLimitCandidates(
       @Param("offerId") String offerId,
       @Param("usageDate") LocalDate usageDate,
-      @Param("previousMonthSpend") BigDecimal previousMonthSpend,
       @Param("limitUnit") String limitUnit);
 
   /** 현재 정책 또는 같은 shared_group_key에 이미 사용된 당월 보상값을 잠금 조회한다. */

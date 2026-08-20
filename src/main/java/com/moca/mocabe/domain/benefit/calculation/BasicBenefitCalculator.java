@@ -56,7 +56,17 @@ public class BasicBenefitCalculator implements BenefitCalculator {
 
     if (!context.newMemberGracePeriod()
         && isLessThan(context.previousMonthSpend(), rule.requiredPreviousMonthSpend())) {
-      return reject(rule, BenefitRejectionReason.PERFORMANCE_NOT_MET);
+      BigDecimal expectedReward =
+          capPaymentAmount(rule, calculateRawReward(rule, context), context.paymentAmount());
+      return new BenefitCalculationResult(
+          rule.ruleId(),
+          rule.benefitType(),
+          rule.rewardUnit(),
+          false,
+          expectedReward,
+          BigDecimal.ZERO,
+          remainingLimitAfter(rule, BigDecimal.ZERO),
+          BenefitRejectionReason.PERFORMANCE_NOT_MET);
     }
 
     // rawRewardValue는 이론상 혜택이고, appliedRewardValue는 월 한도 반영 후 실제 혜택이다.

@@ -12,6 +12,7 @@ import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
 import com.moca.mocabe.domain.benefit.model.BenefitRule;
 import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
+import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
@@ -282,6 +283,7 @@ class BenefitUsageCalculationServiceTest {
         .thenReturn(
             List.of(new BenefitApprovalRow("approval-1", "card-1", 15_000, approvedAt, null)));
     when(mapper.findPreviousMonthSpend("card-1", "2026-07")).thenReturn(300_000);
+    when(mapper.findCurrentMonthSpend("card-1", "2026-08")).thenReturn(450_000);
     when(mapper.findSimpleRulesForUserCard(eq("card-1"), any()))
         .thenReturn(
             List.of(
@@ -297,9 +299,9 @@ class BenefitUsageCalculationServiceTest {
                     "all_merchants",
                     "ALL",
                     1)));
-    when(mapper.findApplicableMonthlyRewardLimit(
-            eq("offer-1"), any(), eq(new BigDecimal("300000")), eq("KRW")))
-        .thenReturn(new MonthlyBenefitLimit("policy-1", "cafe-shared", new BigDecimal("5000")));
+    when(mapper.findMonthlyRewardLimitCandidates(eq("offer-1"), any(), eq("KRW")))
+        .thenReturn(List.of(new BenefitLimitTierCandidate("policy-1", "cafe-shared",
+            new BigDecimal("5000"), new BigDecimal("300000"), BigDecimal.ZERO)));
     when(mapper.findConfirmedMonthlyRewardsForUpdate(
             eq("card-1"), eq("policy-1"), eq("cafe-shared"), any(), any(), eq("KRW")))
         .thenReturn(List.of(new BigDecimal("4000")));
@@ -308,6 +310,8 @@ class BenefitUsageCalculationServiceTest {
         List.of(
             new ApprovalInsert(
                 "approval-1", "user-1", "card-1", null, "A-1", approvedAt, "테스트", 15_000, "{ }")));
+
+    verify(mapper).findMonthlyRewardLimitCandidates(eq("offer-1"), any(), eq("KRW"));
 
     verify(mapper).lockUserCardForBenefitCalculation("card-1");
     verify(mapper)
@@ -363,9 +367,9 @@ class BenefitUsageCalculationServiceTest {
                     "all_merchants",
                     "ALL",
                     1)));
-    when(mapper.findApplicableMonthlyRewardLimit(
-            eq("offer-1"), any(), eq(new BigDecimal("300000")), eq("KRW")))
-        .thenReturn(new MonthlyBenefitLimit("policy-1", null, new BigDecimal("5000")));
+    when(mapper.findMonthlyRewardLimitCandidates(eq("offer-1"), any(), eq("KRW")))
+        .thenReturn(List.of(new BenefitLimitTierCandidate("policy-1", null,
+            new BigDecimal("5000"), new BigDecimal("300000"), BigDecimal.ZERO)));
     when(mapper.findConfirmedMonthlyRewardsForUpdate(
             eq("card-1"), eq("policy-1"), eq(null), any(), any(), eq("KRW")))
         .thenReturn(List.of(new BigDecimal("5000")));
@@ -393,6 +397,36 @@ class BenefitUsageCalculationServiceTest {
             eq(new BigDecimal("1500")),
             eq("not_applied"),
             eq("MONTHLY_LIMIT_EXHAUSTED"));
+  }
+
+  @Test
+  @DisplayName("JSON 조건에 실적이 없어도 월 한도 tier 실적 미달을 놓친 혜택으로 기록한다")
+  void recordsTierPerformanceFailureBeforeMonthlyLimitExhaustion() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("approval-tier")))
+        .thenReturn(List.of(
+            new BenefitApprovalRow("approval-tier", "card-tier", 20_000, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("card-tier", "2026-07")).thenReturn(250_000);
+    when(mapper.findSimpleRulesForUserCard(eq("card-tier"), any()))
+        .thenReturn(List.of(new SimpleBenefitRuleRow(
+            "rule-tier", "offer-tier", "points", "point", new BigDecimal("5"),
+            null, null, null, "all_merchants", "ALL", 1, "include", null,
+            jsonDefinitionWithoutPerformance(), "SUPPORTED")));
+    when(mapper.findMonthlyRewardLimitCandidates(eq("offer-tier"), any(), eq("point")))
+        .thenReturn(List.of(new BenefitLimitTierCandidate(
+            "policy-tier", null, new BigDecimal("3000"),
+            new BigDecimal("300000"), BigDecimal.ZERO)));
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "approval-tier", "user-1", "card-tier", null, "A-TIER", approvedAt,
+        "CU", 20_000, "{}")));
+
+    verify(mapper, never()).insertConfirmedUsage(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    verify(mapper).insertCalculationOutcome(
+        any(), eq("card-tier"), eq("approval-tier"), eq("offer-tier"), eq("rule-tier"),
+        eq(null), any(), eq("POINT"), eq(new BigDecimal("1000")), eq(BigDecimal.ZERO),
+        eq(new BigDecimal("1000")), eq("not_applied"), eq("PERFORMANCE_NOT_MET"));
   }
 
   @Test
@@ -586,6 +620,22 @@ class BenefitUsageCalculationServiceTest {
             "rate":"0.10"
           },
           "limits":[{"type":"DAILY_USAGE_COUNT","value":"1"}]
+        }
+        """;
+  }
+
+  private String jsonDefinitionWithoutPerformance() {
+    return """
+        {
+          "schemaVersion":1,
+          "conditions":{"all":[],"any":[],"none":[]},
+          "reward":{
+            "benefitType":"POINT",
+            "rewardUnit":"POINT",
+            "calculation":"RATE",
+            "rate":"0.05"
+          },
+          "limits":[]
         }
         """;
   }

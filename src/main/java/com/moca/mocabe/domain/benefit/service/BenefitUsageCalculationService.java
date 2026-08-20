@@ -7,6 +7,7 @@ import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationContext;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
+import com.moca.mocabe.domain.benefit.model.BenefitLimitTierSelection;
 import com.moca.mocabe.domain.benefit.model.BenefitRule;
 import com.moca.mocabe.domain.benefit.model.BenefitRuleTarget;
 import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
@@ -47,6 +48,7 @@ public class BenefitUsageCalculationService {
   private final BenefitRuleTargetEvaluator targetEvaluator = new BenefitRuleTargetEvaluator();
   private final BenefitRuleDefinitionParser definitionParser = new BenefitRuleDefinitionParser();
   private final JsonBenefitRuleEvaluator jsonRuleEvaluator = new JsonBenefitRuleEvaluator();
+  private final BenefitLimitTierSelector tierSelector = new BenefitLimitTierSelector();
 
   public BenefitUsageCalculationService(BenefitCalculationMapper mapper) {
     this.mapper = mapper;
@@ -80,6 +82,10 @@ public class BenefitUsageCalculationService {
     if (approvalIds == null || approvalIds.isEmpty()) {
       return;
     }
+    // 현재 월 결과만 최신 전월/당월 실적 기준으로 재계산한다.
+    // 지난달 이전 리포트는 확정값으로 보존하고 승인 자체도 유지한다.
+    mapper.deleteCalculationOutcomes(approvalIds);
+    mapper.deleteBenefitUsages(approvalIds);
     calculateApprovalIds(approvalIds);
   }
 
@@ -105,6 +111,10 @@ public class BenefitUsageCalculationService {
             approval.userCardId(),
             YearMonth.from(usageDate).minusMonths(1).format(YEAR_MONTH));
     BigDecimal previousMonthSpend = BigDecimal.valueOf(valueOrZero(previousMonthSpendSnapshot));
+    Integer currentMonthSpendSnapshot =
+        mapper.findCurrentMonthSpend(
+            approval.userCardId(), YearMonth.from(usageDate).format(YEAR_MONTH));
+    BigDecimal currentMonthSpend = BigDecimal.valueOf(valueOrZero(currentMonthSpendSnapshot));
     Map<String, List<SimpleBenefitRuleRow>> rowsByRule = new LinkedHashMap<>();
     for (SimpleBenefitRuleRow row :
         mapper.findSimpleRulesForUserCard(approval.userCardId(), usageDate)) {
@@ -112,9 +122,12 @@ public class BenefitUsageCalculationService {
     }
     for (List<SimpleBenefitRuleRow> rows : rowsByRule.values()) {
       SimpleBenefitRuleRow first = rows.get(0);
-      MonthlyBenefitLimit monthlyLimit =
-          mapper.findApplicableMonthlyRewardLimit(
-              first.offerId(), usageDate, previousMonthSpend, limitUnitFor(first));
+      BenefitLimitTierSelection tierSelection =
+          tierSelector.select(
+              mapper.findMonthlyRewardLimitCandidates(first.offerId(), usageDate, limitUnitFor(first)),
+              previousMonthSpend,
+              currentMonthSpend);
+      MonthlyBenefitLimit monthlyLimit = tierSelection.limit();
       BigDecimal usedMonthlyValue =
           monthlyLimit == null
               ? BigDecimal.ZERO
@@ -159,12 +172,28 @@ public class BenefitUsageCalculationService {
               context,
               monthlyLimit == null ? BigDecimal.ZERO : monthlyLimit.limitValue(),
               usedMonthlyValue);
+      if (tierSelection.status() == BenefitLimitTierSelection.Status.PERFORMANCE_NOT_MET) {
+        result = performanceNotMet(result);
+      }
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
         persist(approval, usageDate, first, monthlyLimit, result);
       }
     }
   }
+
+  private BenefitCalculationResult performanceNotMet(BenefitCalculationResult calculated) {
+    return new BenefitCalculationResult(
+        calculated.ruleId(),
+        calculated.benefitType(),
+        calculated.rewardUnit(),
+        false,
+        calculated.rawRewardValue(),
+        BigDecimal.ZERO,
+        BigDecimal.ZERO,
+        com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.PERFORMANCE_NOT_MET);
+  }
+
 
   private BenefitCalculationResult calculate(
       List<SimpleBenefitRuleRow> rows,
