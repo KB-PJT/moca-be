@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.moca.mocabe.domain.auth.dto.GoogleLoginRequest;
 import com.moca.mocabe.domain.auth.dto.GoogleLoginResponse;
+import com.moca.mocabe.domain.auth.dto.LogoutRequest;
 import com.moca.mocabe.domain.auth.dto.RefreshTokenResponse;
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.domain.user.dto.UserProfileResponse;
@@ -56,16 +57,18 @@ class AuthControllerTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
 
         String refreshedCookie = controller.refresh("refresh", request).getHeaders().getFirst(HttpHeaders.SET_COOKIE);
-        String expiredCookie = controller.logout("Bearer access", "refresh", request)
+        LogoutRequest logoutRequest = new LogoutRequest();
+        logoutRequest.setFcmToken("fcm-token");
+        String expiredCookie = controller.logout("Bearer access", "refresh", logoutRequest, request)
                 .getHeaders().getFirst(HttpHeaders.SET_COOKIE);
-        controller.logout("Basic ignored", null, request);
+        controller.logout("Basic ignored", null, null, request);
 
         assertTrue(refreshedCookie.contains("new-refresh"));
         assertTrue(refreshedCookie.contains("Secure"));
         assertTrue(refreshedCookie.contains("SameSite=None"));
         assertTrue(expiredCookie.contains("Max-Age=0"));
-        verify(authApplicationService).logout("access", "refresh");
-        verify(authApplicationService).logout(null, null);
+        verify(authApplicationService).logout("access", "refresh", "fcm-token");
+        verify(authApplicationService).logout(null, null, null);
     }
 
     private GoogleLoginResponse loginResponse() {

@@ -5,16 +5,21 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.auth.dto.GoogleLoginResponse;
+import com.moca.mocabe.domain.notification.service.DeviceService;
 import com.moca.mocabe.domain.user.model.UserProfile;
 import com.moca.mocabe.domain.user.service.UserDomainService;
+import com.moca.mocabe.global.auth.AuthenticatedUser;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeExchanger;
 import com.moca.mocabe.global.auth.GoogleUserIdentity;
 import com.moca.mocabe.global.auth.OpaqueTokenPair;
 import com.moca.mocabe.global.auth.OpaqueTokenService;
+import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +41,9 @@ class AuthApplicationServiceTest {
 
     @Mock
     private OpaqueTokenService opaqueTokenService;
+
+    @Mock
+    private DeviceService deviceService;
 
     @InjectMocks
     private AuthApplicationService authApplicationService;
@@ -114,8 +122,31 @@ class AuthApplicationServiceTest {
                 .thenReturn(new OpaqueTokenPair("access", "new-refresh", 1800));
 
         assertEquals("access", authApplicationService.refresh("refresh").getAccessToken());
-        authApplicationService.logout("access", "refresh");
+        authApplicationService.logout("access", "refresh", null);
 
+        verify(opaqueTokenService).revoke("access", "refresh");
+        verifyNoInteractions(deviceService);
+    }
+
+    @Test
+    @DisplayName("fcmToken을 함께 보내면 access token으로 확인한 소유자 명의로 디바이스 매핑을 비활성화한 뒤 세션을 폐기한다")
+    void deactivatesDeviceOnLogoutWhenFcmTokenProvided() {
+        when(opaqueTokenService.authenticate("access")).thenReturn(new AuthenticatedUser(USER_ID, "user"));
+
+        authApplicationService.logout("access", "refresh", "fcm-token");
+
+        verify(deviceService).deactivateByToken(USER_ID, "fcm-token");
+        verify(opaqueTokenService).revoke("access", "refresh");
+    }
+
+    @Test
+    @DisplayName("access token이 무효하면 디바이스 매핑 비활성화 없이 로그아웃만 진행한다")
+    void skipsDeviceDeactivationWhenAccessTokenInvalid() {
+        when(opaqueTokenService.authenticate("access")).thenThrow(new InvalidOpaqueTokenException());
+
+        authApplicationService.logout("access", "refresh", "fcm-token");
+
+        verify(deviceService, never()).deactivateByToken(anyString(), anyString());
         verify(opaqueTokenService).revoke("access", "refresh");
     }
 

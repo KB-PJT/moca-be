@@ -29,4 +29,12 @@ public class DeviceService {
     public void deactivate(String userId, String deviceId) {
         mapper.deactivate(deviceId, userId);
     }
+
+    @Transactional
+    public void deactivateByToken(String userId, String fcmToken) {
+        UserDevice device = mapper.findByToken(fcmToken);
+        if (device != null && device.userId().equals(userId)) {
+            mapper.deactivate(device.userDeviceId(), userId);
+        }
+    }
 }

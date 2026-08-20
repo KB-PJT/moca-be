@@ -2,6 +2,7 @@ package com.moca.mocabe.domain.auth.controller;
 
 import com.moca.mocabe.domain.auth.dto.GoogleLoginRequest;
 import com.moca.mocabe.domain.auth.dto.GoogleLoginResponse;
+import com.moca.mocabe.domain.auth.dto.LogoutRequest;
 import com.moca.mocabe.domain.auth.dto.RefreshTokenResponse;
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.domain.user.dto.SuccessResponse;
@@ -62,8 +63,10 @@ public class AuthController {
     public ResponseEntity<ApiResponse<SuccessResponse>> logout(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @CookieValue(value = REFRESH_COOKIE, required = false) String refreshToken,
+            @Valid @RequestBody(required = false) LogoutRequest request,
             HttpServletRequest servletRequest) {
-        authApplicationService.logout(extractBearerToken(authorization), refreshToken);
+        String fcmToken = request == null ? null : request.getFcmToken();
+        authApplicationService.logout(extractBearerToken(authorization), refreshToken, fcmToken);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, expiredRefreshCookie(servletRequest.getContextPath()).toString())
                 .body(ApiResponse.success(new SuccessResponse(true)));
