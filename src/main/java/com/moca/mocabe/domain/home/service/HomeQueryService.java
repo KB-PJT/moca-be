@@ -71,7 +71,7 @@ public class HomeQueryService {
 
   @Transactional(readOnly = true)
   public RecentHistoryResponse getRecentHistory(
-      String userId, String requestedYearMonth, int limit) {
+      String userId, String requestedYearMonth, int limit, String userCardId) {
     requireProfile(userId);
     YearMonth yearMonth = parseYearMonth(requestedYearMonth);
     if (limit < 1 || limit > 5) {
@@ -90,7 +90,8 @@ public class HomeQueryService {
             .atStartOfDay(SEOUL)
             .withZoneSameInstant(ZoneOffset.UTC)
             .toLocalDateTime();
-    List<RecentHistoryRow> rows = homeMapper.findRecentHistory(userId, fromUtc, toUtc, limit);
+    List<RecentHistoryRow> rows =
+        homeMapper.findRecentHistory(userId, fromUtc, toUtc, limit, userCardId);
     List<RecentHistoryItemResponse> history =
         (rows == null ? List.<RecentHistoryRow>of() : rows)
             .stream().map(this::toRecentHistory).toList();

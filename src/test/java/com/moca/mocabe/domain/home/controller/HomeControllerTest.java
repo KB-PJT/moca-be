@@ -59,7 +59,7 @@ class HomeControllerTest {
                         new HomeCardResponse("uc-1", 1, "신한 Mr.Life", "내 카드", "https://image/card.png",
                                 null, new HomeBenefitHighlightResponse("카페 10% 할인", "월 최대 5천원"),
                                 new HomeCardSummaryResponse(21800, 8200, 30000, 382000, 500000, 76, 118000)))));
-        when(homeQueryService.getRecentHistory(USER_ID, "2026-07", 3))
+        when(homeQueryService.getRecentHistory(USER_ID, "2026-07", 3, null))
                 .thenReturn(new RecentHistoryResponse(List.of(new RecentHistoryItemResponse(
                         "approval-1", "benefit-1", "스타벅스", "DISCOUNT", "카페 10% 할인",
                         "신한 Mr.Life", 15000, 1500, 0, "APPLIED", null,
@@ -98,7 +98,23 @@ class HomeControllerTest {
 
         verify(homeQueryService).getGreeting(USER_ID, "2026-07");
         verify(homeQueryService).getCards(USER_ID, "2026-07", "MANUAL");
-        verify(homeQueryService).getRecentHistory(USER_ID, "2026-07", 3);
+        verify(homeQueryService).getRecentHistory(USER_ID, "2026-07", 3, null);
+    }
+
+    @Test
+    @DisplayName("최근 내역 API는 userCardId 쿼리값을 서비스에 전달한다")
+    void delegatesRecentHistoryUserCardIdFilter() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
+        when(homeQueryService.getRecentHistory(USER_ID, "2026-07", 3, "uc-1"))
+                .thenReturn(new RecentHistoryResponse(List.of()));
+
+        mockMvc.perform(get("/home/recent-history")
+                        .param("yearMonth", "2026-07")
+                        .param("limit", "3")
+                        .param("userCardId", "uc-1"))
+                .andExpect(status().isOk());
+
+        verify(homeQueryService).getRecentHistory(USER_ID, "2026-07", 3, "uc-1");
     }
 
     @Test
