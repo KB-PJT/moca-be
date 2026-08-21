@@ -1984,7 +1984,7 @@ components:
                  performanceRemainingAmount]
       properties:
         receivedBenefitAmount:
-          description: 기준 월에 확정된 혜택 수령 금액입니다.
+          description: 기준 월의 원화 혜택과 1포인트=1원으로 환산한 포인트를 합산한 확정 혜택입니다. 마일리지는 제외합니다.
           type: integer
           format: int64
         availableBenefitAmount:
@@ -2113,7 +2113,7 @@ components:
       type: object
       required: [totalBenefitAmount, discountAmount, cashbackAmount, pointAmount, mileageAmount]
       properties:
-        totalBenefitAmount: { type: integer, format: int64, description: '원화 환산 혜택의 전체 합계입니다. 단위는 원입니다.' }
+        totalBenefitAmount: { type: integer, format: int64, description: '원화 혜택과 1포인트=1원으로 환산한 포인트를 합산한 전체 혜택입니다. 마일리지는 제외하며 단위는 원입니다.' }
         discountAmount: { type: integer, format: int64, description: '할인 혜택의 합계입니다. 단위는 원입니다.' }
         cashbackAmount: { type: integer, format: int64, description: '캐시백 혜택의 합계입니다. 단위는 원입니다.' }
         pointAmount: { type: integer, format: int64, description: '적립 포인트의 합계입니다. 단위는 포인트입니다.' }
@@ -2202,8 +2202,8 @@ components:
       required: [yearMonth, totalBenefitAmount, previousMonthBenefitAmount, differenceAmount, breakdown]
       properties:
         yearMonth: { type: string, pattern: '^\\d{4}-(0[1-9]|1[0-2])$' , description: '집계 기준 월입니다. 형식은 YYYY-MM입니다.'}
-        totalBenefitAmount: { type: integer, format: int64, description: 원화 가치가 있는 확정 혜택 합계 }
-        previousMonthBenefitAmount: { type: integer, format: int64 , description: '직전 달에 확정된 혜택 합계입니다. 단위는 원입니다.'}
+        totalBenefitAmount: { type: integer, format: int64, description: '원화 혜택과 1포인트=1원으로 환산한 포인트를 합산한 확정 혜택입니다. 마일리지는 제외합니다.' }
+        previousMonthBenefitAmount: { type: integer, format: int64 , description: '직전 달의 원화 혜택과 1포인트=1원으로 환산한 포인트 합계입니다. 마일리지는 제외하며 단위는 원입니다.'}
         differenceAmount: { type: integer, format: int64 , description: '기준 월과 직전 달 혜택 합계의 차이입니다. 단위는 원입니다.'}
         breakdown:
           description: '혜택 유형별 합계 목록입니다.'

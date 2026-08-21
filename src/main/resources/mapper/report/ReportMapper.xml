@@ -18,7 +18,9 @@
                    WHEN 'cashback' THEN 'CASHBACK'
                    WHEN 'points' THEN 'POINT'
                END AS benefit_type,
-               CAST(SUM(ubu.reward_amount_krw) AS SIGNED) AS amount
+               CAST(SUM(CASE WHEN ubu.reward_original_unit = 'point'
+                             THEN COALESCE(ubu.reward_original_value, 0)
+                             ELSE ubu.reward_amount_krw END) AS SIGNED) AS amount
         FROM user_benefit_usages ubu
         INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
         INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
@@ -43,7 +45,9 @@
     <select id="findBenefitAmountsByCategory" resultMap="categoryBenefitRowMap">
         SELECT mc.category_code,
                mc.category_name,
-               CAST(SUM(ubu.reward_amount_krw) AS SIGNED) AS benefit_amount
+               CAST(SUM(CASE WHEN ubu.reward_original_unit = 'point'
+                             THEN COALESCE(ubu.reward_original_value, 0)
+                             ELSE ubu.reward_amount_krw END) AS SIGNED) AS benefit_amount
         FROM user_benefit_usages ubu
         INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
         INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
