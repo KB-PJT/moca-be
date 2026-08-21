@@ -3,8 +3,8 @@ package com.moca.mocabe.domain.benefit.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -32,26 +32,22 @@ class BenefitHistoryQueryServiceTest {
 
   @Test
   void filtersAndPaginatesOnlyTheAuthenticatedUsersHistory() {
-    when(mapper.countHistory(eq("user-1"), any(), any(), eq("card-1"), eq("DISCOUNT")))
-        .thenReturn(21L);
     when(mapper.findHistory(
             eq("user-1"),
             any(),
             any(),
             eq("card-1"),
-            eq("DISCOUNT"),
-            eq("BENEFIT_DESC"),
-            eq(20),
-            eq(20)))
-        .thenReturn(List.of(row()));
+            eq(null)))
+        .thenReturn(List.of(row(), lowerBenefitRow()));
     when(mapper.summarizeHistory(eq("user-1"), any(), any(), eq("card-1")))
         .thenReturn(new BenefitHistorySummaryRow(13750, 3200, 7500, 3050, 0));
     BenefitHistoryResponse result =
         new BenefitHistoryQueryService(mapper)
-            .getHistory("user-1", "2026-07", "card-1", "discount", "benefit_desc", 2, 20);
-    assertEquals(21, result.getMeta().getTotalCount());
+            .getHistory("user-1", "2026-07", "card-1", "discount", "benefit_desc", 1, 20);
+    assertEquals(2, result.getMeta().getTotalCount());
     assertEquals(false, result.getMeta().isHasNext());
     assertEquals("2026-07-17T14:30:00+09:00", result.getData().get(0).getApprovedAt());
+    assertEquals("KRW", result.getData().get(0).getBenefitUnit());
     assertEquals(13750, result.getSummary().totalBenefitAmount());
     assertEquals(3200, result.getSummary().discountAmount());
   }
@@ -82,6 +78,7 @@ class BenefitHistoryQueryServiceTest {
         new BenefitHistoryQueryService(mapper).getDetail("user-1", "usage-1");
     assertEquals(3900, result.getMonthlyLimit().getRemainingAmount());
     assertEquals(1200L, result.getEarnedMileage());
+    assertEquals("KRW", result.getBenefitUnit());
   }
 
   @Test
@@ -146,7 +143,7 @@ class BenefitHistoryQueryServiceTest {
 
   @Test
   void defaultsMissingMonthToSeoulCurrentMonth() {
-    when(mapper.findHistory(anyString(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+    when(mapper.findHistory(anyString(), any(), any(), any(), any()))
         .thenReturn(List.of());
     when(mapper.summarizeHistory(anyString(), any(), any(), any()))
         .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
@@ -156,18 +153,97 @@ class BenefitHistoryQueryServiceTest {
             ? YearMonth.now(ZoneId.of("Asia/Seoul")).toString() : "");
   }
 
+  @Test
+  void defaultsMissingPageAndSize() {
+    when(mapper.findHistory(anyString(), any(), any(), any(), any())).thenReturn(List.of(row()));
+    when(mapper.summarizeHistory(anyString(), any(), any(), any()))
+        .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
+
+    BenefitHistoryResponse result =
+        new BenefitHistoryQueryService(mapper)
+            .getHistory("user-1", "2026-07", null, null, null, null, null);
+
+    assertEquals(1, result.getMeta().getPage());
+    assertEquals(20, result.getMeta().getSize());
+  }
+
+  @Test
+  void appliesTypeFilterAfterSelectingApprovalRepresentative() {
+    BenefitHistoryRow appliedDiscount = row();
+    BenefitHistoryRow rejectedPoint = lowerBenefitRow();
+    rejectedPoint.setApprovalId(appliedDiscount.getApprovalId());
+    rejectedPoint.setBenefitType("POINT");
+    rejectedPoint.setCalculationStatus("NOT_APPLIED");
+    rejectedPoint.setMissedBenefitAmount(1000);
+    when(mapper.findHistory(anyString(), any(), any(), any(), eq(null)))
+        .thenReturn(List.of(rejectedPoint, appliedDiscount));
+    when(mapper.summarizeHistory(anyString(), any(), any(), any()))
+        .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
+
+    BenefitHistoryResponse result =
+        new BenefitHistoryQueryService(mapper)
+            .getHistory("user-1", "2026-07", null, "POINT", "LATEST", 1, 20);
+
+    assertTrue(result.getData().isEmpty());
+    assertEquals(0, result.getMeta().getTotalCount());
+  }
+
+  @Test
+  void sortsBenefitDescendingByUnitGroupBeforeNumericValue() {
+    BenefitHistoryRow krw = row();
+    krw.setBenefitAmount(100);
+    krw.setBenefitUnit("KRW");
+    BenefitHistoryRow point = lowerBenefitRow();
+    point.setBenefitAmount(2000);
+    point.setBenefitUnit("POINT");
+    BenefitHistoryRow mileage = lowerBenefitRow();
+    mileage.setBenefitHistoryId("usage-3");
+    mileage.setApprovalId("approval-3");
+    mileage.setBenefitAmount(3000);
+    mileage.setBenefitUnit("MILEAGE");
+    BenefitHistoryRow noUnit = lowerBenefitRow();
+    noUnit.setBenefitHistoryId("usage-4");
+    noUnit.setApprovalId("approval-4");
+    noUnit.setBenefitAmount(4000);
+    noUnit.setBenefitUnit(null);
+    when(mapper.findHistory(anyString(), any(), any(), any(), eq(null)))
+        .thenReturn(List.of(noUnit, mileage, point, krw));
+    when(mapper.summarizeHistory(anyString(), any(), any(), any()))
+        .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
+
+    BenefitHistoryResponse result =
+        new BenefitHistoryQueryService(mapper)
+            .getHistory("user-1", "2026-07", null, null, "BENEFIT_DESC", 1, 20);
+
+    assertEquals("KRW", result.getData().get(0).getBenefitUnit());
+    assertEquals("POINT", result.getData().get(1).getBenefitUnit());
+    assertEquals("MILEAGE", result.getData().get(2).getBenefitUnit());
+    assertNull(result.getData().get(3).getBenefitUnit());
+  }
+
   private BenefitHistoryRow row() {
     BenefitHistoryRow row = new BenefitHistoryRow();
     copy(row);
     return row;
   }
 
+  private BenefitHistoryRow lowerBenefitRow() {
+    BenefitHistoryRow row = new BenefitHistoryRow();
+    copy(row);
+    row.setBenefitHistoryId("usage-2");
+    row.setApprovalId("approval-2");
+    row.setBenefitAmount(100);
+    return row;
+  }
+
   private void copy(BenefitHistoryRow row) {
     row.setBenefitHistoryId("usage-1");
+    row.setApprovalId("approval-1");
     row.setMerchantName("스타벅스");
     row.setApprovedAt(LocalDateTime.of(2026, 7, 17, 5, 30));
     row.setPaymentAmount(15000);
     row.setBenefitAmount(1500);
+    row.setBenefitUnit("KRW");
     row.setBenefitType("DISCOUNT");
     row.setBenefitTitle("카페 할인");
     row.setUserCardId("card-1");

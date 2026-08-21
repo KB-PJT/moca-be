@@ -5,10 +5,12 @@ import java.time.LocalDateTime;
 /** 혜택 이력 목록 SQL 조회 모델이다. */
 public class BenefitHistoryRow {
   private String benefitHistoryId;
+  private String approvalId;
   private String merchantName;
   private LocalDateTime approvedAt;
   private long paymentAmount;
   private long benefitAmount;
+  private String benefitUnit;
   private String benefitType;
   private String benefitTitle;
   private String userCardId;
@@ -25,6 +27,14 @@ public class BenefitHistoryRow {
 
   public void setBenefitHistoryId(String value) {
     benefitHistoryId = value;
+  }
+
+  public String getApprovalId() {
+    return approvalId;
+  }
+
+  public void setApprovalId(String value) {
+    approvalId = value;
   }
 
   public String getMerchantName() {
@@ -57,6 +67,14 @@ public class BenefitHistoryRow {
 
   public void setBenefitAmount(long value) {
     benefitAmount = value;
+  }
+
+  public String getBenefitUnit() {
+    return benefitUnit;
+  }
+
+  public void setBenefitUnit(String value) {
+    benefitUnit = value;
   }
 
   public String getBenefitType() {

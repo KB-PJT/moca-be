@@ -7,6 +7,7 @@ public class BenefitHistoryItemResponse {
   private final String approvedAt;
   private final long paymentAmount;
   private final long benefitAmount;
+  private final String benefitUnit;
   private final String benefitType;
   private final String benefitTitle;
   private final String userCardId;
@@ -22,6 +23,7 @@ public class BenefitHistoryItemResponse {
       String approvedAt,
       long payment,
       long benefit,
+      String benefitUnit,
       String type,
       String title,
       String cardId,
@@ -35,6 +37,7 @@ public class BenefitHistoryItemResponse {
     this.approvedAt = approvedAt;
     this.paymentAmount = payment;
     this.benefitAmount = benefit;
+    this.benefitUnit = benefitUnit;
     this.benefitType = type;
     this.benefitTitle = title;
     this.userCardId = cardId;
@@ -63,6 +66,10 @@ public class BenefitHistoryItemResponse {
 
   public long getBenefitAmount() {
     return benefitAmount;
+  }
+
+  public String getBenefitUnit() {
+    return benefitUnit;
   }
 
   public String getBenefitType() {

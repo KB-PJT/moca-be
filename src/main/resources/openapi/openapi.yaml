@@ -215,11 +215,11 @@ paths:
           schema: { type: string, format: uuid }
         - name: type
           in: query
-          description: 조회할 혜택 유형입니다. 지정하면 해당 혜택이 있는 내역만 반환하며, 일반 결제는 제외됩니다. 생략하면 일반 결제를 포함한 전체 내역을 반환합니다.
+          description: 승인별 대표 계산 결과를 선택한 후 적용할 혜택 유형 필터입니다. 대표 결과가 지정 유형인 내역만 반환하며, 생략하면 일반 결제를 포함한 전체 내역을 반환합니다.
           schema: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE] }
         - name: sort
           in: query
-          description: 정렬 기준입니다. LATEST는 최신 승인순, BENEFIT_DESC는 혜택 금액 내림차순입니다.
+          description: 정렬 기준입니다. LATEST는 최신 승인순입니다. BENEFIT_DESC는 서로 다른 보상 단위를 직접 비교하지 않고 KRW, POINT, MILEAGE, 단위 없음 순으로 묶은 뒤 같은 단위 안에서 적용값과 미적용 예상값 중 큰 값의 내림차순으로 정렬합니다.
           schema: { type: string, enum: [LATEST, BENEFIT_DESC], default: LATEST }
         - name: page
           in: query
@@ -2121,19 +2121,20 @@ components:
     BenefitHistoryItemResponse:
       description: '전체 결제 내역 목록에 표시할 적용·미적용·미계산 결제 한 건입니다.'
       type: object
-      required: [benefitHistoryId, merchantName, approvedAt, paymentAmount, benefitAmount, missedBenefitAmount, userCardId, cardName, calculationStatus]
+      required: [benefitHistoryId, merchantName, approvedAt, paymentAmount, benefitAmount, benefitUnit, missedBenefitAmount, userCardId, cardName, calculationStatus]
       properties:
         benefitHistoryId: { type: string, format: uuid , description: '목록 항목 식별자입니다. 일반 결제는 승인 식별자입니다.'}
         merchantName: { type: string , description: '승인내역에 연결된 가맹점명입니다.'}
         approvedAt: { type: string, format: date-time , description: '카드 승인이 발생한 시각입니다.'}
         paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
-        benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
+        benefitAmount: { type: integer, format: int64 , description: '해당 승인에 실제 적용된 혜택값입니다. benefitUnit이 KRW면 원, POINT면 포인트, MILEAGE면 마일리지입니다. 미적용·미계산이면 0입니다.'}
+        benefitUnit: { type: string, enum: [KRW, POINT, MILEAGE], nullable: true, description: 'benefitAmount의 단위입니다. 원화 할인·캐시백은 KRW, 포인트는 POINT, 마일리지는 MILEAGE이며 계산 결과가 없는 일반 결제는 null입니다.' }
         missedBenefitAmount: { type: integer, format: int64, description: '미적용된 예상 혜택 금액입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위이며, 미적용 사유는 rejectionReason을 참고합니다.' }
         benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE], nullable: true, description: '혜택 유형입니다. 혜택 계산 결과가 없는 일반 결제는 null입니다.'}
         benefitTitle: { type: string, nullable: true, description: '카드 상품 안내에 정의된 혜택명입니다. 일반 결제는 null입니다.'}
         userCardId: { type: string, format: uuid , description: 'userCard 리소스의 식별자입니다.'}
         cardName: { type: string , description: '카드 상품명과 저장된 마스킹 카드번호를 공백으로 연결한 표시명입니다. 카드번호가 없으면 상품명만 반환합니다.'}
-        calculationStatus: { type: string, enum: [APPLIED, NOT_APPLIED, NOT_CALCULATED], description: 'APPLIED는 실제 적용, NOT_APPLIED는 혜택 미적용, NOT_CALCULATED는 혜택 계산 결과가 없는 일반 결제입니다.' }
+        calculationStatus: { type: string, enum: [APPLIED, PARTIALLY_APPLIED, NOT_APPLIED, NOT_CALCULATED], description: 'APPLIED는 실제 적용, PARTIALLY_APPLIED는 한도 등으로 일부 적용, NOT_APPLIED는 혜택 미적용, NOT_CALCULATED는 혜택 계산 결과가 없는 일반 결제입니다.' }
         rejectionReason: { type: string, nullable: true, description: '미적용 또는 부분 적용 사유입니다. 적용 또는 미계산 일반 결제는 null입니다.' }
         performanceShortfall: { $ref: '#/components/schemas/PerformanceShortfallResponse' }
     BenefitHistoryMetaResponse:
@@ -2154,15 +2155,16 @@ components:
     BenefitHistoryDetailResponse:
       description: '적용·미적용·미계산 결제 한 건의 승인·혜택·월 한도·실적 부족 상세 정보입니다.'
       type: object
-      required: [benefitHistoryId, calculationStatus, merchantName, approvedAt, cardName, paymentAmount, benefitAmount, missedBenefitAmount, monthlyLimit]
+      required: [benefitHistoryId, calculationStatus, merchantName, approvedAt, cardName, paymentAmount, benefitAmount, benefitUnit, missedBenefitAmount, monthlyLimit]
       properties:
         benefitHistoryId: { type: string, format: uuid , description: '목록 항목 식별자입니다. 일반 결제는 승인 식별자입니다.'}
-        calculationStatus: { type: string, enum: [APPLIED, NOT_APPLIED, NOT_CALCULATED], description: 'APPLIED는 실제 적용, NOT_APPLIED는 혜택 미적용, NOT_CALCULATED는 혜택 계산 결과가 없는 일반 결제입니다.' }
+        calculationStatus: { type: string, enum: [APPLIED, PARTIALLY_APPLIED, NOT_APPLIED, NOT_CALCULATED], description: 'APPLIED는 실제 적용, PARTIALLY_APPLIED는 한도 등으로 일부 적용, NOT_APPLIED는 혜택 미적용, NOT_CALCULATED는 혜택 계산 결과가 없는 일반 결제입니다.' }
         merchantName: { type: string , description: '승인내역에 연결된 가맹점명입니다.'}
         approvedAt: { type: string, format: date-time , description: '카드 승인이 발생한 시각입니다.'}
         cardName: { type: string , description: '카드 상품명과 저장된 마스킹 카드번호를 공백으로 연결한 표시명입니다. 카드번호가 없으면 상품명만 반환합니다.'}
         paymentAmount: { type: integer, format: int64 , description: '승인 결제금액입니다. 단위는 원입니다.'}
-        benefitAmount: { type: integer, format: int64 , description: '해당 승인에 적용된 혜택 금액입니다. 단위는 원입니다.'}
+        benefitAmount: { type: integer, format: int64 , description: '해당 승인에 실제 적용된 혜택값입니다. benefitUnit이 KRW면 원, POINT면 포인트, MILEAGE면 마일리지입니다. 미적용·미계산이면 0입니다.'}
+        benefitUnit: { type: string, enum: [KRW, POINT, MILEAGE], nullable: true, description: 'benefitAmount의 단위입니다. 계산 결과가 없는 일반 결제는 null입니다.' }
         missedBenefitAmount: { type: integer, format: int64, description: '미적용된 예상 혜택 금액입니다. 원화 혜택은 원, 포인트·마일리지는 해당 보상 단위이며, 미적용 사유는 rejectionReason을 참고합니다.' }
         benefitType: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE], nullable: true, description: '혜택 유형입니다. 혜택 계산 결과가 없는 일반 결제는 null입니다.'}
         benefitTitle: { type: string, nullable: true, description: '카드 상품 안내에 정의된 혜택명입니다. 일반 결제는 null입니다.'}
@@ -2184,9 +2186,9 @@ components:
       type: object
       required: [usedAmount, limitAmount, remainingAmount]
       properties:
-        usedAmount: { type: integer, format: int64 , description: '현재까지 사용한 한도 금액입니다. 단위는 원입니다.'}
-        limitAmount: { type: integer, format: int64 , description: '적용 가능한 전체 한도 금액입니다. 단위는 원입니다.'}
-        remainingAmount: { type: integer, format: int64 , description: '아직 사용할 수 있는 잔여 한도 금액입니다. 단위는 원입니다.'}
+        usedAmount: { type: integer, format: int64 , description: '현재까지 사용한 월 한도입니다. 단위는 상세 응답의 benefitUnit과 같습니다.'}
+        limitAmount: { type: integer, format: int64 , description: '적용 가능한 전체 월 한도입니다. 단위는 상세 응답의 benefitUnit과 같습니다.'}
+        remainingAmount: { type: integer, format: int64 , description: '아직 사용할 수 있는 잔여 월 한도입니다. 단위는 상세 응답의 benefitUnit과 같습니다.'}
     BenefitSummaryReportApiResponse:
       description: 'BenefitSummaryReport API의 공통 성공 응답입니다.'
       type: object

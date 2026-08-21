@@ -6,6 +6,7 @@ public class BenefitHistoryDetailResponse {
       merchantName,
       approvedAt,
       cardName,
+      benefitUnit,
       benefitType,
       benefitTitle;
   private final long paymentAmount, benefitAmount;
@@ -23,6 +24,7 @@ public class BenefitHistoryDetailResponse {
       String card,
       long payment,
       long benefit,
+      String benefitUnit,
       String type,
       String title,
       MonthlyLimitResponse limit,
@@ -37,6 +39,7 @@ public class BenefitHistoryDetailResponse {
     cardName = card;
     paymentAmount = payment;
     benefitAmount = benefit;
+    this.benefitUnit = benefitUnit;
     benefitType = type;
     benefitTitle = title;
     monthlyLimit = limit;
@@ -72,6 +75,10 @@ public class BenefitHistoryDetailResponse {
 
   public long getBenefitAmount() {
     return benefitAmount;
+  }
+
+  public String getBenefitUnit() {
+    return benefitUnit;
   }
 
   public String getBenefitType() {

@@ -2,9 +2,14 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper">
     <sql id="historySource">
-        SELECT ubu.usage_id AS benefit_history_id, approval.merchant_name,
+        SELECT ubu.usage_id AS benefit_history_id, approval.approval_id, approval.merchant_name,
                COALESCE(ubu.approved_at, approval.approved_at) AS approved_at,
-               approval.amount AS payment_amount, CAST(ubu.reward_amount_krw AS SIGNED) AS benefit_amount,
+               approval.amount AS payment_amount,
+               CAST(CASE WHEN ubu.reward_original_unit IN ('point', 'mile')
+                         THEN ubu.reward_original_value ELSE ubu.reward_amount_krw END AS SIGNED) AS benefit_amount,
+               CASE WHEN ubu.reward_original_unit = 'point' THEN 'POINT'
+                    WHEN ubu.reward_original_unit = 'mile' THEN 'MILEAGE'
+                    ELSE 'KRW' END AS benefit_unit,
                0 AS missed_benefit_amount,
                CASE WHEN ubu.reward_original_unit = 'mile' THEN 'MILEAGE'
                     WHEN ubu.reward_original_unit = 'point' THEN 'POINT'
@@ -38,8 +43,11 @@
                 AND partial_outcome.outcome_status = 'partially_applied'
           )
         UNION ALL
-        SELECT outcome.outcome_id, approval.merchant_name, approval.approved_at,
+        SELECT outcome.outcome_id, approval.approval_id, approval.merchant_name, approval.approved_at,
                approval.amount, CAST(outcome.applied_reward_value AS SIGNED),
+               CASE WHEN LOWER(outcome.reward_unit) = 'point' THEN 'POINT'
+                    WHEN LOWER(outcome.reward_unit) = 'mile' THEN 'MILEAGE'
+                    ELSE 'KRW' END,
                CAST(outcome.missed_reward_value AS SIGNED),
                CASE WHEN LOWER(outcome.reward_unit) = 'mile' THEN 'MILEAGE'
                     WHEN LOWER(outcome.reward_unit) = 'point' THEN 'POINT'
@@ -72,8 +80,8 @@
           AND outcome.outcome_status IN ('not_applied', 'partially_applied')
           AND bo.reward_type IN ('discount', 'cashback', 'points')
         UNION ALL
-        SELECT approval.approval_id, approval.merchant_name, approval.approved_at,
-               approval.amount, 0, 0, NULL, NULL, approval.user_card_id,
+        SELECT approval.approval_id, approval.approval_id, approval.merchant_name, approval.approved_at,
+               approval.amount, 0, NULL, 0, NULL, NULL, approval.user_card_id,
                CONCAT_WS(' ', COALESCE(cv.name, uc.card_name_from_codef),
                          NULLIF(TRIM(uc.card_no), '')),
                'NOT_CALCULATED', NULL, NULL, NULL, NULL, approval.approved_at, NULL, NULL
@@ -96,18 +104,10 @@
           )
     </sql>
     <resultMap id="historyRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryRow">
-        <id property="benefitHistoryId" column="benefit_history_id"/><result property="merchantName" column="merchant_name"/><result property="approvedAt" column="approved_at"/><result property="paymentAmount" column="payment_amount"/><result property="benefitAmount" column="benefit_amount"/><result property="benefitType" column="benefit_type"/><result property="benefitTitle" column="benefit_title"/><result property="userCardId" column="user_card_id"/><result property="cardName" column="card_name"/><result property="calculationStatus" column="calculation_status"/><result property="missedBenefitAmount" column="missed_benefit_amount"/><result property="rejectionReason" column="rejection_reason"/><result property="requiredPreviousSpendAmount" column="required_previous_spend_amount"/><result property="previousMonthSpendAmount" column="previous_month_spend_amount"/>
+        <id property="benefitHistoryId" column="benefit_history_id"/><result property="approvalId" column="approval_id"/><result property="merchantName" column="merchant_name"/><result property="approvedAt" column="approved_at"/><result property="paymentAmount" column="payment_amount"/><result property="benefitAmount" column="benefit_amount"/><result property="benefitUnit" column="benefit_unit"/><result property="benefitType" column="benefit_type"/><result property="benefitTitle" column="benefit_title"/><result property="userCardId" column="user_card_id"/><result property="cardName" column="card_name"/><result property="calculationStatus" column="calculation_status"/><result property="missedBenefitAmount" column="missed_benefit_amount"/><result property="rejectionReason" column="rejection_reason"/><result property="requiredPreviousSpendAmount" column="required_previous_spend_amount"/><result property="previousMonthSpendAmount" column="previous_month_spend_amount"/>
     </resultMap>
     <select id="findHistory" resultMap="historyRow">
         SELECT history.* FROM (<include refid="historySource"/>) history
-        WHERE history.approved_at &gt;= #{fromUtc} AND history.approved_at &lt; #{toUtc}
-          <if test="userCardId != null">AND history.user_card_id = #{userCardId}</if>
-          <if test="benefitType != null">AND history.benefit_type = #{benefitType}</if>
-        <choose><when test="sort == 'BENEFIT_DESC'">ORDER BY GREATEST(history.benefit_amount, history.missed_benefit_amount) DESC, history.approved_at DESC, history.benefit_history_id DESC</when><otherwise>ORDER BY history.approved_at DESC, history.benefit_history_id DESC</otherwise></choose>
-        LIMIT #{size} OFFSET #{offset}
-    </select>
-    <select id="countHistory" resultType="long">
-        SELECT COUNT(*) FROM (<include refid="historySource"/>) history
         WHERE history.approved_at &gt;= #{fromUtc} AND history.approved_at &lt; #{toUtc}
           <if test="userCardId != null">AND history.user_card_id = #{userCardId}</if>
           <if test="benefitType != null">AND history.benefit_type = #{benefitType}</if>
@@ -144,7 +144,15 @@
     </resultMap>
     <select id="findDetail" resultMap="detailRow">
         SELECT history.*,
-            CASE WHEN history.limit_policy_id IS NULL THEN 0 ELSE COALESCE((SELECT SUM(u2.reward_amount_krw) FROM user_benefit_usages u2 WHERE u2.user_card_id = history.user_card_id AND u2.limit_policy_id = history.limit_policy_id AND u2.usage_status = 'confirmed' AND DATE_FORMAT(u2.usage_date, '%Y-%m') = DATE_FORMAT(history.usage_date, '%Y-%m')), 0) END AS monthly_used_amount,
+            CASE WHEN history.limit_policy_id IS NULL THEN 0 ELSE COALESCE((SELECT SUM(
+                CASE WHEN history.benefit_unit = 'KRW' THEN u2.reward_amount_krw
+                     ELSE COALESCE(u2.reward_original_value, 0) END)
+                FROM user_benefit_usages u2
+                WHERE u2.user_card_id = history.user_card_id
+                  AND u2.limit_policy_id = history.limit_policy_id
+                  AND u2.usage_status = 'confirmed'
+                  AND DATE_FORMAT(u2.usage_date, '%Y-%m') = DATE_FORMAT(history.usage_date, '%Y-%m')), 0)
+            END AS monthly_used_amount,
             COALESCE((SELECT MAX(t.limit_value) FROM benefit_limit_tiers t WHERE t.limit_policy_id = history.limit_policy_id), 0) AS monthly_limit_amount,
             CASE WHEN history.reward_original_unit = 'mile' THEN CAST(history.reward_original_value AS SIGNED) ELSE NULL END AS earned_mileage
         FROM (<include refid="historySource"/>) history
