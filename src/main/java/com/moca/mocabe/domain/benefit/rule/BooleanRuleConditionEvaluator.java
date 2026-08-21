@@ -26,7 +26,12 @@ public class BooleanRuleConditionEvaluator implements RuleConditionEvaluator {
     if (!context.hasTarget("AVAILABLE_FIELD", type)) {
       return RuleConditionResult.unavailable();
     }
-    boolean expected = Boolean.parseBoolean(condition.value());
+    String configuredValue = condition.value();
+    if (!"true".equalsIgnoreCase(configuredValue)
+        && !"false".equalsIgnoreCase(configuredValue)) {
+      return RuleConditionResult.unavailable();
+    }
+    boolean expected = Boolean.parseBoolean(configuredValue);
     boolean actual = switch (type) {
       case "FOREIGN_TRANSACTION" -> context.foreignTransaction();
       case "NEW_MEMBER_GRACE" -> context.newMemberGracePeriod();

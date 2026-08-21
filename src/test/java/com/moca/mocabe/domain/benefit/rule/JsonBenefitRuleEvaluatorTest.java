@@ -232,6 +232,8 @@ class JsonBenefitRuleEvaluatorTest {
         .decision() == RuleConditionDecision.MATCHED);
     assertTrue(bool.evaluate(conditionWith("PAYMENT_CHANNEL_ELIGIBLE", "EQ", "true"), context)
         .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(bool.evaluate(conditionWith("NEW_MEMBER_GRACE", "EQ", "bad"), context)
+        .decision() == RuleConditionDecision.UNAVAILABLE);
     assertFalse(bool.supports(null));
 
     TargetRuleConditionEvaluator target = new TargetRuleConditionEvaluator();

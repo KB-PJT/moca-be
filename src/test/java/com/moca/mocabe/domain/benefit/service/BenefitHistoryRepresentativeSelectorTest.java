@@ -46,6 +46,17 @@ class BenefitHistoryRepresentativeSelectorTest {
   }
 
   @Test
+  void prefersAppliedBenefitToPartialBenefitRegardlessOfInputOrder() {
+    BenefitHistoryRow applied = row("usage-1", "approval-1", "APPLIED", 7, 0);
+    BenefitHistoryRow partial = row("outcome-1", "approval-1", "PARTIALLY_APPLIED", 5, 2);
+
+    assertEquals(
+        "usage-1", selector.select(List.of(applied, partial)).get(0).getBenefitHistoryId());
+    assertEquals(
+        "usage-1", selector.select(List.of(partial, applied)).get(0).getBenefitHistoryId());
+  }
+
+  @Test
   void selectsLargestMissedBenefitWhenNoCandidateWasApplied() {
     BenefitHistoryRow small = row("outcome-1", "approval-1", "NOT_APPLIED", 0, 10);
     BenefitHistoryRow large = row("outcome-2", "approval-1", "NOT_APPLIED", 0, 20);

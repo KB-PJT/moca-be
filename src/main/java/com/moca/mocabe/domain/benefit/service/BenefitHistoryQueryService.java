@@ -60,8 +60,12 @@ public class BenefitHistoryQueryService {
     LocalDateTime to = toUtc(month.plusMonths(1));
     String cardId = blankToNull(userCardId);
     List<BenefitHistoryRow> representatives =
-        representativeSelector.select(benefitHistoryMapper.findHistory(userId, from, to, cardId, type));
-    List<BenefitHistoryRow> ordered = representatives.stream().sorted(historyOrder(sort)).toList();
+        representativeSelector.select(benefitHistoryMapper.findHistory(userId, from, to, cardId, null));
+    List<BenefitHistoryRow> ordered =
+        representatives.stream()
+            .filter(row -> type == null || type.equals(row.getBenefitType()))
+            .sorted(historyOrder(sort))
+            .toList();
     long total = ordered.size();
     List<BenefitHistoryItemResponse> data =
         ordered.stream()
@@ -90,11 +94,23 @@ public class BenefitHistoryQueryService {
     if (!"BENEFIT_DESC".equals(sort)) {
       return latest;
     }
-    return Comparator.comparingLong(
-            (BenefitHistoryRow row) ->
-                Math.max(row.getBenefitAmount(), row.getMissedBenefitAmount()))
-        .reversed()
+    return Comparator.comparingInt(
+            (BenefitHistoryRow row) -> benefitUnitPriority(row.getBenefitUnit()))
+        .thenComparing(
+            Comparator.comparingLong(
+                    (BenefitHistoryRow row) ->
+                        Math.max(row.getBenefitAmount(), row.getMissedBenefitAmount()))
+                .reversed())
         .thenComparing(latest);
+  }
+
+  private int benefitUnitPriority(String unit) {
+    return switch (unit == null ? "" : unit) {
+      case "KRW" -> 0;
+      case "POINT" -> 1;
+      case "MILEAGE" -> 2;
+      default -> 3;
+    };
   }
 
   @Transactional(readOnly = true)

@@ -215,11 +215,11 @@ paths:
           schema: { type: string, format: uuid }
         - name: type
           in: query
-          description: 조회할 혜택 유형입니다. 지정하면 해당 혜택이 있는 내역만 반환하며, 일반 결제는 제외됩니다. 생략하면 일반 결제를 포함한 전체 내역을 반환합니다.
+          description: 승인별 대표 계산 결과를 선택한 후 적용할 혜택 유형 필터입니다. 대표 결과가 지정 유형인 내역만 반환하며, 생략하면 일반 결제를 포함한 전체 내역을 반환합니다.
           schema: { type: string, enum: [DISCOUNT, CASHBACK, POINT, MILEAGE] }
         - name: sort
           in: query
-          description: 정렬 기준입니다. LATEST는 최신 승인순, BENEFIT_DESC는 혜택 금액 내림차순입니다.
+          description: 정렬 기준입니다. LATEST는 최신 승인순입니다. BENEFIT_DESC는 서로 다른 보상 단위를 직접 비교하지 않고 KRW, POINT, MILEAGE, 단위 없음 순으로 묶은 뒤 같은 단위 안에서 적용값과 미적용 예상값 중 큰 값의 내림차순으로 정렬합니다.
           schema: { type: string, enum: [LATEST, BENEFIT_DESC], default: LATEST }
         - name: page
           in: query
@@ -2186,9 +2186,9 @@ components:
       type: object
       required: [usedAmount, limitAmount, remainingAmount]
       properties:
-        usedAmount: { type: integer, format: int64 , description: '현재까지 사용한 한도 금액입니다. 단위는 원입니다.'}
-        limitAmount: { type: integer, format: int64 , description: '적용 가능한 전체 한도 금액입니다. 단위는 원입니다.'}
-        remainingAmount: { type: integer, format: int64 , description: '아직 사용할 수 있는 잔여 한도 금액입니다. 단위는 원입니다.'}
+        usedAmount: { type: integer, format: int64 , description: '현재까지 사용한 월 한도입니다. 단위는 상세 응답의 benefitUnit과 같습니다.'}
+        limitAmount: { type: integer, format: int64 , description: '적용 가능한 전체 월 한도입니다. 단위는 상세 응답의 benefitUnit과 같습니다.'}
+        remainingAmount: { type: integer, format: int64 , description: '아직 사용할 수 있는 잔여 월 한도입니다. 단위는 상세 응답의 benefitUnit과 같습니다.'}
     BenefitSummaryReportApiResponse:
       description: 'BenefitSummaryReport API의 공통 성공 응답입니다.'
       type: object
