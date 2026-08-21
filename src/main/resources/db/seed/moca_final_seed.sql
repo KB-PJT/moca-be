@@ -29942,7 +29942,7 @@ INSERT INTO moca.card_content_versions
 (content_version_id, card_id, content_sha256, name, discontinued, main_benefits, image_url, first_seen_at, last_seen_at)
 SELECT UUID(), c.card_id, SHA2('HD_Z_WORK_ED2_V1', 256),
        '현대카드Z work Edition2', 0,
-       '카페 10%할인\n온라인 쇼핑 10%할인\n대중교통 10%할인\n편의점 10%할인\n도서 10%할인',
+       '편의점 10% 청구 할인(GS25·CU·세븐일레븐·이마트24, 1일 1회)\n커피전문점 10% 청구 할인(스타벅스·투썸플레이스·커피빈·폴바셋, 1일 1회)\n도서 10% 청구 할인(교보문고·YES24, 1일 1회)\n각 영역 전월 이용금액 50만원 이상 월 6천원, 100만원 이상 월 1만원\n백화점·할인점·쇼핑몰 입점 및 공동가맹점 제외\n도서 온라인은 공식 홈페이지·앱 결제만 적용',
        'https://d1c5n4ri2guedi.cloudfront.net/card/2680/card_img/39646/2680card.png',
        CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM moca.cards c
@@ -33746,6 +33746,17 @@ WHERE benefit.source_category_id=52
 -- 4) 가맹점 마스터 생성 뒤 명시 target 재조정
 --    첫 seed 실행에서도 Z work·무신사·SOL Plan target이 빠지지 않도록 한다.
 -- -----------------------------------------------------------------------------
+DELETE target
+FROM moca.benefit_rule_targets target
+JOIN moca.benefit_rules rule_data ON rule_data.rule_id=target.rule_id
+JOIN moca.benefit_offers offer ON offer.offer_id=rule_data.offer_id
+JOIN moca.card_benefits benefit ON benefit.benefit_id=offer.benefit_id
+JOIN moca.card_content_versions version ON version.content_version_id=benefit.content_version_id
+JOIN moca.cards card ON card.card_id=version.card_id
+WHERE card.gorilla_card_id='2680'
+  AND offer.offer_name IN ('편의점 10% 청구 할인', '커피전문점 10% 청구 할인')
+  AND target.target_type='merchant_category';
+
 CREATE TEMPORARY TABLE seed_appended_card_targets (
     gorilla_card_id VARCHAR(50) NOT NULL,
     offer_name VARCHAR(255) NOT NULL,
@@ -33759,8 +33770,14 @@ CREATE TEMPORARY TABLE seed_appended_card_targets (
 INSERT INTO seed_appended_card_targets
 (gorilla_card_id, offer_name, condition_group, match_mode, target_type, target_code, target_name)
 VALUES
-    ('2680', '편의점 10% 청구 할인', 1, 'include', 'merchant_category', 'CONVENIENCE_STORE', '편의점'),
-    ('2680', '커피전문점 10% 청구 할인', 1, 'include', 'merchant_category', 'CAFE', '커피전문점'),
+    ('2680', '편의점 10% 청구 할인', 1, 'include', 'merchant', 'GS25', 'GS25'),
+    ('2680', '편의점 10% 청구 할인', 2, 'include', 'merchant', 'CU', 'CU'),
+    ('2680', '편의점 10% 청구 할인', 3, 'include', 'merchant', '세븐일레븐', '세븐일레븐'),
+    ('2680', '편의점 10% 청구 할인', 4, 'include', 'merchant', '이마트24', '이마트24'),
+    ('2680', '커피전문점 10% 청구 할인', 1, 'include', 'merchant', '스타벅스', '스타벅스'),
+    ('2680', '커피전문점 10% 청구 할인', 2, 'include', 'merchant', '투썸플레이스', '투썸플레이스'),
+    ('2680', '커피전문점 10% 청구 할인', 3, 'include', 'merchant', '커피빈', '커피빈'),
+    ('2680', '커피전문점 10% 청구 할인', 4, 'include', 'merchant', '폴바셋', '폴바셋'),
     ('2680', '온라인 쇼핑 10% 청구 할인', 1, 'include', 'merchant', '네이버쇼핑', '네이버쇼핑'),
     ('2680', '온라인 쇼핑 10% 청구 할인', 2, 'include', 'merchant', '쿠팡', '쿠팡'),
     ('2680', '온라인 쇼핑 10% 청구 할인', 3, 'include', 'merchant', 'G마켓', 'G마켓'),
