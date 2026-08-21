@@ -12,7 +12,7 @@ public class OfflineMerchantBenefitValidator {
       Set.of("CU", "GS25", "세븐일레븐", "이마트24");
   private static final Set<String> CAFE_MERCHANTS =
       Set.of("스타벅스", "투썸플레이스", "커피빈", "폴바셋", "이디야", "메가MGC커피",
-          "컴포즈커피", "매머드커피", "빽다방");
+          "컴포즈커피", "매머드", "매머드커피", "빽다방");
   private static final Set<String> EXCLUDED_HOST_CATEGORIES =
       Set.of("DEPARTMENT_STORE", "LARGE_MART", "SHOPPING_MALL", "DUTY_FREE", "AIRPORT");
 

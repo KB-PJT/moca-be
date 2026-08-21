@@ -73,6 +73,106 @@ class BenefitUsageCalculationServiceTest {
   }
 
   @Test
+  @DisplayName("기간 일부만 동기화해도 영향을 받는 보유 카드의 월 전체 승인을 재계산한다")
+  void expandsPeriodRecalculationToWholeCardMonth() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 12, 3, 0);
+    when(mapper.findApprovalIdsForPeriod(eq("user-1"), any(), any()))
+        .thenReturn(List.of("approval-new"));
+    when(mapper.findApprovalsForCalculation(List.of("approval-new")))
+        .thenReturn(List.of(new BenefitApprovalRow(
+            "approval-new", "card-1", 10_000, approvedAt, null)));
+    when(mapper.findApprovedApprovalIdsForCardMonth("card-1", "2026-08"))
+        .thenReturn(List.of("approval-old", "approval-new"));
+    when(mapper.hasBenefitOfferForUserCard(
+        "card-1", "Deep Dream 모두드림 0.2%"))
+        .thenReturn(true);
+    when(mapper.findApprovalsForCalculation(List.of("approval-new", "approval-old")))
+        .thenReturn(List.of());
+
+    service.calculateAndPersistForPeriod(
+        "user-1", LocalDateTime.of(2026, 8, 12, 0, 0),
+        LocalDateTime.of(2026, 8, 13, 0, 0));
+
+    verify(mapper).deleteCalculationOutcomes(List.of("approval-new", "approval-old"));
+    verify(mapper).deleteBenefitUsages(List.of("approval-new", "approval-old"));
+    verify(mapper).findApprovalsForCalculation(List.of("approval-new", "approval-old"));
+  }
+
+  @Test
+  @DisplayName("Deep Dream 최다 영역은 기본 적립과 한도 내 추가 적립을 합산한다")
+  void appliesDeepDreamTopAreaAndRemainingExtraLimit() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    BenefitApprovalRow approval = new BenefitApprovalRow(
+        "approval-dream", "card-dream", 100_000, approvedAt, null, "merchant-cu", null, null);
+    SimpleBenefitRuleRow rule = new SimpleBenefitRuleRow(
+        "rule-dream", "offer-dream", "Deep Dream 모두드림 0.2%", "points", "point",
+        new BigDecimal("0.2"), null, null, null, "all_merchants", "ALL", 1,
+        "include", null, null, "SUPPORTED");
+    when(mapper.findApprovalsForCalculation(List.of("approval-dream")))
+        .thenReturn(List.of(approval));
+    when(mapper.hasBenefitOfferForUserCard(
+        "card-dream", "Deep Dream 모두드림 0.2%"))
+        .thenReturn(true);
+    when(mapper.findApprovedApprovalIdsForCardMonth("card-dream", "2026-08"))
+        .thenReturn(List.of("approval-dream"));
+    when(mapper.findBenefitAreaKeysForApproval("approval-dream", "DREAM"))
+        .thenReturn(List.of("RETAIL_STORE"));
+    when(mapper.findMonthlyBenefitAreaSpends("card-dream", "DREAM", "2026-08"))
+        .thenReturn(List.of(new com.moca.mocabe.domain.benefit.model.BenefitAreaSpendRow(
+            "DREAM", "RETAIL_STORE", "편의점·잡화", 2, new BigDecimal("100000"), 1)));
+    when(mapper.findPreviousMonthSpend("card-dream", "2026-07")).thenReturn(200_000);
+    when(mapper.findSimpleRulesForUserCard(eq("card-dream"), any())).thenReturn(List.of(rule));
+    when(mapper.findConfirmedDeepDreamExtraRewardForUpdate(eq("card-dream"), any(), any()))
+        .thenReturn(new BigDecimal("4500"));
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "approval-dream", "user-1", "card-dream", "merchant-cu", "A-DREAM", approvedAt,
+        "CU", 100_000, "{}")));
+
+    verify(mapper).insertConfirmedUsage(
+        any(), eq("card-dream"), eq("offer-dream"), eq("rule-dream"), eq(null),
+        eq("approval-dream"), any(), eq(new BigDecimal("100000")), eq(BigDecimal.ZERO),
+        eq(new BigDecimal("700")), eq("point"), eq(approvedAt));
+  }
+
+  @Test
+  @DisplayName("Deep Dream 비대상 가맹점은 모두드림 기본 0.2%만 적립한다")
+  void keepsDeepDreamBaseRewardOutsideDreamArea() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("approval-base")))
+        .thenReturn(List.of(new BenefitApprovalRow(
+            "approval-base", "card-dream", 100_000, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("card-dream", "2026-07")).thenReturn(200_000);
+    when(mapper.findSimpleRulesForUserCard(eq("card-dream"), any()))
+        .thenReturn(List.of(new SimpleBenefitRuleRow(
+            "rule-dream", "offer-dream", "Deep Dream 모두드림 0.2%", "points", "percent",
+            new BigDecimal("0.2"), null, null, null, "all_merchants", "ALL", 1,
+            "include", null, deepDreamDefinition(), "SUPPORTED")));
+    when(mapper.findBenefitAreaKeysForApproval("approval-base", "DREAM"))
+        .thenReturn(List.of());
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "approval-base", "user-1", "card-dream", null, "A-BASE", approvedAt,
+        "일반 가맹점", 100_000, "{}")));
+
+    verify(mapper).insertConfirmedUsage(
+        any(), eq("card-dream"), eq("offer-dream"), eq("rule-dream"), eq(null),
+        eq("approval-base"), any(), eq(new BigDecimal("100000")), eq(BigDecimal.ZERO),
+        eq(new BigDecimal("200")), eq("point"), eq(approvedAt));
+  }
+
+  @Test
+  @DisplayName("SimpleBenefitRuleRow 기존 matchMode 생성자는 offerName 없이 호환된다")
+  void keepsLegacySimpleRuleConstructor() {
+    SimpleBenefitRuleRow row = new SimpleBenefitRuleRow(
+        "rule", "offer", "points", "point", BigDecimal.ONE, null, null, null,
+        "all_merchants", "ALL", 1, "include");
+
+    assertEquals("include", row.matchMode());
+    org.junit.jupiter.api.Assertions.assertNull(row.offerName());
+  }
+
+  @Test
   void convertsPointMileageAndCashbackRulesAndKeepsZeroRewardOutcomesSilent() throws Exception {
     java.lang.reflect.Method benefitType =
         BenefitUsageCalculationService.class.getDeclaredMethod(
@@ -707,6 +807,14 @@ class BenefitUsageCalculationServiceTest {
           },
           "limits":[]
         }
+        """;
+  }
+
+  private String deepDreamDefinition() {
+    return """
+        {"schemaVersion":1,"conditions":{"all":[],"any":[],"none":[]},
+         "reward":{"benefitType":"POINT","rewardUnit":"POINT","calculation":"RATE",
+                   "rate":"0.002","value":"0","spendUnitAmount":"0"},"limits":[]}
         """;
   }
 }

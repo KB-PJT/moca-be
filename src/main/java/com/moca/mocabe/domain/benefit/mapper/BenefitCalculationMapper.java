@@ -4,6 +4,7 @@ import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
 import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.benefit.model.BenefitUsageCounts;
+import com.moca.mocabe.domain.benefit.model.BenefitAreaSpendRow;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +30,9 @@ public interface BenefitCalculationMapper {
   List<SimpleBenefitRuleRow> findSimpleRulesForUserCard(
       @Param("userCardId") String userCardId, @Param("usageDate") LocalDate usageDate);
 
+  boolean hasBenefitOfferForUserCard(
+      @Param("userCardId") String userCardId, @Param("offerName") String offerName);
+
   Integer findPreviousMonthSpend(
       @Param("userCardId") String userCardId, @Param("performanceMonth") String performanceMonth);
 
@@ -44,6 +48,35 @@ public interface BenefitCalculationMapper {
       @Param("usageDate") LocalDate usageDate,
       @Param("usageMonthStart") LocalDate usageMonthStart,
       @Param("nextMonthStart") LocalDate nextMonthStart);
+
+  List<BenefitAreaSpendRow> findMonthlyBenefitAreaSpends(
+      @Param("userCardId") String userCardId,
+      @Param("areaGroupKey") String areaGroupKey,
+      @Param("usageMonth") String usageMonth);
+
+  List<String> findBenefitAreaKeysForApproval(
+      @Param("approvalId") String approvalId, @Param("areaGroupKey") String areaGroupKey);
+
+  int insertBenefitAreaSpendEventIfAbsent(
+      @Param("approvalId") String approvalId,
+      @Param("userCardId") String userCardId,
+      @Param("areaGroupKey") String areaGroupKey,
+      @Param("areaKey") String areaKey,
+      @Param("usageMonth") String usageMonth,
+      @Param("amountKrw") BigDecimal amountKrw);
+
+  void upsertMonthlyBenefitAreaSpend(
+      @Param("userCardId") String userCardId,
+      @Param("areaGroupKey") String areaGroupKey,
+      @Param("areaKey") String areaKey,
+      @Param("usageMonth") String usageMonth,
+      @Param("amountKrw") BigDecimal amountKrw);
+
+  List<String> findApprovedApprovalIdsForCardMonth(
+      @Param("userCardId") String userCardId, @Param("usageMonth") String usageMonth);
+
+  void rebuildMonthlyBenefitAreaSpends(
+      @Param("userCardId") String userCardId, @Param("usageMonth") String usageMonth);
 
   List<BenefitLimitTierCandidate> findMonthlyRewardLimitCandidates(
       @Param("offerId") String offerId,
@@ -64,6 +97,12 @@ public interface BenefitCalculationMapper {
       @Param("usageDate") LocalDate usageDate,
       @Param("previousMonthSpend") BigDecimal previousMonthSpend,
       @Param("limitUnit") String limitUnit);
+
+  /** Deep Dream 모두드림을 제외한 당월 추가 적립 사용량을 잠금 조회한다. */
+  BigDecimal findConfirmedDeepDreamExtraRewardForUpdate(
+      @Param("userCardId") String userCardId,
+      @Param("usageMonthStart") LocalDate usageMonthStart,
+      @Param("nextMonthStart") LocalDate nextMonthStart);
 
   BigDecimal findConfirmedMonthlyRewardForOfferForUpdate(
       @Param("userCardId") String userCardId,
