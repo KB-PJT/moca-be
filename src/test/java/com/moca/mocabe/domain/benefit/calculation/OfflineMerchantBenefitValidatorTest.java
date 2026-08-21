@@ -32,6 +32,22 @@ class OfflineMerchantBenefitValidatorTest {
   }
 
   @Test
+  @DisplayName("공백과 소문자가 섞인 INCLUDE 가맹점 코드도 편의점으로 판정한다")
+  void normalizesIncludedMerchantCode() {
+    Set<BenefitRuleTarget> normalizedTarget = Set.of(
+        new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, " merchant ", " cu "));
+    assertFalse(validator.isEligible(normalizedTarget, context("LARGE_MART")));
+  }
+
+  @Test
+  @DisplayName("EXCLUDE 편의점 대상은 호스트 업종 검증을 발동하지 않는다")
+  void ignoresExcludedConvenienceMerchantTarget() {
+    Set<BenefitRuleTarget> excludedTarget = Set.of(
+        new BenefitRuleTarget(1, BenefitTargetMatchMode.EXCLUDE, "merchant", "CU"));
+    assertTrue(validator.isEligible(excludedTarget, context("DEPARTMENT_STORE")));
+  }
+
+  @Test
   @DisplayName("일치하지 않는 제외 대상만 있으면 혜택을 적용한다")
   void acceptsWhenExcludeTargetDoesNotMatch() {
     Set<BenefitRuleTarget> exclusions = Set.of(

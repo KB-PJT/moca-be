@@ -2,6 +2,7 @@ package com.moca.mocabe.domain.benefit.calculation;
 
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationContext;
 import com.moca.mocabe.domain.benefit.model.BenefitRuleTarget;
+import com.moca.mocabe.domain.benefit.type.BenefitTargetMatchMode;
 import java.util.Locale;
 import java.util.Set;
 
@@ -13,8 +14,9 @@ public class OfflineMerchantBenefitValidator {
 
   public boolean isEligible(Set<BenefitRuleTarget> targets, BenefitCalculationContext context) {
     boolean convenienceTarget = targets.stream()
-        .anyMatch(target -> "MERCHANT".equals(normalize(target.targetType()))
-            && CONVENIENCE_MERCHANTS.contains(target.targetCode()));
+        .anyMatch(target -> target.matchMode() == BenefitTargetMatchMode.INCLUDE
+            && "MERCHANT".equals(normalize(target.targetType()))
+            && CONVENIENCE_MERCHANTS.contains(normalize(target.targetCode())));
     if (!convenienceTarget) {
       return true;
     }

@@ -206,8 +206,6 @@
           AND p.limit_period = 'monthly'
           AND p.limit_type = 'reward_amount'
           AND p.limit_unit = #{limitUnit}
-          AND (p.applicable_months_json IS NULL
-               OR JSON_CONTAINS(p.applicable_months_json, CAST(MONTH(#{usageDate}) AS JSON), '$'))
           AND (p.valid_from IS NULL OR p.valid_from &lt;= #{usageDate})
           AND (p.valid_to IS NULL OR p.valid_to &gt;= #{usageDate})
         ORDER BY t.position

@@ -113,6 +113,7 @@ JOIN (
     UNION ALL SELECT 3, 15000, 800000
 ) tier ON 1 = 1
 WHERE offer.offer_name = '일상 생활비 포인트 적립'
+  AND policy.policy_name = '일상 생활비 일반월 한도'
   AND NOT EXISTS (
       SELECT 1 FROM benefit_limit_tiers existing
       WHERE existing.limit_policy_id = policy.limit_policy_id
