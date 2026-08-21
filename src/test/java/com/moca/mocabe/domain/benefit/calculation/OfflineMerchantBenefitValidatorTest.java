@@ -32,6 +32,23 @@ class OfflineMerchantBenefitValidatorTest {
   }
 
   @Test
+  @DisplayName("이마트24도 편의점 대상이며 할인점 입점 결제는 제외한다")
+  void recognizesEmart24AndRejectsLargeMartHost() {
+    Set<BenefitRuleTarget> emart24 = Set.of(
+        new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, "merchant", "이마트24"));
+    assertFalse(validator.isEligible(emart24, context("LARGE_MART")));
+  }
+
+  @Test
+  @DisplayName("카페 대상 브랜드는 쇼핑몰 입점 결제를 제외한다")
+  void rejectsCafeInsideShoppingMall() {
+    Set<BenefitRuleTarget> cafe = Set.of(
+        new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, "merchant", "스타벅스"));
+    assertFalse(validator.isEligible(cafe, context("SHOPPING_MALL")));
+    assertTrue(validator.isEligible(cafe, context("CAFE")));
+  }
+
+  @Test
   @DisplayName("공백과 소문자가 섞인 INCLUDE 가맹점 코드도 편의점으로 판정한다")
   void normalizesIncludedMerchantCode() {
     Set<BenefitRuleTarget> normalizedTarget = Set.of(
