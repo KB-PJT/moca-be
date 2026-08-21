@@ -34397,6 +34397,183 @@ DROP TEMPORARY TABLE seed_deep_dream_rules;
 -- All error queries below should return 0 rows.
 -- =================================================================================
 
+-- 노리2 체크카드(KB Pay) 오프라인 혜택 구조화
+INSERT INTO moca.merchant_categories
+    (merchant_category_id, parent_id, category_code, category_name, display_order, created_at, updated_at)
+SELECT UUID(), NULL, 'BEAUTY', '미용실', 0, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+WHERE NOT EXISTS (SELECT 1 FROM moca.merchant_categories WHERE category_code='BEAUTY');
+
+INSERT INTO moca.merchants
+    (merchant_id, merchant_category_id, name, normalized_name, status, has_physical_location, created_at, updated_at)
+SELECT UUID(), category.merchant_category_id, seed.merchant_name, seed.merchant_name, 'active', TRUE,
+       CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM (SELECT 'CAFE' category_code, '커피빈' merchant_name UNION ALL SELECT 'CAFE','폴바셋'
+      UNION ALL SELECT 'DRUGSTORE','올리브영' UNION ALL SELECT 'MOVIE','CGV'
+      UNION ALL SELECT 'THEME_PARK','에버랜드' UNION ALL SELECT 'THEME_PARK','롯데월드'
+      UNION ALL SELECT 'CONVENIENCE_STORE','GS25' UNION ALL SELECT 'CONVENIENCE_STORE','CU') seed
+JOIN moca.merchant_categories category ON category.category_code=seed.category_code
+WHERE NOT EXISTS (SELECT 1 FROM moca.merchants existing WHERE existing.normalized_name=seed.merchant_name);
+
+-- 부분 실행 후 재실행해도 같은 구조가 되도록 노리2 계산 구조만 재생성한다.
+DELETE tier
+FROM moca.benefit_limit_tiers tier
+JOIN moca.benefit_limit_policies policy ON policy.limit_policy_id=tier.limit_policy_id
+WHERE policy.shared_group_key='NORI2_MONTHLY_TOTAL';
+
+DELETE policy
+FROM moca.benefit_limit_policies policy
+WHERE policy.shared_group_key='NORI2_MONTHLY_TOTAL';
+
+DELETE target
+FROM moca.benefit_rule_targets target
+JOIN moca.benefit_rules rule_data ON rule_data.rule_id=target.rule_id
+JOIN moca.benefit_offers offer ON offer.offer_id=rule_data.offer_id
+WHERE offer.offer_name IN ('스타벅스·커피빈 10% 할인','올리브영·미용실 5% 할인',
+                           'GS25·CU 5% 할인','CGV 4,000원 할인','에버랜드·롯데월드 15,000원 할인');
+
+DELETE rule_data
+FROM moca.benefit_rules rule_data
+JOIN moca.benefit_offers offer ON offer.offer_id=rule_data.offer_id
+WHERE offer.offer_name IN ('스타벅스·커피빈 10% 할인','올리브영·미용실 5% 할인',
+                           'GS25·CU 5% 할인','CGV 4,000원 할인','에버랜드·롯데월드 15,000원 할인');
+
+DELETE offer
+FROM moca.benefit_offers offer
+JOIN moca.card_benefits benefit ON benefit.benefit_id=offer.benefit_id
+JOIN moca.card_content_versions version ON version.content_version_id=benefit.content_version_id
+JOIN moca.cards card ON card.card_id=version.card_id
+WHERE card.gorilla_card_id='2422'
+  AND offer.offer_name IN ('스타벅스·커피빈 10% 할인','올리브영·미용실 5% 할인',
+                           'GS25·CU 5% 할인','CGV 4,000원 할인','에버랜드·롯데월드 15,000원 할인');
+
+CREATE TEMPORARY TABLE seed_nori2_offline_benefits (
+    benefit_title VARCHAR(100) NOT NULL,
+    offer_name VARCHAR(150) NOT NULL,
+    reward_type VARCHAR(30) NOT NULL,
+    value_type VARCHAR(30) NOT NULL,
+    reward_value DECIMAL(12,4) NOT NULL,
+    reward_unit VARCHAR(20) NOT NULL,
+    previous_spend_min_krw DECIMAL(12,2) NULL,
+    transaction_min_krw DECIMAL(12,2) NULL,
+    monthly_limit_krw DECIMAL(12,2) NOT NULL,
+    monthly_usage_count INT NULL,
+    target_type VARCHAR(30) NOT NULL,
+    target_code VARCHAR(100) NOT NULL,
+    target_name VARCHAR(150) NOT NULL,
+    condition_group INT NOT NULL
+) ENGINE=InnoDB;
+
+INSERT INTO seed_nori2_offline_benefits VALUES
+('카페','스타벅스·커피빈 10% 할인','discount','percentage',10,'percent',NULL,NULL,3000,NULL,'merchant','스타벅스','스타벅스',1),
+('카페','스타벅스·커피빈 10% 할인','discount','percentage',10,'percent',NULL,NULL,3000,NULL,'merchant','커피빈','커피빈',2),
+('드럭스토어','올리브영·미용실 5% 할인','discount','percentage',5,'percent',200000,NULL,2000,NULL,'merchant','올리브영','올리브영',1),
+('드럭스토어','올리브영·미용실 5% 할인','discount','percentage',5,'percent',200000,NULL,2000,NULL,'merchant_category','DRUGSTORE','미용실',2),
+('편의점','GS25·CU 5% 할인','discount','percentage',5,'percent',200000,NULL,2000,NULL,'merchant','GS25','GS25',1),
+('편의점','GS25·CU 5% 할인','discount','percentage',5,'percent',200000,NULL,2000,NULL,'merchant','CU','CU',2),
+('영화','CGV 4,000원 할인','discount','fixed_amount',4000,'KRW',200000,10000,8000,2,'merchant','CGV','CGV',1),
+('테마파크','에버랜드·롯데월드 15,000원 할인','discount','fixed_amount',15000,'KRW',200000,30000,15000,1,'merchant','에버랜드','에버랜드',1),
+('테마파크','에버랜드·롯데월드 15,000원 할인','discount','fixed_amount',15000,'KRW',200000,30000,15000,1,'merchant','롯데월드','롯데월드',2);
+
+INSERT INTO moca.benefit_offers
+    (offer_id, benefit_id, offer_name, position, reward_type, value_type,
+     calculation_mode, calculation_basis, stacking_mode, valuation_scope, valuation_method)
+SELECT UUID(), benefit.benefit_id, seed.offer_name, 2, seed.reward_type, seed.value_type,
+       CASE seed.value_type WHEN 'fixed_amount' THEN 'single_tier' ELSE 'flat' END,
+       'transaction_amount', 'standalone', 'transaction', 'direct'
+FROM (SELECT DISTINCT benefit_title, offer_name, reward_type, value_type
+      FROM seed_nori2_offline_benefits) seed
+JOIN moca.cards card ON card.gorilla_card_id='2422'
+JOIN moca.card_content_versions version ON version.card_id=card.card_id
+JOIN moca.card_benefits benefit ON benefit.content_version_id=version.content_version_id
+  AND benefit.title=seed.benefit_title
+WHERE NOT EXISTS (
+    SELECT 1 FROM moca.benefit_offers existing
+    WHERE existing.benefit_id=benefit.benefit_id AND existing.offer_name=seed.offer_name
+);
+
+INSERT INTO moca.benefit_rules
+    (rule_id, offer_id, position, rule_effect, stacking_mode, reward_value, reward_unit,
+     previous_spend_min_krw, transaction_min_krw, rule_schema_version,
+     rule_support_status, rule_definition_json)
+SELECT UUID(), offer.offer_id, 1, 'grant', 'standalone', seed.reward_value, seed.reward_unit,
+       seed.previous_spend_min_krw, seed.transaction_min_krw, 1, 'SUPPORTED',
+       JSON_OBJECT(
+           'schemaVersion', 1,
+           'conditions', JSON_OBJECT('all', JSON_ARRAY(), 'any', JSON_ARRAY(), 'none', JSON_ARRAY()),
+           'reward', JSON_OBJECT(
+               'benefitType', 'DISCOUNT',
+               'rewardUnit', CASE WHEN seed.value_type='fixed_amount' THEN 'KRW' ELSE 'KRW' END,
+               'calculation', CASE WHEN seed.value_type='fixed_amount' THEN 'FIXED' ELSE 'RATE' END,
+               'rate', CASE WHEN seed.value_type='fixed_amount' THEN '0' ELSE CAST(seed.reward_value / 100 AS CHAR) END,
+               'value', CASE WHEN seed.value_type='fixed_amount' THEN CAST(seed.reward_value AS CHAR) ELSE '0' END,
+               'spendUnitAmount', '0'
+           ),
+           'limits', JSON_MERGE_PRESERVE(
+               JSON_ARRAY(),
+               CASE WHEN seed.monthly_usage_count IS NOT NULL
+                    THEN JSON_ARRAY(JSON_OBJECT('type', 'MONTHLY_USAGE_COUNT', 'value', CAST(seed.monthly_usage_count AS CHAR)))
+                    ELSE JSON_ARRAY() END
+           )
+       )
+FROM (SELECT DISTINCT benefit_title, offer_name, reward_type, value_type, reward_value,
+             reward_unit, previous_spend_min_krw, transaction_min_krw, monthly_usage_count
+      FROM seed_nori2_offline_benefits) seed
+JOIN moca.cards card ON card.gorilla_card_id='2422'
+JOIN moca.card_content_versions version ON version.card_id=card.card_id
+JOIN moca.card_benefits benefit ON benefit.content_version_id=version.content_version_id
+  AND benefit.title=seed.benefit_title
+JOIN moca.benefit_offers offer ON offer.benefit_id=benefit.benefit_id AND offer.offer_name=seed.offer_name
+WHERE NOT EXISTS (SELECT 1 FROM moca.benefit_rules existing WHERE existing.offer_id=offer.offer_id);
+
+INSERT INTO moca.benefit_rule_targets
+    (target_id, rule_id, condition_group, match_mode, target_type,
+     merchant_category_id, merchant_id, target_code, target_name,
+     target_source, target_authority, minimum_place_confidence, created_at, updated_at)
+SELECT UUID(), rule_data.rule_id, seed.condition_group, 'include', seed.target_type,
+       category.merchant_category_id, merchant.merchant_id, seed.target_code, seed.target_name,
+       'CARD_BENEFIT_EXPLICIT', CASE seed.target_type WHEN 'merchant' THEN 'MERCHANT_EXACT' ELSE 'ISSUER_CATEGORY' END,
+       0.990, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM seed_nori2_offline_benefits seed
+JOIN moca.cards card ON card.gorilla_card_id='2422'
+JOIN moca.card_content_versions version ON version.card_id=card.card_id
+JOIN moca.card_benefits benefit ON benefit.content_version_id=version.content_version_id AND benefit.title=seed.benefit_title
+JOIN moca.benefit_offers offer ON offer.benefit_id=benefit.benefit_id AND offer.offer_name=seed.offer_name
+JOIN moca.benefit_rules rule_data ON rule_data.offer_id=offer.offer_id
+LEFT JOIN moca.merchant_categories category ON seed.target_type='merchant_category' AND category.category_code=seed.target_code
+LEFT JOIN moca.merchants merchant ON seed.target_type='merchant' AND merchant.normalized_name=seed.target_code
+WHERE NOT EXISTS (
+    SELECT 1 FROM moca.benefit_rule_targets existing
+    WHERE existing.rule_id=rule_data.rule_id AND existing.target_type=seed.target_type
+      AND existing.target_code=seed.target_code
+)
+  AND ((seed.target_type='merchant' AND merchant.merchant_id IS NOT NULL)
+       OR (seed.target_type='merchant_category' AND category.merchant_category_id IS NOT NULL));
+
+INSERT INTO moca.benefit_limit_policies
+    (limit_policy_id, offer_id, policy_name, limit_period, limit_type, limit_unit, shared_group_key)
+SELECT UUID(), offer.offer_id, '노리2 월간 통합할인한도', 'monthly', 'reward_amount', 'KRW', 'NORI2_MONTHLY_TOTAL'
+FROM moca.benefit_offers offer
+JOIN moca.card_benefits benefit ON benefit.benefit_id=offer.benefit_id
+JOIN moca.card_content_versions version ON version.content_version_id=benefit.content_version_id
+JOIN moca.cards card ON card.card_id=version.card_id
+WHERE card.gorilla_card_id='2422'
+  AND offer.offer_name IN ('스타벅스·커피빈 10% 할인','올리브영·미용실 5% 할인','GS25·CU 5% 할인','CGV 4,000원 할인','에버랜드·롯데월드 15,000원 할인')
+  AND NOT EXISTS (SELECT 1 FROM moca.benefit_limit_policies existing WHERE existing.offer_id=offer.offer_id AND existing.shared_group_key='NORI2_MONTHLY_TOTAL');
+
+INSERT INTO moca.benefit_limit_tiers
+    (limit_tier_id, limit_policy_id, position, limit_value, previous_spend_min_krw)
+SELECT UUID(), policy.limit_policy_id, tiers.position, tiers.limit_value, tiers.previous_spend_min_krw
+FROM moca.benefit_limit_policies policy
+JOIN moca.benefit_offers offer ON offer.offer_id=policy.offer_id
+JOIN moca.card_benefits benefit ON benefit.benefit_id=offer.benefit_id
+JOIN moca.card_content_versions version ON version.content_version_id=benefit.content_version_id
+JOIN moca.cards card ON card.card_id=version.card_id
+CROSS JOIN (SELECT 1 position,20000 limit_value,200000 previous_spend_min_krw UNION ALL SELECT 2,30000,400000 UNION ALL SELECT 3,40000,600000 UNION ALL SELECT 4,50000,800000) tiers
+WHERE card.gorilla_card_id='2422' AND policy.shared_group_key='NORI2_MONTHLY_TOTAL'
+  AND NOT EXISTS (SELECT 1 FROM moca.benefit_limit_tiers existing WHERE existing.limit_policy_id=policy.limit_policy_id AND existing.position=tiers.position);
+
+DROP TEMPORARY TABLE seed_nori2_offline_benefits;
+
 -- issuer canonical configuration checks
 SELECT 'ISSUER_CONFIG_MISMATCH' AS error_type, i.issuer_id, i.issuer_name
 FROM issuers i
@@ -34551,6 +34728,29 @@ SET rule_data.rule_schema_version = 1,
     )
 WHERE card.gorilla_card_id = '733'
   AND offer.offer_name = '무신사/솔드아웃 5% 할인';
+
+-- 노리2 체크카드의 온라인·자동이체 혜택은 카드 설명에는 표시하되,
+-- 현재 오프라인 승인 기반 계산 범위에서는 정보 전용으로 유지한다.
+UPDATE moca.benefit_rules rule_data
+JOIN moca.benefit_offers offer ON offer.offer_id = rule_data.offer_id
+JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+JOIN moca.card_content_versions version ON version.content_version_id = benefit.content_version_id
+JOIN moca.cards card ON card.card_id = version.card_id
+SET rule_data.rule_schema_version = 1,
+    rule_data.rule_support_status = 'INFORMATION_ONLY',
+    rule_data.rule_definition_json = JSON_OBJECT(
+        'schemaVersion', 1,
+        'mode', 'INFORMATION_ONLY',
+        'reason', 'ONLINE_OR_AUTOPAY_CALCULATION_OUT_OF_SCOPE'
+    )
+WHERE card.gorilla_card_id = '2422'
+  AND offer.offer_name IN (
+      '구글플레이스토어·앱스토어 10% 할인',
+      '인터파크 티켓 10% 할인',
+      '넷플릭스·유튜브 프리미엄 1,000원 할인',
+      '배달의민족·요기요 1,000원 할인',
+      '통신요금 2,500원 할인'
+  );
 
 UPDATE moca.benefit_rules rule_data
 JOIN moca.benefit_offers offer ON offer.offer_id = rule_data.offer_id

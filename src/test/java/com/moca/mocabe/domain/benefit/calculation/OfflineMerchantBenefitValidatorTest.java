@@ -69,6 +69,15 @@ class OfflineMerchantBenefitValidatorTest {
   }
 
   @Test
+  @DisplayName("철도역사와 호텔 입점 가맹점은 혜택 대상에서 제외한다")
+  void rejectsRailwayStationAndHotelHosts() {
+    Set<BenefitRuleTarget> cafe = Set.of(
+        new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, "merchant", "커피빈"));
+    assertFalse(validator.isEligible(cafe, context("RAILWAY_STATION")));
+    assertFalse(validator.isEligible(cafe, context("HOTEL")));
+  }
+
+  @Test
   @DisplayName("공백과 소문자가 섞인 INCLUDE 가맹점 코드도 편의점으로 판정한다")
   void normalizesIncludedMerchantCode() {
     Set<BenefitRuleTarget> normalizedTarget = Set.of(
