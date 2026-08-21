@@ -83,6 +83,8 @@ class BenefitReportSeedIntegrationTest {
         new BenefitUsageCalculationService(calculationMapper)
             .calculateAndPersist(insertSolPlanScopeApprovals(jdbc, cards.get(2)));
         new BenefitUsageCalculationService(calculationMapper)
+            .calculateAndPersist(insertMusinsaDiscountApprovals(jdbc, cards.get(3)));
+        new BenefitUsageCalculationService(calculationMapper)
             .calculateAndPersist(insertAdditionalPointPlanBrandApprovals(jdbc, cards.get(4)));
         ApprovalInsert performanceNotMet = insertPointPlanPerformanceNotMetApproval(jdbc, cards.get(4));
         new BenefitUsageCalculationService(calculationMapper)
@@ -108,6 +110,7 @@ class BenefitReportSeedIntegrationTest {
             .anyMatch(item -> "NOT_APPLIED".equals(item.getCalculationStatus())));
         assertPointPlanCheckCalculationAndReport(jdbc, report, cards.get(4));
         assertSolPlanCalculationScope(jdbc, cards.get(2));
+        assertMusinsaMerchantDiscount(jdbc, cards.get(3));
       }
     }
   }
@@ -231,9 +234,24 @@ class BenefitReportSeedIntegrationTest {
       String approvalId = String.format("26000000-0000-4000-8000-%012d", index + 1);
       LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 20 + index, 3, 0);
       insertApproval(jdbc, approvalId, card, approvedAt, amounts.get(index), merchantId(jdbc, merchant));
-      approvals.add(new ApprovalInsert(
-          approvalId, USER_ID, card.userCardId(), null, "AUG-SOL-" + index,
-          approvedAt, merchant, amounts.get(index), "{}"));
+      approvals.add(new ApprovalInsert(approvalId, USER_ID, card.userCardId(), null,
+          "AUG-SOL-" + index, approvedAt, merchant, amounts.get(index), "{}"));
+    }
+    return approvals;
+  }
+
+  private List<ApprovalInsert> insertMusinsaDiscountApprovals(
+      JdbcTemplate jdbc, SeedCard card) {
+    List<String> merchants = List.of("무신사", "솔드아웃", "무신사");
+    List<Integer> amounts = List.of(500_000, 200_000, 100_000);
+    List<ApprovalInsert> approvals = new ArrayList<>();
+    for (int index = 0; index < merchants.size(); index++) {
+      String merchant = merchants.get(index);
+      String approvalId = String.format("27000000-0000-4000-8000-%012d", index + 1);
+      LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 21 + index, 3, 0);
+      insertApproval(jdbc, approvalId, card, approvedAt, amounts.get(index), merchantId(jdbc, merchant));
+      approvals.add(new ApprovalInsert(approvalId, USER_ID, card.userCardId(), null,
+          "AUG-MUSINSA-" + index, approvedAt, merchant, amounts.get(index), "{}"));
     }
     return approvals;
   }
@@ -267,6 +285,23 @@ class BenefitReportSeedIntegrationTest {
         + "WHERE outcome.user_card_id=? "
         + "AND merchant.normalized_name IN ('쿠팡','넷플릭스') "
         + "AND outcome.rejection_reason='CALCULATION_UNSUPPORTED'", card.userCardId()));
+  }
+
+  private void assertMusinsaMerchantDiscount(JdbcTemplate jdbc, SeedCard card) {
+    assertEquals(2, count(jdbc, "SELECT COUNT(*) FROM user_benefit_usages usage_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=usage_data.offer_id "
+        + "WHERE usage_data.user_card_id=? "
+        + "AND offer.offer_name='무신사/솔드아웃 5% 할인'", card.userCardId()));
+    assertEquals(30_000, count(jdbc, "SELECT COALESCE(SUM(usage_data.reward_amount_krw),0) "
+        + "FROM user_benefit_usages usage_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=usage_data.offer_id "
+        + "WHERE usage_data.user_card_id=? "
+        + "AND offer.offer_name='무신사/솔드아웃 5% 할인'", card.userCardId()));
+    assertEquals(1, count(jdbc, "SELECT COUNT(*) FROM user_benefit_calculation_outcomes outcome "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=outcome.offer_id "
+        + "WHERE outcome.user_card_id=? "
+        + "AND offer.offer_name='무신사/솔드아웃 5% 할인' "
+        + "AND outcome.rejection_reason='MONTHLY_LIMIT_EXHAUSTED'", card.userCardId()));
   }
 
   private void assertPointPlanCheckCalculationAndReport(
