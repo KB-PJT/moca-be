@@ -162,6 +162,24 @@
         )
     </select>
 
+    <select id="findApprovalMerchantNormalizedName" resultType="string">
+        SELECT merchant.normalized_name
+        FROM card_payment_approvals approval
+        INNER JOIN merchants merchant ON merchant.merchant_id = approval.merchant_id
+        WHERE approval.approval_id = #{approvalId}
+    </select>
+
+    <select id="findConfirmedMonthlyEligibleSpendForUpdate" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(eligible_amount_krw), 0)
+        FROM user_benefit_usages
+        WHERE user_card_id = #{userCardId}
+          AND offer_id = #{offerId}
+          AND usage_status = 'confirmed'
+          AND usage_date &gt;= #{usageMonthStart}
+          AND usage_date &lt; #{nextMonthStart}
+        FOR UPDATE
+    </select>
+
     <resultMap id="benefitUsageCounts"
                type="com.moca.mocabe.domain.benefit.model.BenefitUsageCounts">
         <constructor>

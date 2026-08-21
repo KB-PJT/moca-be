@@ -42,6 +42,13 @@ import org.springframework.transaction.annotation.Transactional;
  * 확인할 수 없는 조건은 적용으로 추정하지 않는다.
  */
 public class BenefitUsageCalculationService {
+  private static final String SOL_BASIC_OFFER = "국내/외 전가맹점 기본 적립";
+  private static final String SOL_SPECIAL_OFFER = "특별 적립 (주유/쇼핑/배달)";
+  private static final BigDecimal SOL_FUEL_MONTHLY_SPEND_LIMIT = new BigDecimal("300000");
+  private static final Set<String> SOL_UNSUPPORTED_MERCHANTS = Set.of(
+      "쿠팡", "SSG.COM", "무신사", "29CM", "땡겨요", "배달의민족", "요기요", "쿠팡이츠",
+      "넷플릭스", "유튜브 프리미엄", "티빙", "디즈니플러스", "네이버플러스 멤버십",
+      "쿠팡 와우 멤버십");
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final DateTimeFormatter YEAR_MONTH = DateTimeFormatter.ofPattern("uuuu-MM");
   private final BenefitCalculationMapper mapper;
@@ -158,6 +165,7 @@ public class BenefitUsageCalculationService {
         mapper.findCurrentMonthSpend(
             approval.userCardId(), YearMonth.from(usageDate).format(YEAR_MONTH));
     BigDecimal currentMonthSpend = BigDecimal.valueOf(valueOrZero(currentMonthSpendSnapshot));
+    String merchantName = mapper.findApprovalMerchantNormalizedName(approval.approvalId());
     Map<String, List<SimpleBenefitRuleRow>> rowsByRule = new LinkedHashMap<>();
     for (SimpleBenefitRuleRow row :
         mapper.findSimpleRulesForUserCard(approval.userCardId(), usageDate)) {
@@ -219,14 +227,58 @@ public class BenefitUsageCalculationService {
       if (tierSelection.status() == BenefitLimitTierSelection.Status.PERFORMANCE_NOT_MET) {
         result = performanceNotMet(result);
       }
+      BigDecimal eligibleAmount = BigDecimal.valueOf(approval.amount());
+      if (SOL_SPECIAL_OFFER.equals(first.offerName()) && result.applicable()) {
+        BigDecimal usedEligibleSpend = zero(mapper.findConfirmedMonthlyEligibleSpendForUpdate(
+            approval.userCardId(), first.offerId(), usageMonthStart,
+            usageMonthStart.plusMonths(1)));
+        eligibleAmount = SOL_FUEL_MONTHLY_SPEND_LIMIT.subtract(usedEligibleSpend)
+            .max(BigDecimal.ZERO).min(eligibleAmount);
+        result = calculateSolFuelReward(
+            first, previousMonthSpend, eligibleAmount, monthlyLimit, usedMonthlyValue);
+      }
+      result = unsupportedSolSpecialMerchant(first, merchantName, result);
       result = capMonthlyOfferReward(
           approval, usageDate, usageMonthStart, previousMonthSpend, first, result);
       result = applyDeepDreamAreaRate(approval, usageDate, first, previousMonthSpend, result);
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
-        persist(approval, usageDate, first, monthlyLimit, result);
+        persist(approval, usageDate, first, monthlyLimit, eligibleAmount, result);
       }
     }
+  }
+
+  private BenefitCalculationResult calculateSolFuelReward(
+      SimpleBenefitRuleRow rule,
+      BigDecimal previousMonthSpend,
+      BigDecimal eligibleAmount,
+      MonthlyBenefitLimit monthlyLimit,
+      BigDecimal usedMonthlyValue) {
+    BigDecimal rate = previousMonthSpend.compareTo(new BigDecimal("1000000")) >= 0
+        ? new BigDecimal("0.05") : new BigDecimal("0.025");
+    BigDecimal raw = eligibleAmount.multiply(rate).setScale(0, java.math.RoundingMode.FLOOR);
+    BigDecimal remainingReward = monthlyLimit == null
+        ? raw : monthlyLimit.limitValue().subtract(zero(usedMonthlyValue)).max(BigDecimal.ZERO);
+    BigDecimal applied = raw.min(remainingReward);
+    boolean applicable = eligibleAmount.signum() > 0 && applied.signum() > 0;
+    return new BenefitCalculationResult(
+        rule.ruleId(), BenefitType.POINT, RewardUnit.POINT, applicable, raw, applied,
+        remainingReward.subtract(applied).max(BigDecimal.ZERO),
+        applicable
+            ? com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.NONE
+            : com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.MONTHLY_LIMIT_EXHAUSTED);
+  }
+
+  private BenefitCalculationResult unsupportedSolSpecialMerchant(
+      SimpleBenefitRuleRow rule, String merchantName, BenefitCalculationResult result) {
+    if ((!SOL_BASIC_OFFER.equals(rule.offerName()) && !SOL_SPECIAL_OFFER.equals(rule.offerName()))
+        || merchantName == null || !SOL_UNSUPPORTED_MERCHANTS.contains(merchantName)) {
+      return result;
+    }
+    return new BenefitCalculationResult(
+        result.ruleId(), BenefitType.POINT, RewardUnit.POINT, false,
+        BigDecimal.ZERO, BigDecimal.ZERO, result.remainingLimitValue(),
+        com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.CALCULATION_UNSUPPORTED);
   }
 
   private BenefitCalculationResult capMonthlyOfferReward(
@@ -438,6 +490,7 @@ public class BenefitUsageCalculationService {
       LocalDate usageDate,
       SimpleBenefitRuleRow rule,
       MonthlyBenefitLimit monthlyLimit,
+      BigDecimal eligibleAmount,
       BenefitCalculationResult result) {
     boolean monetary = result.rewardUnit() == RewardUnit.KRW;
     mapper.insertConfirmedUsage(
@@ -448,7 +501,7 @@ public class BenefitUsageCalculationService {
         monthlyLimit == null ? null : monthlyLimit.limitPolicyId(),
         approval.approvalId(),
         usageDate,
-        BigDecimal.valueOf(approval.amount()),
+        eligibleAmount,
         monetary ? result.appliedRewardValue() : BigDecimal.ZERO,
         monetary ? null : result.appliedRewardValue(),
         monetary ? null : result.rewardUnit().name().toLowerCase(Locale.ROOT),
