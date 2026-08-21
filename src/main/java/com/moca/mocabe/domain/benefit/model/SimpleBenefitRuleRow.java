@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 public record SimpleBenefitRuleRow(
     String ruleId,
     String offerId,
+    String offerName,
     String rewardType,
     String rewardUnit,
     BigDecimal rewardValue,
@@ -34,7 +35,7 @@ public record SimpleBenefitRuleRow(
       int conditionGroup,
       String matchMode) {
     this(
-        ruleId, offerId, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
+        ruleId, offerId, null, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
         previousSpendMinKrw, transactionMinKrw, targetType, targetCode, conditionGroup,
         matchMode, null, null, "LEGACY");
   }
@@ -43,8 +44,19 @@ public record SimpleBenefitRuleRow(
                               BigDecimal rewardValue, BigDecimal rewardBasisAmount,
                               BigDecimal previousSpendMinKrw, BigDecimal transactionMinKrw,
                               String targetType, String targetCode, int conditionGroup) {
-    this(ruleId, offerId, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
+    this(ruleId, offerId, null, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
         previousSpendMinKrw, transactionMinKrw, targetType, targetCode, conditionGroup, "include",
         null, null, "LEGACY");
+  }
+
+  public SimpleBenefitRuleRow(
+      String ruleId, String offerId, String rewardType, String rewardUnit,
+      BigDecimal rewardValue, BigDecimal rewardBasisAmount, BigDecimal previousSpendMinKrw,
+      BigDecimal transactionMinKrw, String targetType, String targetCode, int conditionGroup,
+      String matchMode, BigDecimal transactionMaxKrw, String ruleDefinitionJson,
+      String ruleSupportStatus) {
+    this(ruleId, offerId, null, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
+        previousSpendMinKrw, transactionMinKrw, targetType, targetCode, conditionGroup,
+        matchMode, transactionMaxKrw, ruleDefinitionJson, ruleSupportStatus);
   }
 }

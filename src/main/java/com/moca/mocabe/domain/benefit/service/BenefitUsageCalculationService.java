@@ -176,11 +176,39 @@ public class BenefitUsageCalculationService {
       if (tierSelection.status() == BenefitLimitTierSelection.Status.PERFORMANCE_NOT_MET) {
         result = performanceNotMet(result);
       }
+      result = capMonthlyOfferReward(
+          approval, usageDate, usageMonthStart, previousMonthSpend, first, result);
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
         persist(approval, usageDate, first, monthlyLimit, result);
       }
     }
+  }
+
+  private BenefitCalculationResult capMonthlyOfferReward(
+      BenefitApprovalRow approval,
+      LocalDate usageDate,
+      LocalDate usageMonthStart,
+      BigDecimal previousMonthSpend,
+      SimpleBenefitRuleRow rule,
+      BenefitCalculationResult result) {
+    BigDecimal offerLimit = mapper.findMonthlyOfferRewardLimit(
+        rule.offerId(), usageDate, previousMonthSpend, limitUnitFor(rule));
+    if (offerLimit == null || !result.applicable()) {
+      return result;
+    }
+    BigDecimal used = zero(mapper.findConfirmedMonthlyRewardForOfferForUpdate(
+        approval.userCardId(), rule.offerId(), usageMonthStart, usageMonthStart.plusMonths(1)));
+    BigDecimal remaining = offerLimit.subtract(used).max(BigDecimal.ZERO);
+    BigDecimal applied = result.appliedRewardValue().min(remaining);
+    boolean applicable = applied.signum() > 0;
+    return new BenefitCalculationResult(
+        result.ruleId(), result.benefitType(), result.rewardUnit(), applicable,
+        result.rawRewardValue(), applied,
+        result.remainingLimitValue().min(remaining.subtract(applied).max(BigDecimal.ZERO)),
+        applicable
+            ? result.rejectionReason()
+            : com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.MONTHLY_LIMIT_EXHAUSTED);
   }
 
   private BenefitCalculationResult performanceNotMet(BenefitCalculationResult calculated) {

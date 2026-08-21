@@ -44,6 +44,7 @@ class MocaFinalSeedIntegrationTest {
       assertSupportedRulesHaveIncludeTarget(jdbc);
       assertZWorkMapBenefitTargets(jdbc);
       assertSolPlanAllMerchantTargets(jdbc);
+      assertShinhanNarasarangStructure(jdbc);
       assertFlatMerchantTaxonomy(jdbc);
       assertRequiredMerchantMasters(jdbc);
       assertNhPointCardTargets(jdbc);
@@ -80,6 +81,7 @@ class MocaFinalSeedIntegrationTest {
       assertMapVisibilityFlags(jdbc);
       assertMerchantPhysicalLocationFlags(jdbc);
       assertRepresentativeRewardTargets(jdbc);
+      assertShinhanNarasarangStructure(jdbc);
       assertFlatMerchantTaxonomy(jdbc);
       assertRequiredMerchantMasters(jdbc);
       assertNhPointCardTargets(jdbc);
@@ -345,6 +347,50 @@ class MocaFinalSeedIntegrationTest {
         + "WHERE card.gorilla_card_id='2899' "
         + "AND offer.offer_name='국내/외 전가맹점 기본 적립' "
         + "AND target.match_mode='include' AND target.target_type='all_merchants'"));
+  }
+
+  private void assertShinhanNarasarangStructure(JdbcTemplate jdbc) {
+    assertEquals(5, count(jdbc, "SELECT COUNT(*) FROM benefit_offers "
+        + "WHERE benefit_id='d2f751e7-87db-5c87-80da-3566a3f87686'"));
+    assertEquals(4, count(jdbc, "SELECT COUNT(*) FROM benefit_rules rule_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+        + "WHERE offer.benefit_id='d2f751e7-87db-5c87-80da-3566a3f87686' "
+        + "AND rule_data.rule_support_status='SUPPORTED'"));
+    assertEquals(1, count(jdbc, "SELECT COUNT(*) FROM benefit_rules rule_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+        + "WHERE offer.benefit_id='d2f751e7-87db-5c87-80da-3566a3f87686' "
+        + "AND offer.offer_name='카카오T 택시 10% 캐시백' "
+        + "AND rule_data.rule_support_status='INFORMATION_ONLY'"));
+    assertEquals(3, count(jdbc, "SELECT COUNT(*) FROM benefit_rules rule_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+        + "WHERE offer.benefit_id='a199918c-17f4-5bd5-a366-2c8c4171f946' "
+        + "AND rule_data.rule_support_status='INFORMATION_ONLY'"));
+    assertEquals(25, count(jdbc, "SELECT COUNT(*) FROM benefit_limit_tiers tier "
+        + "INNER JOIN benefit_limit_policies policy "
+        + "ON policy.limit_policy_id=tier.limit_policy_id "
+        + "WHERE policy.shared_group_key='SHINHAN_NARASARANG_LIFE'"));
+    assertEquals(5, count(jdbc, "SELECT COUNT(*) FROM benefit_offers offer "
+        + "WHERE offer.benefit_id='d2f751e7-87db-5c87-80da-3566a3f87686' "
+        + "AND offer.offer_name IN ('대중교통 20% 캐시백','광역교통 10% 캐시백',"
+        + "'카카오T 택시 10% 캐시백','편의점 20% 캐시백','주요 커피 브랜드 5% 캐시백')"));
+    assertEquals(5, count(jdbc, "SELECT COUNT(*) FROM benefit_limit_policies policy "
+        + "INNER JOIN benefit_limit_tiers tier "
+        + "ON tier.limit_policy_id=policy.limit_policy_id "
+        + "WHERE policy.limit_type='reward_amount' "
+        + "AND policy.shared_group_key=CONCAT('OFFER:', policy.offer_id) "
+        + "AND ((policy.offer_id='29330000-0000-4000-8000-000000000001' "
+        + "AND tier.limit_value=5000) "
+        + "OR (policy.offer_id='29330000-0000-4000-8000-000000000002' "
+        + "AND tier.limit_value=3000) "
+        + "OR (policy.offer_id='29330000-0000-4000-8000-000000000003' "
+        + "AND tier.limit_value=2000) "
+        + "OR (policy.offer_id='29330000-0000-4000-8000-000000000004' "
+        + "AND tier.limit_value=5000) "
+        + "OR (policy.offer_id='29330000-0000-4000-8000-000000000005' "
+        + "AND tier.limit_value=6000))"));
+    assertEquals(7, count(jdbc, "SELECT COUNT(*) FROM benefit_rule_targets target "
+        + "WHERE target.rule_id='29330000-0000-4000-8000-000000000105' "
+        + "AND target.match_mode='include' AND target.target_type='merchant'"));
   }
 
   private void assertFlatMerchantTaxonomy(JdbcTemplate jdbc) {

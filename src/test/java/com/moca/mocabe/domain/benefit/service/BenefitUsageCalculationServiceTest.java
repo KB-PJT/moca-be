@@ -582,6 +582,76 @@ class BenefitUsageCalculationServiceTest {
             eq("TARGET_NOT_MATCHED"));
   }
 
+  @Test
+  @DisplayName("나라사랑 편의점 캐시백은 혜택별 월 잔여 한도까지만 적용한다")
+  void capsNarasarangConvenienceCashbackByOfferLimit() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("narasarang-approval")))
+        .thenReturn(List.of(new BenefitApprovalRow(
+            "narasarang-approval", "narasarang-card", 10_000, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("narasarang-card", "2026-07")).thenReturn(200_000);
+    when(mapper.findSimpleRulesForUserCard(eq("narasarang-card"), any()))
+        .thenReturn(List.of(narasarangConvenienceRule()));
+    when(mapper.findMonthlyOfferRewardLimit(
+        eq("narasarang-offer"), any(), eq(new BigDecimal("200000")), eq("KRW")))
+        .thenReturn(new BigDecimal("5000"));
+    when(mapper.findConfirmedMonthlyRewardForOfferForUpdate(
+        eq("narasarang-card"), eq("narasarang-offer"), any(), any()))
+        .thenReturn(new BigDecimal("4500"));
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "narasarang-approval", "user-1", "narasarang-card", null, "A-1", approvedAt,
+        "CU", 10_000, "{}")));
+
+    verify(mapper).insertConfirmedUsage(
+        any(), eq("narasarang-card"), eq("narasarang-offer"),
+        eq("narasarang-rule"), eq(null), eq("narasarang-approval"), any(),
+        eq(new BigDecimal("10000")), eq(new BigDecimal("500")), eq(null), eq(null),
+        eq(approvedAt));
+  }
+
+  @Test
+  @DisplayName("나라사랑 편의점 월 캐시백 한도가 소진되면 미적용 결과를 저장한다")
+  void rejectsNarasarangConvenienceCashbackWhenOfferLimitIsExhausted() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    when(mapper.findApprovalsForCalculation(List.of("narasarang-exhausted")))
+        .thenReturn(List.of(new BenefitApprovalRow(
+            "narasarang-exhausted", "narasarang-card", 10_000, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("narasarang-card", "2026-07")).thenReturn(200_000);
+    when(mapper.findSimpleRulesForUserCard(eq("narasarang-card"), any()))
+        .thenReturn(List.of(narasarangConvenienceRule()));
+    when(mapper.findMonthlyOfferRewardLimit(
+        eq("narasarang-offer"), any(), eq(new BigDecimal("200000")), eq("KRW")))
+        .thenReturn(new BigDecimal("5000"));
+    when(mapper.findConfirmedMonthlyRewardForOfferForUpdate(
+        eq("narasarang-card"), eq("narasarang-offer"), any(), any()))
+        .thenReturn(new BigDecimal("5000"));
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "narasarang-exhausted", "user-1", "narasarang-card", null, "A-2", approvedAt,
+        "CU", 10_000, "{}")));
+
+    verify(mapper, never()).insertConfirmedUsage(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    verify(mapper).insertCalculationOutcome(
+        any(), eq("narasarang-card"), eq("narasarang-exhausted"),
+        eq("narasarang-offer"), eq("narasarang-rule"), eq(null), any(), eq("KRW"),
+        eq(new BigDecimal("2000")), eq(BigDecimal.ZERO), eq(new BigDecimal("2000")),
+        eq("not_applied"), eq("MONTHLY_LIMIT_EXHAUSTED"));
+  }
+
+  private SimpleBenefitRuleRow narasarangConvenienceRule() {
+    return new SimpleBenefitRuleRow(
+        "narasarang-rule", "narasarang-offer", "편의점 20% 캐시백",
+        "cashback", "percent", new BigDecimal("20"), null, new BigDecimal("100000"),
+        null, "all_merchants", "ALL", 1, "include", null,
+        """
+            {"schemaVersion":1,"conditions":{"all":[],"any":[],"none":[]},
+             "reward":{"benefitType":"CASHBACK","rewardUnit":"KRW",
+                       "calculation":"RATE","rate":"0.20"},"limits":[]}
+            """, "SUPPORTED");
+  }
+
   private SimpleBenefitRuleRow jsonRule(String ruleId, String definition) {
     return new SimpleBenefitRuleRow(
         ruleId,
