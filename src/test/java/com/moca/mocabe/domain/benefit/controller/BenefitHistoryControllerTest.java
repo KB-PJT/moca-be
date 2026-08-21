@@ -35,6 +35,7 @@ class BenefitHistoryControllerTest {
             "카드",
             1,
             1,
+            "KRW",
             "DISCOUNT",
             "할인",
             new MonthlyLimitResponse(1, 1, 0),

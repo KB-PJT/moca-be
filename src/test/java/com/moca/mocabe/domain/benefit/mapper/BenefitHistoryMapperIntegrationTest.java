@@ -196,7 +196,7 @@ class BenefitHistoryMapperIntegrationTest {
     LocalDateTime from = LocalDateTime.of(2026, 6, 30, 15, 0);
     LocalDateTime to = LocalDateTime.of(2026, 7, 31, 15, 0);
     List<BenefitHistoryRow> rows =
-        mapper.findHistory(USER, from, to, null, "DISCOUNT", "LATEST", 0, 20);
+        mapper.findHistory(USER, from, to, null, "DISCOUNT");
     assertEquals(3, rows.size());
     BenefitHistoryRow performanceOutcome = find(rows, OUTCOME);
     assertEquals("NOT_APPLIED", performanceOutcome.getCalculationStatus());
@@ -207,25 +207,27 @@ class BenefitHistoryMapperIntegrationTest {
     BenefitHistoryRow limitOutcome = find(rows, LIMIT_OUTCOME);
     assertEquals("PARTIALLY_APPLIED", limitOutcome.getCalculationStatus());
     assertEquals(500L, limitOutcome.getBenefitAmount());
+    assertEquals("KRW", limitOutcome.getBenefitUnit());
     assertEquals(1300L, limitOutcome.getMissedBenefitAmount());
     assertEquals("MONTHLY_LIMIT_EXHAUSTED", limitOutcome.getRejectionReason());
     assertEquals("테스트 카드 1234********5678", find(rows, USAGE).getCardName());
     assertEquals(1500L, find(rows, USAGE).getBenefitAmount());
+    assertEquals("KRW", find(rows, USAGE).getBenefitUnit());
     BenefitHistorySummaryRow summary = mapper.summarizeHistory(USER, from, to, USER_CARD);
     assertEquals(1500L, summary.totalBenefitAmount());
     assertEquals(1500L, summary.discountAmount());
     assertEquals(0L, summary.cashbackAmount());
     assertEquals(0L, summary.pointAmount());
     assertEquals(0L, summary.mileageAmount());
-    assertEquals(3L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
     List<BenefitHistoryRow> allRows =
-        mapper.findHistory(USER, from, to, null, null, "LATEST", 0, 20);
+        mapper.findHistory(USER, from, to, null, null);
     assertEquals(4, allRows.size());
     BenefitHistoryRow general = find(allRows, GENERAL_APPROVAL);
     assertEquals("NOT_CALCULATED", general.getCalculationStatus());
     assertNull(general.getBenefitType());
+    assertNull(general.getBenefitUnit());
     assertNull(general.getBenefitTitle());
-    assertEquals(0L, mapper.countHistory(OTHER_USER, from, to, null, null));
+    assertEquals(0L, mapper.findHistory(OTHER_USER, from, to, null, null).size());
     assertNull(mapper.findDetail(OTHER_USER, USAGE));
     BenefitHistoryDetailRow detail = mapper.findDetail(USER, USAGE);
     assertEquals("카페 할인", detail.getBenefitTitle());
@@ -236,6 +238,73 @@ class BenefitHistoryMapperIntegrationTest {
     BenefitHistoryDetailRow generalDetail = mapper.findDetail(USER, GENERAL_APPROVAL);
     assertEquals("NOT_CALCULATED", generalDetail.getCalculationStatus());
     assertNull(generalDetail.getBenefitTitle());
+  }
+
+  @Test
+  void returnsPointValueAndUnitForAppliedPointBenefit() {
+    String pointBenefit = "70000000-0000-4000-8000-000000000002";
+    String pointOffer = "80000000-0000-4000-8000-000000000002";
+    String pointApproval = "90000000-0000-4000-8000-000000000005";
+    String pointUsage = "a0000000-0000-4000-8000-000000000002";
+    String pointLimit = "82000000-0000-4000-8000-000000000002";
+    jdbc.update(
+        "INSERT INTO card_benefits (benefit_id,content_version_id,position,record_type,title)"
+            + " VALUES (?,?,2,'benefit','커피 포인트 적립')",
+        pointBenefit,
+        VERSION);
+    jdbc.update(
+        "INSERT INTO benefit_offers"
+            + " (offer_id,benefit_id,offer_name,position,reward_type,value_type,calculation_mode,"
+            + "calculation_basis,stacking_mode,valuation_scope,valuation_method)"
+            + " VALUES (?,?,'커피 포인트 적립',1,'points','percentage','flat',"
+            + "'transaction_amount','standalone','transaction','direct')",
+        pointOffer,
+        pointBenefit);
+    jdbc.update(
+        "INSERT INTO benefit_limit_policies"
+            + " (limit_policy_id,offer_id,policy_name,limit_period,limit_type,limit_unit)"
+            + " VALUES (?,?,'포인트 월 한도','monthly','reward_amount','point')",
+        pointLimit,
+        pointOffer);
+    jdbc.update(
+        "INSERT INTO benefit_limit_tiers"
+            + " (limit_tier_id,limit_policy_id,position,limit_value) VALUES (UUID(),?,1,5000)",
+        pointLimit);
+    jdbc.update(
+        "INSERT INTO card_payment_approvals"
+            + " (approval_id,user_id,user_card_id,approved_at,merchant_name,amount,approval_status,"
+            + "source_payload,created_at) VALUES (?,?,?,'2026-07-21 05:30:00','컴포즈커피',3600,"
+            + "'approved',JSON_OBJECT(),UTC_TIMESTAMP(6))",
+        pointApproval,
+        USER,
+        USER_CARD);
+    jdbc.update(
+        "INSERT INTO user_benefit_usages"
+            + " (usage_id,user_card_id,offer_id,limit_policy_id,approval_id,usage_date,eligible_amount_krw,"
+            + "reward_amount_krw,reward_original_value,reward_original_unit,usage_status,approved_at,"
+            + "confirmed_at) VALUES (?,?,?,?,?, '2026-07-21',3600,0,7,'point','confirmed',"
+            + "'2026-07-21 05:30:00','2026-07-21 05:30:01')",
+        pointUsage,
+        USER_CARD,
+        pointOffer,
+        pointLimit,
+        pointApproval);
+
+    List<BenefitHistoryRow> rows =
+        mapper.findHistory(
+            USER,
+            LocalDateTime.of(2026, 6, 30, 15, 0),
+            LocalDateTime.of(2026, 7, 31, 15, 0),
+            USER_CARD,
+            "POINT");
+
+    assertEquals(1, rows.size());
+    assertEquals(7L, rows.get(0).getBenefitAmount());
+    assertEquals("POINT", rows.get(0).getBenefitUnit());
+    assertEquals("POINT", rows.get(0).getBenefitType());
+    BenefitHistoryDetailRow detail = mapper.findDetail(USER, pointUsage);
+    assertEquals(7L, detail.getMonthlyUsedAmount());
+    assertEquals(5000L, detail.getMonthlyLimitAmount());
   }
 
   private BenefitHistoryRow find(List<BenefitHistoryRow> rows, String historyId) {
@@ -250,6 +319,8 @@ class BenefitHistoryMapperIntegrationTest {
     jdbc.update("DELETE FROM user_benefit_usages");
     jdbc.update("DELETE FROM user_card_performance_snapshots");
     jdbc.update("DELETE FROM card_payment_approvals");
+    jdbc.update("DELETE FROM benefit_limit_tiers");
+    jdbc.update("DELETE FROM benefit_limit_policies");
     jdbc.update("DELETE FROM benefit_rules");
     jdbc.update("DELETE FROM benefit_offers");
     jdbc.update("DELETE FROM card_benefits");

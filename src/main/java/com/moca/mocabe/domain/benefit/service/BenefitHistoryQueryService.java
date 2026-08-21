@@ -20,6 +20,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,9 +32,11 @@ public class BenefitHistoryQueryService {
       DateTimeFormatter.ofPattern("uuuu-MM", Locale.ROOT).withResolverStyle(ResolverStyle.STRICT);
   private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
   private final BenefitHistoryMapper benefitHistoryMapper;
+  private final BenefitHistoryRepresentativeSelector representativeSelector;
 
   public BenefitHistoryQueryService(BenefitHistoryMapper benefitHistoryMapper) {
     this.benefitHistoryMapper = benefitHistoryMapper;
+    this.representativeSelector = new BenefitHistoryRepresentativeSelector();
   }
 
   @Transactional(readOnly = true)
@@ -56,12 +59,14 @@ public class BenefitHistoryQueryService {
     LocalDateTime from = toUtc(month);
     LocalDateTime to = toUtc(month.plusMonths(1));
     String cardId = blankToNull(userCardId);
-    long total = benefitHistoryMapper.countHistory(userId, from, to, cardId, type);
+    List<BenefitHistoryRow> representatives =
+        representativeSelector.select(benefitHistoryMapper.findHistory(userId, from, to, cardId, type));
+    List<BenefitHistoryRow> ordered = representatives.stream().sorted(historyOrder(sort)).toList();
+    long total = ordered.size();
     List<BenefitHistoryItemResponse> data =
-        benefitHistoryMapper
-            .findHistory(
-                userId, from, to, cardId, type, sort, (page - 1) * size, size)
-            .stream()
+        ordered.stream()
+            .skip((long) (page - 1) * size)
+            .limit(size)
             .map(this::toItem)
             .toList();
     BenefitHistorySummaryRow summary =
@@ -75,6 +80,21 @@ public class BenefitHistoryQueryService {
             summary.pointAmount(),
             summary.mileageAmount()),
         new BenefitHistoryMetaResponse(page, size, total, (long) page * size < total));
+  }
+
+  private Comparator<BenefitHistoryRow> historyOrder(String sort) {
+    Comparator<BenefitHistoryRow> latest =
+        Comparator.comparing(BenefitHistoryRow::getApprovedAt)
+            .reversed()
+            .thenComparing(BenefitHistoryRow::getBenefitHistoryId, Comparator.reverseOrder());
+    if (!"BENEFIT_DESC".equals(sort)) {
+      return latest;
+    }
+    return Comparator.comparingLong(
+            (BenefitHistoryRow row) ->
+                Math.max(row.getBenefitAmount(), row.getMissedBenefitAmount()))
+        .reversed()
+        .thenComparing(latest);
   }
 
   @Transactional(readOnly = true)
@@ -95,6 +115,7 @@ public class BenefitHistoryQueryService {
         row.getCardName(),
         row.getPaymentAmount(),
         row.getBenefitAmount(),
+        row.getBenefitUnit(),
         row.getBenefitType(),
         row.getBenefitTitle(),
         new MonthlyLimitResponse(used, limit, Math.max(0, limit - used)),
@@ -111,6 +132,7 @@ public class BenefitHistoryQueryService {
         format(row.getApprovedAt()),
         row.getPaymentAmount(),
         row.getBenefitAmount(),
+        row.getBenefitUnit(),
         row.getBenefitType(),
         row.getBenefitTitle(),
         row.getUserCardId(),

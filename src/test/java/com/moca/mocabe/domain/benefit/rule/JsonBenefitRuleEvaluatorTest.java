@@ -188,6 +188,82 @@ class JsonBenefitRuleEvaluatorTest {
     assertEquals(BenefitRejectionReason.FREQUENCY_LIMIT_EXHAUSTED, result.rejectionReason());
   }
 
+  @Test
+  void coversConditionEvaluatorBoundariesAndInvalidValues() {
+    BenefitCalculationContext context =
+        new BenefitCalculationContext(
+            new BigDecimal("10000"),
+            BigDecimal.ONE,
+            new BigDecimal("500000"),
+            LocalDateTime.of(2026, 8, 14, 16, 30),
+            "CAFE",
+            false,
+            1,
+            2,
+            true,
+            true,
+            false,
+            Map.of(
+                "AVAILABLE_FIELD",
+                Set.of(
+                    "PAYMENT_AMOUNT", "PREVIOUS_MONTH_SPEND", "USED_DAILY_COUNT",
+                    "USED_MONTHLY_COUNT", "APPROVED_AT", "FOREIGN_TRANSACTION",
+                    "NEW_MEMBER_GRACE", "MERCHANT_ELIGIBLE", "PAYMENT_CHANNEL_ELIGIBLE",
+                    "MERCHANT", "MERCHANT_CATEGORY"),
+                "MERCHANT", Set.of("CAFE-1"),
+                "MERCHANT_CATEGORY_CODE", Set.of("CAFE")));
+    NumericRuleConditionEvaluator numeric = new NumericRuleConditionEvaluator();
+    assertTrue(numeric.evaluate(conditionWith("PAYMENT_AMOUNT", "LT", "10001"), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(numeric.evaluate(conditionWith("USED_DAILY_COUNT", "LTE", "1"), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(numeric.evaluate(conditionWith("USED_MONTHLY_COUNT", "EQ", "2"), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(numeric.evaluate(conditionWith("PAYMENT_AMOUNT", "BAD", "1"), context)
+        .decision() == RuleConditionDecision.NOT_MATCHED);
+    assertTrue(numeric.evaluate(conditionWith("PAYMENT_AMOUNT", "EQ", "bad"), context)
+        .decision() == RuleConditionDecision.UNAVAILABLE);
+    assertFalse(numeric.supports(null));
+
+    BooleanRuleConditionEvaluator bool = new BooleanRuleConditionEvaluator();
+    assertTrue(bool.evaluate(conditionWith("NEW_MEMBER_GRACE", "EQ", "false"), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(bool.evaluate(conditionWith("MERCHANT_ELIGIBLE", "EQ", "true"), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(bool.evaluate(conditionWith("PAYMENT_CHANNEL_ELIGIBLE", "EQ", "true"), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertFalse(bool.supports(null));
+
+    TargetRuleConditionEvaluator target = new TargetRuleConditionEvaluator();
+    assertTrue(target.evaluate(conditionWith("MERCHANT", "EQ", "CAFE-1"), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(target.evaluate(
+            new BenefitRuleDefinition.Condition(
+                "MERCHANT_CATEGORY", "IN", null, List.of("CAFE", "FOOD"), null), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertFalse(target.supports(null));
+
+    TemporalRuleConditionEvaluator temporal = new TemporalRuleConditionEvaluator();
+    assertTrue(temporal.evaluate(
+            new BenefitRuleDefinition.Condition(
+                "APPROVED_TIME", "BETWEEN", null, List.of("23:00", "02:00"), null), context)
+        .decision() == RuleConditionDecision.MATCHED);
+    assertTrue(temporal.evaluate(
+            new BenefitRuleDefinition.Condition(
+                "APPROVED_TIME", "BETWEEN", null, List.of("bad", "02:00"), null), context)
+        .decision() == RuleConditionDecision.NOT_MATCHED);
+    assertTrue(temporal.evaluate(
+            new BenefitRuleDefinition.Condition(
+                "APPROVED_TIME", "BETWEEN", null, List.of("23:00"), null), context)
+        .decision() == RuleConditionDecision.NOT_MATCHED);
+    assertFalse(temporal.supports(null));
+  }
+
+  private BenefitRuleDefinition.Condition conditionWith(
+      String type, String operator, String value) {
+    return new BenefitRuleDefinition.Condition(type, operator, value, List.of(), null);
+  }
+
   private BenefitCalculationResult evaluate(BenefitRuleDefinition.Reward reward) {
     return evaluator.evaluate(
         "rule",
