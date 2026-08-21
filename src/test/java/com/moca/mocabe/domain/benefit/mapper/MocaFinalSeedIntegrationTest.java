@@ -515,16 +515,14 @@ class MocaFinalSeedIntegrationTest {
         + "INNER JOIN benefit_rules rule ON rule.offer_id=offer.offer_id "
         + "INNER JOIN benefit_rule_targets target ON target.rule_id=rule.rule_id "
         + "WHERE version.name='현대카드Z work Edition2' ";
-    assertEquals(1, count(jdbc, "SELECT COUNT(*) > 0 " + zWorkBenefits
+    assertEquals(4, count(jdbc, "SELECT COUNT(*) " + zWorkBenefits
         + "AND benefit.title='편의점 10% 청구 할인' "
-        + "AND target.target_type='merchant_category' "
-        + "AND target.merchant_category_id=(SELECT merchant_category_id FROM merchant_categories "
-        + "WHERE category_code='CONVENIENCE_STORE')"));
-    assertEquals(1, count(jdbc, "SELECT COUNT(*) > 0 " + zWorkBenefits
+        + "AND target.target_type='merchant' "
+        + "AND target.target_code IN ('GS25','CU','세븐일레븐','이마트24')"));
+    assertEquals(4, count(jdbc, "SELECT COUNT(*) " + zWorkBenefits
         + "AND benefit.title='커피전문점 10% 청구 할인' "
-        + "AND target.target_type='merchant_category' "
-        + "AND target.merchant_category_id=(SELECT merchant_category_id FROM merchant_categories "
-        + "WHERE category_code='CAFE')"));
+        + "AND target.target_type='merchant' "
+        + "AND target.target_code IN ('스타벅스','투썸플레이스','커피빈','폴바셋')"));
     assertEquals(2, count(jdbc, "SELECT COUNT(*) " + zWorkBenefits
         + "AND benefit.title='도서 10% 청구 할인' AND target.target_type='merchant' "
         + "AND target.merchant_id IN (SELECT merchant_id FROM merchants "
