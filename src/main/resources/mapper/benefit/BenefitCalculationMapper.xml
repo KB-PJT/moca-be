@@ -75,6 +75,7 @@
         <constructor>
             <arg column="rule_id" javaType="java.lang.String"/>
             <arg column="offer_id" javaType="java.lang.String"/>
+            <arg column="offer_name" javaType="java.lang.String"/>
             <arg column="reward_type" javaType="java.lang.String"/>
             <arg column="reward_unit" javaType="java.lang.String"/>
             <arg column="reward_value" javaType="java.math.BigDecimal"/>
@@ -96,7 +97,7 @@
       월 보상 한도는 별도 조회하여 전월 실적 tier 및 shared_group_key 사용량을 반영한다.
     -->
     <select id="findSimpleRulesForUserCard" resultMap="simpleRuleRow">
-        SELECT r.rule_id, o.offer_id, o.reward_type, r.reward_unit, r.reward_value,
+        SELECT r.rule_id, o.offer_id, o.offer_name, o.reward_type, r.reward_unit, r.reward_value,
                r.reward_basis_amount, r.previous_spend_min_krw, r.transaction_min_krw,
                r.transaction_max_krw,
                CAST(r.rule_definition_json AS CHAR) AS rule_definition_json,
@@ -222,6 +223,17 @@
           AND ubu.usage_date &lt; #{nextMonthStart}
           AND ((#{sharedGroupKey} IS NULL AND ubu.limit_policy_id = #{limitPolicyId})
                OR (#{sharedGroupKey} IS NOT NULL AND used_policy.shared_group_key = #{sharedGroupKey}))
+        FOR UPDATE
+    </select>
+
+    <select id="findConfirmedMonthlyRewardForOfferForUpdate" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(reward_amount_krw), 0)
+        FROM user_benefit_usages
+        WHERE user_card_id = #{userCardId}
+          AND offer_id = #{offerId}
+          AND usage_status = 'confirmed'
+          AND usage_date &gt;= #{usageMonthStart}
+          AND usage_date &lt; #{nextMonthStart}
         FOR UPDATE
     </select>
 
