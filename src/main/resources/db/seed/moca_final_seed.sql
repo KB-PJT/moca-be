@@ -34188,6 +34188,23 @@ WHERE card.gorilla_card_id = '2680'
       '도서 10% 청구 할인'
   );
 
+-- 무신사·솔드아웃 온라인 할인은 카드 설명에는 표시하되,
+-- 현재 오프라인 승인 기반 계산 범위에서는 정보 전용으로 유지한다.
+UPDATE moca.benefit_rules rule_data
+JOIN moca.benefit_offers offer ON offer.offer_id = rule_data.offer_id
+JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+JOIN moca.card_content_versions version ON version.content_version_id = benefit.content_version_id
+JOIN moca.cards card ON card.card_id = version.card_id
+SET rule_data.rule_schema_version = 1,
+    rule_data.rule_support_status = 'INFORMATION_ONLY',
+    rule_data.rule_definition_json = JSON_OBJECT(
+        'schemaVersion', 1,
+        'mode', 'INFORMATION_ONLY',
+        'reason', 'ONLINE_MERCHANT_CALCULATION_OUT_OF_SCOPE'
+    )
+WHERE card.gorilla_card_id = '733'
+  AND offer.offer_name = '무신사/솔드아웃 5% 할인';
+
 UPDATE moca.benefit_rules rule_data
 JOIN moca.benefit_offers offer ON offer.offer_id = rule_data.offer_id
 JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
