@@ -9,6 +9,7 @@ import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -61,7 +62,6 @@ class BenefitReportSeedIntegrationTest {
       removePointPlanCheckStructure(jdbc);
       insertPointPlanSiblingStructure(jdbc);
       Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
-      supplementSolPlanCurrentSpendTiers(jdbc);
       insertUser(jdbc);
       List<SeedCard> cards = registerSeedCards(jdbc);
       assertEquals(CARD_NAMES, cards.stream().map(SeedCard::name).toList());
@@ -80,6 +80,8 @@ class BenefitReportSeedIntegrationTest {
         assertPointPlanCheckStructure(jdbc, cards.get(4), calculationMapper);
 
         new BenefitUsageCalculationService(calculationMapper).calculateAndPersist(augustApprovals);
+        new BenefitUsageCalculationService(calculationMapper)
+            .calculateAndPersist(insertSolPlanScopeApprovals(jdbc, cards.get(2)));
         new BenefitUsageCalculationService(calculationMapper)
             .calculateAndPersist(insertAdditionalPointPlanBrandApprovals(jdbc, cards.get(4)));
         ApprovalInsert performanceNotMet = insertPointPlanPerformanceNotMetApproval(jdbc, cards.get(4));
@@ -105,6 +107,7 @@ class BenefitReportSeedIntegrationTest {
         assertTrue(report.getData().stream()
             .anyMatch(item -> "NOT_APPLIED".equals(item.getCalculationStatus())));
         assertPointPlanCheckCalculationAndReport(jdbc, report, cards.get(4));
+        assertSolPlanCalculationScope(jdbc, cards.get(2));
       }
     }
   }
@@ -219,6 +222,53 @@ class BenefitReportSeedIntegrationTest {
     return approvals;
   }
 
+  private List<ApprovalInsert> insertSolPlanScopeApprovals(JdbcTemplate jdbc, SeedCard card) {
+    List<String> merchants = List.of("SK에너지", "GS칼텍스", "쿠팡", "넷플릭스");
+    List<Integer> amounts = List.of(280_000, 50_000, 100_000, 100_000);
+    List<ApprovalInsert> approvals = new ArrayList<>();
+    for (int index = 0; index < merchants.size(); index++) {
+      String merchant = merchants.get(index);
+      String approvalId = String.format("26000000-0000-4000-8000-%012d", index + 1);
+      LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 20 + index, 3, 0);
+      insertApproval(jdbc, approvalId, card, approvedAt, amounts.get(index), merchantId(jdbc, merchant));
+      approvals.add(new ApprovalInsert(
+          approvalId, USER_ID, card.userCardId(), null, "AUG-SOL-" + index,
+          approvedAt, merchant, amounts.get(index), "{}"));
+    }
+    return approvals;
+  }
+
+  private void assertSolPlanCalculationScope(JdbcTemplate jdbc, SeedCard card) {
+    assertEquals(2, count(jdbc, "SELECT COUNT(*) FROM user_benefit_usages usage_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=usage_data.offer_id "
+        + "WHERE usage_data.user_card_id=? "
+        + "AND offer.offer_name='특별 적립 (주유/쇼핑/배달)'", card.userCardId()));
+    assertEquals(300_000, count(jdbc, "SELECT COALESCE(SUM(usage_data.eligible_amount_krw),0) "
+        + "FROM user_benefit_usages usage_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=usage_data.offer_id "
+        + "WHERE usage_data.user_card_id=? "
+        + "AND offer.offer_name='특별 적립 (주유/쇼핑/배달)'", card.userCardId()));
+    assertEquals(15_000, count(jdbc, "SELECT COALESCE(SUM(usage_data.reward_original_value),0) "
+        + "FROM user_benefit_usages usage_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=usage_data.offer_id "
+        + "WHERE usage_data.user_card_id=? "
+        + "AND offer.offer_name='특별 적립 (주유/쇼핑/배달)'", card.userCardId()));
+    assertEquals(0, count(jdbc, "SELECT COUNT(*) FROM user_benefit_usages usage_data "
+        + "INNER JOIN card_payment_approvals approval "
+        + "ON approval.approval_id=usage_data.approval_id "
+        + "INNER JOIN merchants merchant ON merchant.merchant_id=approval.merchant_id "
+        + "WHERE usage_data.user_card_id=? "
+        + "AND merchant.normalized_name IN ('쿠팡','넷플릭스')", card.userCardId()));
+    assertEquals(2, count(jdbc, "SELECT COUNT(DISTINCT outcome.approval_id) "
+        + "FROM user_benefit_calculation_outcomes outcome "
+        + "INNER JOIN card_payment_approvals approval "
+        + "ON approval.approval_id=outcome.approval_id "
+        + "INNER JOIN merchants merchant ON merchant.merchant_id=approval.merchant_id "
+        + "WHERE outcome.user_card_id=? "
+        + "AND merchant.normalized_name IN ('쿠팡','넷플릭스') "
+        + "AND outcome.rejection_reason='CALCULATION_UNSUPPORTED'", card.userCardId()));
+  }
+
   private void assertPointPlanCheckCalculationAndReport(
       JdbcTemplate jdbc, BenefitHistoryResponse report, SeedCard card) {
     assertEquals(3, count(jdbc, "SELECT COUNT(*) FROM user_benefit_usages usage_data "
@@ -248,17 +298,6 @@ class BenefitReportSeedIntegrationTest {
             && "PERFORMANCE_NOT_MET".equals(item.getRejectionReason())));
   }
 
-  private void supplementSolPlanCurrentSpendTiers(JdbcTemplate jdbc) {
-    String policyId = solPlanLimitPolicyId(jdbc);
-    jdbc.update("UPDATE benefit_limit_tiers SET current_spend_min_krw=0 "
-        + "WHERE limit_policy_id=? AND position=1", policyId);
-    jdbc.update("INSERT INTO benefit_limit_tiers (limit_tier_id,limit_policy_id,position,"
-            + "limit_value,previous_spend_min_krw,current_spend_min_krw,created_at,updated_at) "
-            + "VALUES (UUID(),?,2,60000,400000,300000,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6)),"
-            + "(UUID(),?,3,70000,400000,500000,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))",
-        policyId, policyId);
-  }
-
   private void assertSolPlanTierBoundaries(
       JdbcTemplate jdbc, BenefitCalculationMapper calculationMapper) {
     String offerId = jdbc.queryForObject(
@@ -273,27 +312,17 @@ class BenefitReportSeedIntegrationTest {
         offerId, java.time.LocalDate.of(2026, 8, 10), "point");
     BenefitLimitTierSelector selector = new BenefitLimitTierSelector();
 
-    MonthlyBenefitLimit below =
-        selector.select(candidates, money(400_000), money(299_999)).limit();
-    MonthlyBenefitLimit middle =
-        selector.select(candidates, money(400_000), money(300_000)).limit();
+    var below =
+        selector.select(candidates, money(399_999), BigDecimal.ZERO);
+    MonthlyBenefitLimit minimum =
+        selector.select(candidates, money(400_000), BigDecimal.ZERO).limit();
     MonthlyBenefitLimit high =
-        selector.select(candidates, money(400_000), money(500_000)).limit();
-    assertEquals(0, below.limitValue().compareTo(money(50_000)));
-    assertEquals(0, middle.limitValue().compareTo(money(60_000)));
-    assertEquals(0, high.limitValue().compareTo(money(70_000)));
-  }
-
-  private String solPlanLimitPolicyId(JdbcTemplate jdbc) {
-    return jdbc.queryForObject(
-        "SELECT policy.limit_policy_id FROM benefit_limit_policies policy "
-            + "INNER JOIN benefit_offers offer ON offer.offer_id=policy.offer_id "
-            + "INNER JOIN card_benefits benefit ON benefit.benefit_id=offer.benefit_id "
-            + "INNER JOIN card_content_versions version "
-            + "ON version.content_version_id=benefit.content_version_id "
-            + "WHERE version.name='신한카드 SOL Plan' "
-            + "AND policy.policy_name='쓸수록 SOLSOL 통합 적립 한도' LIMIT 1",
-        String.class);
+        selector.select(candidates, money(1_000_000), BigDecimal.ZERO).limit();
+    assertEquals(
+        com.moca.mocabe.domain.benefit.model.BenefitLimitTierSelection.Status.PERFORMANCE_NOT_MET,
+        below.status());
+    assertEquals(0, minimum.limitValue().compareTo(money(50_000)));
+    assertEquals(0, high.limitValue().compareTo(money(50_000)));
   }
 
   private java.math.BigDecimal money(int value) {

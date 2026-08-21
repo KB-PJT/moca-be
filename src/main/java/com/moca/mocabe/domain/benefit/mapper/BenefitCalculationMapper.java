@@ -110,6 +110,14 @@ public interface BenefitCalculationMapper {
       @Param("usageMonthStart") LocalDate usageMonthStart,
       @Param("nextMonthStart") LocalDate nextMonthStart);
 
+  String findApprovalMerchantNormalizedName(@Param("approvalId") String approvalId);
+
+  BigDecimal findConfirmedMonthlyEligibleSpendForUpdate(
+      @Param("userCardId") String userCardId,
+      @Param("offerId") String offerId,
+      @Param("usageMonthStart") LocalDate usageMonthStart,
+      @Param("nextMonthStart") LocalDate nextMonthStart);
+
   void insertConfirmedUsage(
       @Param("usageId") String usageId,
       @Param("userCardId") String userCardId,

@@ -752,6 +752,66 @@ class BenefitUsageCalculationServiceTest {
             """, "SUPPORTED");
   }
 
+  @Test
+  void appliesSolFuelRateToRemainingMonthlyEligibleSpend() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    prepareSolApproval(approvedAt, 50_000, 1_000_000, "SK에너지", solSpecialRule());
+    when(mapper.findConfirmedMonthlyEligibleSpendForUpdate(
+        eq("sol-card"), eq("sol-special"), any(), any()))
+        .thenReturn(new BigDecimal("280000"));
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "sol-approval", "user-1", "sol-card", null, "A-1", approvedAt,
+        "SK에너지", 50_000, "{ }")));
+
+    verify(mapper).insertConfirmedUsage(
+        any(), eq("sol-card"), eq("sol-special"), eq("sol-rule"), eq(null),
+        eq("sol-approval"), any(), eq(new BigDecimal("20000")),
+        eq(BigDecimal.ZERO), eq(new BigDecimal("1000")), eq("point"), eq(approvedAt));
+  }
+
+  @Test
+  void excludesUnsupportedSolOnlineMerchantFromAutomaticCalculation() {
+    LocalDateTime approvedAt = LocalDateTime.of(2026, 8, 5, 3, 0);
+    prepareSolApproval(approvedAt, 100_000, 1_000_000, "쿠팡", solBasicRule());
+
+    service.calculateAndPersist(List.of(new ApprovalInsert(
+        "sol-approval", "user-1", "sol-card", null, "A-1", approvedAt,
+        "쿠팡", 100_000, "{ }")));
+
+    verify(mapper, never()).insertConfirmedUsage(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    verify(mapper).insertCalculationOutcome(
+        any(), eq("sol-card"), eq("sol-approval"), eq("sol-basic"), eq("sol-rule"),
+        eq(null), any(), eq("POINT"), eq(BigDecimal.ZERO), eq(BigDecimal.ZERO),
+        eq(BigDecimal.ZERO), eq("not_applied"), eq("CALCULATION_UNSUPPORTED"));
+  }
+
+  private void prepareSolApproval(
+      LocalDateTime approvedAt, int amount, int previousSpend, String merchantName,
+      SimpleBenefitRuleRow rule) {
+    when(mapper.findApprovalsForCalculation(List.of("sol-approval")))
+        .thenReturn(List.of(new BenefitApprovalRow(
+            "sol-approval", "sol-card", amount, approvedAt, null)));
+    when(mapper.findPreviousMonthSpend("sol-card", "2026-07")).thenReturn(previousSpend);
+    when(mapper.findApprovalMerchantNormalizedName("sol-approval")).thenReturn(merchantName);
+    when(mapper.findSimpleRulesForUserCard(eq("sol-card"), any())).thenReturn(List.of(rule));
+  }
+
+  private SimpleBenefitRuleRow solSpecialRule() {
+    return new SimpleBenefitRuleRow(
+        "sol-rule", "sol-special", "특별 적립 (주유/쇼핑/배달)",
+        "points", "point", new BigDecimal("2.5"), null, new BigDecimal("400000"),
+        null, "all_merchants", "ALL", 1, "include", null, null, "PARTIAL");
+  }
+
+  private SimpleBenefitRuleRow solBasicRule() {
+    return new SimpleBenefitRuleRow(
+        "sol-rule", "sol-basic", "국내/외 전가맹점 기본 적립", "points", "point",
+        BigDecimal.ONE, null, new BigDecimal("400000"), null, "all_merchants", "ALL", 1,
+        "include", null, null, "PARTIAL");
+  }
+
   private SimpleBenefitRuleRow jsonRule(String ruleId, String definition) {
     return new SimpleBenefitRuleRow(
         ruleId,
