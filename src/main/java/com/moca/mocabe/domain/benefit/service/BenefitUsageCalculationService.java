@@ -41,12 +41,6 @@ import org.springframework.transaction.annotation.Transactional;
  * 확인할 수 없는 조건은 적용으로 추정하지 않는다.
  */
 public class BenefitUsageCalculationService {
-  private static final Map<String, BigDecimal> NARASARANG_OFFER_LIMITS = Map.of(
-      "대중교통 20% 캐시백", new BigDecimal("5000"),
-      "광역교통 10% 캐시백", new BigDecimal("3000"),
-      "카카오T 택시 10% 캐시백", new BigDecimal("2000"),
-      "편의점 20% 캐시백", new BigDecimal("5000"),
-      "주요 커피 브랜드 5% 캐시백", new BigDecimal("6000"));
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final DateTimeFormatter YEAR_MONTH = DateTimeFormatter.ofPattern("uuuu-MM");
   private final BenefitCalculationMapper mapper;
@@ -182,8 +176,8 @@ public class BenefitUsageCalculationService {
       if (tierSelection.status() == BenefitLimitTierSelection.Status.PERFORMANCE_NOT_MET) {
         result = performanceNotMet(result);
       }
-      result = capNarasarangOffer(
-          approval, usageMonthStart, first, result);
+      result = capMonthlyOfferReward(
+          approval, usageDate, usageMonthStart, previousMonthSpend, first, result);
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
         persist(approval, usageDate, first, monthlyLimit, result);
@@ -191,13 +185,15 @@ public class BenefitUsageCalculationService {
     }
   }
 
-  private BenefitCalculationResult capNarasarangOffer(
+  private BenefitCalculationResult capMonthlyOfferReward(
       BenefitApprovalRow approval,
+      LocalDate usageDate,
       LocalDate usageMonthStart,
+      BigDecimal previousMonthSpend,
       SimpleBenefitRuleRow rule,
       BenefitCalculationResult result) {
-    BigDecimal offerLimit = rule.offerName() == null
-        ? null : NARASARANG_OFFER_LIMITS.get(rule.offerName());
+    BigDecimal offerLimit = mapper.findMonthlyOfferRewardLimit(
+        rule.offerId(), usageDate, previousMonthSpend, limitUnitFor(rule));
     if (offerLimit == null || !result.applicable()) {
       return result;
     }

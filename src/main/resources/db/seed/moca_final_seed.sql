@@ -34847,8 +34847,6 @@ FROM (
            '대중교통 20% 캐시백' offer_name, 0.20 rate UNION ALL
     SELECT '29330000-0000-4000-8000-000000000102',
            '29330000-0000-4000-8000-000000000002', '광역교통 10% 캐시백', 0.10 UNION ALL
-    SELECT '29330000-0000-4000-8000-000000000103',
-           '29330000-0000-4000-8000-000000000003', '카카오T 택시 10% 캐시백', 0.10 UNION ALL
     SELECT '29330000-0000-4000-8000-000000000104',
            '29330000-0000-4000-8000-000000000004', '편의점 20% 캐시백', 0.20 UNION ALL
     SELECT '29330000-0000-4000-8000-000000000105',
@@ -34866,6 +34864,11 @@ SELECT source.rule_id, source.offer_id, 1, source.offer_name, 'grant', 'standalo
        JSON_OBJECT('schemaVersion', 1, 'mode', 'INFORMATION_ONLY',
                    'reason', source.reason), UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
 FROM (
+    SELECT '29330000-0000-4000-8000-000000000103' rule_id,
+           '29330000-0000-4000-8000-000000000003' offer_id,
+           '카카오T 택시 10% 캐시백' offer_name, 10 reward_value,
+           'percent' reward_unit,
+           'PAYMENT_CHANNEL_AND_TAXI_SERVICE_NOT_VERIFIABLE' reason UNION ALL
     SELECT '29330000-0000-4000-8000-000000000106' rule_id,
            '29330000-0000-4000-8000-000000000006' offer_id,
            'CGV 관람권 6천원 정액 제공' offer_name, NULL reward_value,
@@ -34972,3 +34975,47 @@ WHERE offer.offer_id IN (
   AND NOT EXISTS (SELECT 1 FROM benefit_limit_tiers existing
                   WHERE existing.limit_policy_id = policy.limit_policy_id
                     AND existing.position = tier_data.position);
+
+-- Life 통합 한도와 별도로 각 서비스의 월간 캐시백 상한을 보존한다.
+-- OFFER 그룹 키는 통합 한도 후보와 분리해 서비스에서 두 한도를 모두 적용한다.
+INSERT INTO benefit_limit_policies
+    (limit_policy_id, offer_id, policy_name, limit_period, limit_type, limit_unit,
+     shared_group_key, created_at, updated_at)
+SELECT source.limit_policy_id, source.offer_id, source.policy_name,
+       'monthly', 'reward_amount', 'KRW', CONCAT('OFFER:', source.offer_id),
+       UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+FROM (
+    SELECT '29330000-0000-4000-8000-000000000301' limit_policy_id,
+           '29330000-0000-4000-8000-000000000001' offer_id,
+           '대중교통 월 캐시백 한도' policy_name UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000302',
+           '29330000-0000-4000-8000-000000000002', '광역교통 월 캐시백 한도' UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000303',
+           '29330000-0000-4000-8000-000000000003', '카카오T 택시 월 캐시백 한도' UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000304',
+           '29330000-0000-4000-8000-000000000004', '편의점 월 캐시백 한도' UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000305',
+           '29330000-0000-4000-8000-000000000005', '주요 커피 브랜드 월 캐시백 한도'
+) source
+WHERE EXISTS (SELECT 1 FROM benefit_offers offer WHERE offer.offer_id = source.offer_id)
+  AND NOT EXISTS (SELECT 1 FROM benefit_limit_policies existing
+                  WHERE existing.limit_policy_id = source.limit_policy_id);
+
+INSERT INTO benefit_limit_tiers
+    (limit_tier_id, limit_policy_id, position, limit_value,
+     previous_spend_min_krw, created_at, updated_at)
+SELECT UUID(), source.limit_policy_id, 1, source.limit_value,
+       100000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+FROM (
+    SELECT '29330000-0000-4000-8000-000000000301' limit_policy_id,
+           5000 limit_value UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000302', 3000 UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000303', 2000 UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000304', 5000 UNION ALL
+    SELECT '29330000-0000-4000-8000-000000000305', 6000
+) source
+WHERE EXISTS (SELECT 1 FROM benefit_limit_policies policy
+              WHERE policy.limit_policy_id = source.limit_policy_id)
+  AND NOT EXISTS (SELECT 1 FROM benefit_limit_tiers existing
+                  WHERE existing.limit_policy_id = source.limit_policy_id
+                    AND existing.position = 1);

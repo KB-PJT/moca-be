@@ -59,6 +59,12 @@ public interface BenefitCalculationMapper {
       @Param("nextMonthStart") LocalDate nextMonthStart,
       @Param("limitUnit") String limitUnit);
 
+  BigDecimal findMonthlyOfferRewardLimit(
+      @Param("offerId") String offerId,
+      @Param("usageDate") LocalDate usageDate,
+      @Param("previousMonthSpend") BigDecimal previousMonthSpend,
+      @Param("limitUnit") String limitUnit);
+
   BigDecimal findConfirmedMonthlyRewardForOfferForUpdate(
       @Param("userCardId") String userCardId,
       @Param("offerId") String offerId,

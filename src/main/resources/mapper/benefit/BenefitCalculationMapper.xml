@@ -207,6 +207,7 @@
           AND p.limit_period = 'monthly'
           AND p.limit_type = 'reward_amount'
           AND p.limit_unit = #{limitUnit}
+          AND (p.shared_group_key IS NULL OR p.shared_group_key NOT LIKE 'OFFER:%')
           AND (p.valid_from IS NULL OR p.valid_from &lt;= #{usageDate})
           AND (p.valid_to IS NULL OR p.valid_to &gt;= #{usageDate})
         ORDER BY t.position
@@ -224,6 +225,23 @@
           AND ((#{sharedGroupKey} IS NULL AND ubu.limit_policy_id = #{limitPolicyId})
                OR (#{sharedGroupKey} IS NOT NULL AND used_policy.shared_group_key = #{sharedGroupKey}))
         FOR UPDATE
+    </select>
+
+    <select id="findMonthlyOfferRewardLimit" resultType="java.math.BigDecimal">
+        SELECT t.limit_value
+        FROM benefit_limit_policies p
+        INNER JOIN benefit_limit_tiers t ON t.limit_policy_id = p.limit_policy_id
+        WHERE p.offer_id = #{offerId}
+          AND p.limit_period = 'monthly'
+          AND p.limit_type = 'reward_amount'
+          AND p.limit_unit = #{limitUnit}
+          AND p.shared_group_key = CONCAT('OFFER:', #{offerId})
+          AND (p.valid_from IS NULL OR p.valid_from &lt;= #{usageDate})
+          AND (p.valid_to IS NULL OR p.valid_to &gt;= #{usageDate})
+          AND (t.previous_spend_min_krw IS NULL
+               OR t.previous_spend_min_krw &lt;= #{previousMonthSpend})
+        ORDER BY COALESCE(t.previous_spend_min_krw, 0) DESC, t.position DESC
+        LIMIT 1
     </select>
 
     <select id="findConfirmedMonthlyRewardForOfferForUpdate" resultType="java.math.BigDecimal">
