@@ -8,5 +8,15 @@ public record BenefitLimitTierCandidate(
     String sharedGroupKey,
     BigDecimal limitValue,
     BigDecimal previousSpendMinKrw,
-    BigDecimal currentSpendMinKrw) {
+    BigDecimal currentSpendMinKrw,
+    String applicableMonthsJson) {
+
+  public BenefitLimitTierCandidate(
+      String limitPolicyId,
+      String sharedGroupKey,
+      BigDecimal limitValue,
+      BigDecimal previousSpendMinKrw,
+      BigDecimal currentSpendMinKrw) {
+    this(limitPolicyId, sharedGroupKey, limitValue, previousSpendMinKrw, currentSpendMinKrw, null);
+  }
 }

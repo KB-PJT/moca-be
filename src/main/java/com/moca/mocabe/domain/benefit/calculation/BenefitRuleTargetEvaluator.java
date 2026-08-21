@@ -12,10 +12,15 @@ import java.util.stream.Collectors;
  * 같은 condition_group의 include는 AND, 서로 다른 그룹은 OR로 평가한다. exclude는 그룹과 무관하게 하나라도 일치하면 최종 대상에서 제외한다.
  */
 public class BenefitRuleTargetEvaluator {
+  private final OfflineMerchantBenefitValidator offlineMerchantBenefitValidator =
+      new OfflineMerchantBenefitValidator();
 
   public boolean matches(Set<BenefitRuleTarget> targets, BenefitCalculationContext context) {
     if (targets == null || targets.isEmpty()) {
       return true;
+    }
+    if (!offlineMerchantBenefitValidator.isEligible(targets, context)) {
+      return false;
     }
 
     boolean excluded =
