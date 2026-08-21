@@ -37,7 +37,7 @@ class MocaFinalSeedIntegrationTest {
 
       ResourceDatabasePopulator populator =
           new ResourceDatabasePopulator(
-              new ClassPathResource("db/migration/moca_final_seed.sql"));
+              new ClassPathResource("db/seed/moca_final_seed.sql"));
       populator.execute(dataSource);
 
       JdbcTemplate jdbc = new JdbcTemplate(dataSource);

@@ -6,7 +6,7 @@ const fixturePath = path.join(
   root,
   'src/test/resources/benefit/card-benefit-detail-cases-1206.json',
 );
-const finalSeedPath = path.join(root, 'src/main/resources/db/migration/moca_final_seed.sql');
+const finalSeedPath = path.join(root, 'src/main/resources/db/seed/moca_final_seed.sql');
 const sectionStart = '-- BEGIN GENERATED SAFE BENEFIT STRUCTURING';
 const sectionEnd = '-- END GENERATED SAFE BENEFIT STRUCTURING';
 const insertionAnchor = '-- =================================================================================\n-- 추가 카드 3종';

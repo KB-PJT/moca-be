@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.BenefitLimitTierSelection;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,21 @@ class BenefitLimitTierSelectorTest {
     assertEquals(BenefitLimitTierSelection.Status.CURRENT_TIER_NOT_MET,
         selector.select(List.of(tier("tier", 5_000, 0, 300_000)),
             money(0), money(299_999)).status());
+  }
+
+  @Test
+  @DisplayName("적용 월 정책에 따라 일반월과 가족행사월 tier를 분리한다")
+  void selectsTierByApplicableMonth() {
+    List<BenefitLimitTierCandidate> candidates = List.of(
+        new BenefitLimitTierCandidate("regular", null, money(15_000), money(800_000),
+            money(0), "[1,2,3,4,6,7,8,9,10,11]"),
+        new BenefitLimitTierCandidate("family", null, money(20_000), money(800_000),
+            money(0), "[5,12]"));
+
+    assertEquals("regular", selector.select(candidates, money(800_000), money(0),
+        LocalDate.of(2026, 8, 21)).limit().limitPolicyId());
+    assertEquals("family", selector.select(candidates, money(800_000), money(0),
+        LocalDate.of(2026, 5, 21)).limit().limitPolicyId());
   }
 
   private BenefitLimitTierCandidate tier(String id, int limit, int previous, int current) {

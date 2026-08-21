@@ -54,7 +54,7 @@ class BenefitReportSeedIntegrationTest {
       DataSource dataSource = dataSource(container);
       Flyway.configure().dataSource(dataSource).locations("classpath:db/migration")
           .target("23").load().migrate();
-      new ResourceDatabasePopulator(new ClassPathResource("db/migration/moca_final_seed.sql"))
+      new ResourceDatabasePopulator(new ClassPathResource("db/seed/moca_final_seed.sql"))
           .execute(dataSource);
 
       JdbcTemplate jdbc = new JdbcTemplate(dataSource);

@@ -126,7 +126,8 @@ public class BenefitUsageCalculationService {
           tierSelector.select(
               mapper.findMonthlyRewardLimitCandidates(first.offerId(), usageDate, limitUnitFor(first)),
               previousMonthSpend,
-              currentMonthSpend);
+              currentMonthSpend,
+              usageDate);
       MonthlyBenefitLimit monthlyLimit = tierSelection.limit();
       BigDecimal usedMonthlyValue =
           monthlyLimit == null

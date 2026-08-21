@@ -193,11 +193,13 @@
             <arg column="limit_value" javaType="java.math.BigDecimal"/>
             <arg column="previous_spend_min_krw" javaType="java.math.BigDecimal"/>
             <arg column="current_spend_min_krw" javaType="java.math.BigDecimal"/>
+            <arg column="applicable_months_json" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
     <select id="findMonthlyRewardLimitCandidates" resultMap="monthlyBenefitLimitCandidate">
         SELECT p.limit_policy_id, p.shared_group_key, t.limit_value,
-               t.previous_spend_min_krw, t.current_spend_min_krw
+               t.previous_spend_min_krw, t.current_spend_min_krw,
+               CAST(p.applicable_months_json AS CHAR) AS applicable_months_json
         FROM benefit_limit_policies p
         INNER JOIN benefit_limit_tiers t ON t.limit_policy_id = p.limit_policy_id
         WHERE p.offer_id = #{offerId}
