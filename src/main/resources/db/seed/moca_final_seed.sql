@@ -30219,7 +30219,7 @@ SELECT UUID(), r.rule_id, x.condition_group, x.match_mode, x.target_type,
        category.merchant_category_id, merchant.merchant_id, x.target_code, x.target_name
 FROM (
     SELECT '무신사/솔드아웃 5% 할인' offer_name,1 condition_group,'include' match_mode,'merchant' target_type,'무신사' target_code,'무신사' target_name UNION ALL
-    SELECT '무신사/솔드아웃 5% 할인',1,'include','merchant','솔드아웃','솔드아웃' UNION ALL
+    SELECT '무신사/솔드아웃 5% 할인',2,'include','merchant','솔드아웃','솔드아웃' UNION ALL
     SELECT '국내외 가맹점 1% 적립',1,'include','all_merchants','ALL','전가맹점' UNION ALL
     SELECT '국내외 가맹점 1% 적립',2,'exclude','merchant','무신사','무신사' UNION ALL
     SELECT '국내외 가맹점 1% 적립',2,'exclude','merchant','솔드아웃','솔드아웃'
@@ -33788,7 +33788,7 @@ VALUES
     ('2680', '도서 10% 청구 할인', 1, 'include', 'merchant', '교보문고', '교보문고'),
     ('2680', '도서 10% 청구 할인', 2, 'include', 'merchant', 'YES24', 'YES24'),
     ('733', '무신사/솔드아웃 5% 할인', 1, 'include', 'merchant', '무신사', '무신사'),
-    ('733', '무신사/솔드아웃 5% 할인', 1, 'include', 'merchant', '솔드아웃', '솔드아웃'),
+    ('733', '무신사/솔드아웃 5% 할인', 2, 'include', 'merchant', '솔드아웃', '솔드아웃'),
     ('733', '국내외 가맹점 1% 적립', 1, 'include', 'all_merchants', 'ALL', '전가맹점'),
     ('733', '국내외 가맹점 1% 적립', 2, 'exclude', 'merchant', '무신사', '무신사'),
     ('733', '국내외 가맹점 1% 적립', 2, 'exclude', 'merchant', '솔드아웃', '솔드아웃'),
@@ -34712,19 +34712,29 @@ WHERE card.gorilla_card_id = '2680'
       '도서 10% 청구 할인'
   );
 
--- 무신사·솔드아웃 온라인 할인은 카드 설명에는 표시하되,
--- 현재 오프라인 승인 기반 계산 범위에서는 정보 전용으로 유지한다.
+-- 공식 안내는 온라인 채널이 아니라 무신사·솔드아웃 가맹점 승인을 할인 기준으로 둔다.
 UPDATE moca.benefit_rules rule_data
 JOIN moca.benefit_offers offer ON offer.offer_id = rule_data.offer_id
 JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
 JOIN moca.card_content_versions version ON version.content_version_id = benefit.content_version_id
 JOIN moca.cards card ON card.card_id = version.card_id
 SET rule_data.rule_schema_version = 1,
-    rule_data.rule_support_status = 'INFORMATION_ONLY',
+    rule_data.rule_support_status = 'SUPPORTED',
     rule_data.rule_definition_json = JSON_OBJECT(
         'schemaVersion', 1,
-        'mode', 'INFORMATION_ONLY',
-        'reason', 'ONLINE_MERCHANT_CALCULATION_OUT_OF_SCOPE'
+        'conditions', JSON_OBJECT(
+            'all', JSON_ARRAY(
+                JSON_OBJECT('type', 'PREVIOUS_MONTH_SPEND', 'operator', 'GTE',
+                            'value', '300000', 'rejectionReason', 'PERFORMANCE_NOT_MET')
+            ),
+            'any', JSON_ARRAY(),
+            'none', JSON_ARRAY()
+        ),
+        'reward', JSON_OBJECT(
+            'benefitType', 'DISCOUNT', 'rewardUnit', 'KRW',
+            'calculation', 'RATE', 'rate', '0.05'
+        ),
+        'limits', JSON_ARRAY()
     )
 WHERE card.gorilla_card_id = '733'
   AND offer.offer_name = '무신사/솔드아웃 5% 할인';
