@@ -9,7 +9,7 @@ INSERT INTO benefit_offers
      reward_type, value_type, value_unit, calculation_mode, calculation_basis,
      stacking_mode, reward_timing, valuation_scope, valuation_method,
      created_at, updated_at)
-SELECT UUID(), benefit.benefit_id, '일상 생활비 포인트 적립', 1, 90,
+SELECT UUID(), benefit.benefit_id, '일상 생활비 포인트 적립', 2, 90,
        'SHINHAN_POINT_PLAN_CHECK_DAILY_LIVING', 'points', 'percentage', 'percent',
        'flat', 'transaction_amount', 'standalone', 'point_accrual', 'transaction',
        'direct', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
@@ -21,7 +21,7 @@ WHERE card.gorilla_card_id = '2890'
   AND NOT EXISTS (
       SELECT 1 FROM benefit_offers existing
       WHERE existing.benefit_id = benefit.benefit_id
-        AND existing.offer_name = '일상 생활비 포인트 적립'
+        AND existing.position = 2
   );
 
 INSERT INTO benefit_rules
