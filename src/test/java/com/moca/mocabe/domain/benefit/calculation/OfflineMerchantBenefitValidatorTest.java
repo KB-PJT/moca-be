@@ -43,9 +43,29 @@ class OfflineMerchantBenefitValidatorTest {
   @DisplayName("카페 대상 브랜드는 쇼핑몰 입점 결제를 제외한다")
   void rejectsCafeInsideShoppingMall() {
     Set<BenefitRuleTarget> cafe = Set.of(
-        new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, "merchant", "스타벅스"));
+        new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, "merchant", "커피빈"));
     assertFalse(validator.isEligible(cafe, context("SHOPPING_MALL")));
     assertTrue(validator.isEligible(cafe, context("CAFE")));
+  }
+
+  @Test
+  @DisplayName("신한카드 커피 가맹점은 커피 대상이며 입점 매장은 제외한다")
+  void recognizesShinhanCoffeeMerchants() {
+    for (String merchant : Set.of(
+        "스타벅스", "투썸플레이스", "폴바셋", "매머드", "메가MGC커피", "이디야", "커피빈")) {
+      Set<BenefitRuleTarget> target = Set.of(
+          new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, "merchant", merchant));
+      assertTrue(validator.isEligible(target, context("CAFE")), merchant);
+      assertFalse(validator.isEligible(target, context("SHOPPING_MALL")), merchant);
+    }
+  }
+
+  @Test
+  @DisplayName("스타벅스도 공통 커피 가맹점으로 판정한다")
+  void recognizesStarbucksAsCommonCoffeeMerchant() {
+    Set<BenefitRuleTarget> target = Set.of(
+        new BenefitRuleTarget(1, BenefitTargetMatchMode.INCLUDE, "merchant", "스타벅스"));
+    assertTrue(validator.isEligible(target, context("CAFE")));
   }
 
   @Test

@@ -39,7 +39,8 @@
         LEFT JOIN merchants m ON m.merchant_id = a.merchant_id AND m.status = 'active'
         LEFT JOIN merchant_categories mc ON mc.merchant_category_id = m.merchant_category_id
         LEFT JOIN approval_categories lineage ON lineage.approval_id = a.approval_id
-        WHERE a.approval_id IN
+        WHERE a.approval_status = 'approved'
+          AND a.approval_id IN
         <foreach collection="approvalIds" item="approvalId" open="(" separator="," close=")">#{approvalId}</foreach>
         GROUP BY a.approval_id, a.user_card_id, a.amount, a.approved_at,
                  mc.category_code, m.merchant_id
@@ -149,6 +150,18 @@
         ORDER BY r.priority DESC, r.rule_id, t.condition_group, t.target_id
     </select>
 
+    <select id="hasBenefitOfferForUserCard" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM user_cards user_card
+            INNER JOIN card_content_versions version ON version.card_id = user_card.card_id
+            INNER JOIN card_benefits benefit ON benefit.content_version_id = version.content_version_id
+            INNER JOIN benefit_offers offer ON offer.benefit_id = benefit.benefit_id
+            WHERE user_card.user_card_id = #{userCardId}
+              AND offer.offer_name = #{offerName}
+        )
+    </select>
+
     <resultMap id="benefitUsageCounts"
                type="com.moca.mocabe.domain.benefit.model.BenefitUsageCounts">
         <constructor>
@@ -167,6 +180,106 @@
           AND usage_date &gt;= #{usageMonthStart}
           AND usage_date &lt; #{nextMonthStart}
     </select>
+
+    <resultMap id="benefitAreaSpend" type="com.moca.mocabe.domain.benefit.model.BenefitAreaSpendRow">
+        <constructor>
+            <arg column="group_key" javaType="java.lang.String"/>
+            <arg column="area_key" javaType="java.lang.String"/>
+            <arg column="area_name" javaType="java.lang.String"/>
+            <arg column="display_order" javaType="_int"/>
+            <arg column="eligible_amount_krw" javaType="java.math.BigDecimal"/>
+            <arg column="transaction_count" javaType="_int"/>
+        </constructor>
+    </resultMap>
+    <select id="findMonthlyBenefitAreaSpends" resultMap="benefitAreaSpend">
+        SELECT group_def.group_key,
+               area.area_key,
+               area.area_name,
+               area.display_order,
+               COALESCE(monthly.eligible_amount_krw, 0) AS eligible_amount_krw,
+               COALESCE(monthly.transaction_count, 0) AS transaction_count
+        FROM benefit_area_groups group_def
+        INNER JOIN benefit_areas area ON area.area_group_id = group_def.area_group_id
+        LEFT JOIN user_benefit_area_monthly_spends monthly
+          ON monthly.area_id = area.area_id
+         AND monthly.user_card_id = #{userCardId}
+         AND monthly.usage_month = #{usageMonth}
+        WHERE group_def.group_key = #{areaGroupKey}
+        GROUP BY group_def.group_key, area.area_id, area.area_key, area.area_name, area.display_order,
+                 monthly.eligible_amount_krw, monthly.transaction_count
+        ORDER BY eligible_amount_krw DESC, area.display_order ASC, area.area_id ASC
+    </select>
+
+    <select id="findBenefitAreaKeysForApproval" resultType="string">
+        SELECT DISTINCT area.area_key, area.display_order
+        FROM card_payment_approvals approval
+        INNER JOIN merchants merchant ON merchant.merchant_id = approval.merchant_id
+        INNER JOIN benefit_area_groups group_def ON group_def.group_key = #{areaGroupKey}
+        INNER JOIN benefit_areas area ON area.area_group_id = group_def.area_group_id
+        INNER JOIN benefit_area_targets area_target ON area_target.area_id = area.area_id
+          AND area_target.match_mode = 'include'
+        WHERE approval.approval_id = #{approvalId}
+          AND (
+              (area_target.target_type = 'merchant'
+                  AND (area_target.merchant_id = merchant.merchant_id
+                       OR UPPER(TRIM(area_target.target_code)) = UPPER(TRIM(merchant.normalized_name))))
+              OR (area_target.target_type = 'merchant_category'
+                  AND area_target.merchant_category_id = merchant.merchant_category_id)
+              OR area_target.target_type = 'all_merchants'
+          )
+        ORDER BY area.display_order, area.area_key
+    </select>
+
+    <insert id="insertBenefitAreaSpendEventIfAbsent">
+        INSERT IGNORE INTO user_benefit_area_spend_events
+            (event_id, approval_id, user_card_id, area_id, usage_month, amount_krw, transaction_count)
+        SELECT UUID(), #{approvalId}, #{userCardId}, area.area_id, #{usageMonth}, #{amountKrw}, 1
+        FROM benefit_area_groups group_def
+        INNER JOIN benefit_areas area ON area.area_group_id = group_def.area_group_id
+        WHERE group_def.group_key = #{areaGroupKey}
+          AND area.area_key = #{areaKey}
+    </insert>
+
+    <insert id="upsertMonthlyBenefitAreaSpend">
+        INSERT INTO user_benefit_area_monthly_spends
+            (monthly_spend_id, user_card_id, area_group_id, area_id, usage_month,
+             eligible_amount_krw, transaction_count)
+        SELECT UUID(), #{userCardId}, group_def.area_group_id, area.area_id,
+               #{usageMonth}, #{amountKrw}, 1
+        FROM benefit_area_groups group_def
+        INNER JOIN benefit_areas area ON area.area_group_id = group_def.area_group_id
+        WHERE group_def.group_key = #{areaGroupKey} AND area.area_key = #{areaKey}
+        ON DUPLICATE KEY UPDATE
+            eligible_amount_krw = eligible_amount_krw + VALUES(eligible_amount_krw),
+            transaction_count = transaction_count + VALUES(transaction_count),
+            updated_at = CURRENT_TIMESTAMP(6)
+    </insert>
+
+    <select id="findApprovedApprovalIdsForCardMonth" resultType="string">
+        SELECT approval_id
+        FROM card_payment_approvals
+        WHERE user_card_id = #{userCardId}
+          AND approval_status = 'approved'
+          AND DATE_FORMAT(CONVERT_TZ(approved_at, 'UTC', 'Asia/Seoul'), '%Y-%m') = #{usageMonth}
+        ORDER BY approved_at, approval_id
+    </select>
+
+    <insert id="rebuildMonthlyBenefitAreaSpends">
+        INSERT INTO user_benefit_area_monthly_spends
+            (monthly_spend_id, user_card_id, area_group_id, area_id, usage_month,
+             eligible_amount_krw, transaction_count)
+        SELECT UUID(), event.user_card_id, area.area_group_id, event.area_id, event.usage_month,
+               SUM(event.amount_krw), SUM(event.transaction_count)
+        FROM user_benefit_area_spend_events event
+        INNER JOIN benefit_areas area ON area.area_id = event.area_id
+        WHERE event.user_card_id = #{userCardId}
+          AND event.usage_month = #{usageMonth}
+        GROUP BY event.user_card_id, area.area_group_id, event.area_id, event.usage_month
+        ON DUPLICATE KEY UPDATE
+            eligible_amount_krw = VALUES(eligible_amount_krw),
+            transaction_count = VALUES(transaction_count),
+            updated_at = CURRENT_TIMESTAMP(6)
+    </insert>
 
     <select id="findPreviousMonthSpend" resultType="int">
         SELECT current_spend_amount
@@ -252,6 +365,20 @@
           AND usage_status = 'confirmed'
           AND usage_date &gt;= #{usageMonthStart}
           AND usage_date &lt; #{nextMonthStart}
+        FOR UPDATE
+    </select>
+
+    <select id="findConfirmedDeepDreamExtraRewardForUpdate" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(GREATEST(
+                   benefit_usage.reward_original_value
+                   - FLOOR(benefit_usage.eligible_amount_krw * 0.002), 0)), 0)
+        FROM user_benefit_usages benefit_usage
+        INNER JOIN benefit_offers offer ON offer.offer_id = benefit_usage.offer_id
+        WHERE benefit_usage.user_card_id = #{userCardId}
+          AND offer.offer_name = 'Deep Dream 모두드림 0.2%'
+          AND benefit_usage.usage_status = 'confirmed'
+          AND benefit_usage.usage_date &gt;= #{usageMonthStart}
+          AND benefit_usage.usage_date &lt; #{nextMonthStart}
         FOR UPDATE
     </select>
 

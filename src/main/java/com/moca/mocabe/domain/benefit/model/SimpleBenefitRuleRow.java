@@ -49,6 +49,7 @@ public record SimpleBenefitRuleRow(
         null, null, "LEGACY");
   }
 
+  /** offerName 필드 추가 전 테스트·호출부와의 호환 생성자다. */
   public SimpleBenefitRuleRow(
       String ruleId, String offerId, String rewardType, String rewardUnit,
       BigDecimal rewardValue, BigDecimal rewardBasisAmount, BigDecimal previousSpendMinKrw,

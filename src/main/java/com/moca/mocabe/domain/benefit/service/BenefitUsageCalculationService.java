@@ -5,6 +5,7 @@ import com.moca.mocabe.domain.benefit.calculation.BenefitCalculator;
 import com.moca.mocabe.domain.benefit.calculation.BenefitRuleTargetEvaluator;
 import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
+import com.moca.mocabe.domain.benefit.model.BenefitAreaSpendRow;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationContext;
 import com.moca.mocabe.domain.benefit.model.BenefitCalculationResult;
 import com.moca.mocabe.domain.benefit.model.BenefitLimitTierSelection;
@@ -49,9 +50,11 @@ public class BenefitUsageCalculationService {
   private final BenefitRuleDefinitionParser definitionParser = new BenefitRuleDefinitionParser();
   private final JsonBenefitRuleEvaluator jsonRuleEvaluator = new JsonBenefitRuleEvaluator();
   private final BenefitLimitTierSelector tierSelector = new BenefitLimitTierSelector();
+  private final BenefitAreaSpendService benefitAreaSpendService;
 
   public BenefitUsageCalculationService(BenefitCalculationMapper mapper) {
     this.mapper = mapper;
+    this.benefitAreaSpendService = new BenefitAreaSpendService(mapper);
   }
 
   /** 기존 단위 테스트용 CardSyncService 생성자에서 사용하는 부작용 없는 구현이다. */
@@ -68,7 +71,7 @@ public class BenefitUsageCalculationService {
     if (mapper == null || insertedApprovals == null || insertedApprovals.isEmpty()) {
       return;
     }
-    calculateApprovalIds(insertedApprovals.stream().map(ApprovalInsert::approvalId).toList());
+    recalculateFullMonths(insertedApprovals.stream().map(ApprovalInsert::approvalId).toList());
   }
 
   /** 승인 동기화 전에 이미 저장된 승인까지 같은 계산 경로로 보강한다. */
@@ -82,30 +85,70 @@ public class BenefitUsageCalculationService {
     if (approvalIds == null || approvalIds.isEmpty()) {
       return;
     }
-    // 현재 월 결과만 최신 전월/당월 실적 기준으로 재계산한다.
-    // 지난달 이전 리포트는 확정값으로 보존하고 승인 자체도 유지한다.
-    mapper.deleteCalculationOutcomes(approvalIds);
-    mapper.deleteBenefitUsages(approvalIds);
-    calculateApprovalIds(approvalIds);
+    recalculateFullMonths(approvalIds);
+  }
+
+  private void recalculateFullMonths(List<String> approvalIds) {
+    List<BenefitApprovalRow> requestedApprovals = mapper.findApprovalsForCalculation(approvalIds);
+    Set<String> fullMonthIds = new java.util.LinkedHashSet<>(approvalIds);
+    Set<String> requestedCardMonths = new java.util.LinkedHashSet<>();
+    Set<String> requestedCards = new java.util.LinkedHashSet<>();
+    for (BenefitApprovalRow approval : requestedApprovals) {
+      requestedCards.add(approval.userCardId());
+      LocalDate usageDate = toUsageDate(approval);
+      if (mapper.hasBenefitOfferForUserCard(
+          approval.userCardId(), "Deep Dream 모두드림 0.2%")) {
+        requestedCardMonths.add(
+            approval.userCardId() + "\t" + YearMonth.from(usageDate));
+      }
+    }
+    for (String userCardId : requestedCards) {
+      mapper.lockUserCardForBenefitCalculation(userCardId);
+    }
+    for (String cardMonth : requestedCardMonths) {
+      String[] key = cardMonth.split("\t", 2);
+      List<String> monthlyIds = mapper.findApprovedApprovalIdsForCardMonth(key[0], key[1]);
+      if (monthlyIds != null) {
+        fullMonthIds.addAll(monthlyIds);
+      }
+    }
+    List<String> recalculationIds = List.copyOf(fullMonthIds);
+    mapper.deleteCalculationOutcomes(recalculationIds);
+    mapper.deleteBenefitUsages(recalculationIds);
+    if (recalculationIds.size() == approvalIds.size()) {
+      calculateApprovals(requestedApprovals);
+    } else {
+      calculateApprovalIds(recalculationIds);
+    }
   }
 
   private void calculateApprovalIds(List<String> approvalIds) {
-    List<BenefitApprovalRow> approvals = mapper.findApprovalsForCalculation(approvalIds);
+    calculateApprovals(mapper.findApprovalsForCalculation(approvalIds));
+  }
+
+  private void calculateApprovals(List<BenefitApprovalRow> approvals) {
+    // 월 최다 영역은 승인 순서가 아니라 월 전체 이용액으로 정한다. 계산 전에 영역 원장을 먼저 완성한다.
+    Set<String> cardMonths = new java.util.LinkedHashSet<>();
+    for (BenefitApprovalRow approval : approvals) {
+      LocalDate usageDate = toUsageDate(approval);
+      String usageMonth = YearMonth.from(usageDate).toString();
+      benefitAreaSpendService.recordApproval(
+          approval.approvalId(), approval.userCardId(), BigDecimal.valueOf(approval.amount()),
+          YearMonth.from(usageDate));
+      cardMonths.add(approval.userCardId() + "\t" + usageMonth);
+    }
+    // 재동기화 후에도 집계는 승인 이벤트 원장과 정확히 같아야 한다.
+    for (String cardMonth : cardMonths) {
+      String[] key = cardMonth.split("\t", 2);
+      mapper.rebuildMonthlyBenefitAreaSpends(key[0], key[1]);
+    }
     for (BenefitApprovalRow approval : approvals) {
       calculateApproval(approval);
     }
   }
 
   private void calculateApproval(BenefitApprovalRow approval) {
-    // 사용 이력 합계를 읽고 새 이력을 넣는 동안 같은 카드의 계산은 하나만 실행한다.
-    // shared_group_key는 카드 상품 내 공유 한도이므로 user_card 단위 직렬화가 충분하다.
-    mapper.lockUserCardForBenefitCalculation(approval.userCardId());
-    LocalDate usageDate =
-        approval
-            .approvedAt()
-            .atZone(java.time.ZoneOffset.UTC)
-            .withZoneSameInstant(SEOUL)
-            .toLocalDate();
+    LocalDate usageDate = toUsageDate(approval);
     Integer previousMonthSpendSnapshot =
         mapper.findPreviousMonthSpend(
             approval.userCardId(),
@@ -178,6 +221,7 @@ public class BenefitUsageCalculationService {
       }
       result = capMonthlyOfferReward(
           approval, usageDate, usageMonthStart, previousMonthSpend, first, result);
+      result = applyDeepDreamAreaRate(approval, usageDate, first, previousMonthSpend, result);
       persistOutcome(approval, usageDate, first, monthlyLimit, result);
       if (result.applicable() && result.appliedRewardValue().signum() > 0) {
         persist(approval, usageDate, first, monthlyLimit, result);
@@ -209,6 +253,42 @@ public class BenefitUsageCalculationService {
         applicable
             ? result.rejectionReason()
             : com.moca.mocabe.domain.benefit.type.BenefitRejectionReason.MONTHLY_LIMIT_EXHAUSTED);
+  }
+
+  private BenefitCalculationResult applyDeepDreamAreaRate(
+      BenefitApprovalRow approval,
+      LocalDate usageDate,
+      SimpleBenefitRuleRow rule,
+      BigDecimal previousMonthSpend,
+      BenefitCalculationResult result) {
+    if (!"Deep Dream 모두드림 0.2%".equals(rule.offerName())
+        || result.rewardUnit() != RewardUnit.POINT
+        || !result.applicable()) {
+      return result;
+    }
+    List<String> areaKeys = benefitAreaSpendService.findAreaKeysForApproval(
+        approval.approvalId(), "DREAM");
+    if (areaKeys.isEmpty()) {
+      return result;
+    }
+    BenefitAreaSpendRow topArea = benefitAreaSpendService.findTopArea(
+        approval.userCardId(), "DREAM", YearMonth.from(usageDate));
+    boolean topAreaApproval = topArea != null && areaKeys.contains(topArea.areaKey());
+    LocalDate monthStart = usageDate.withDayOfMonth(1);
+    BigDecimal usedExtra = mapper.findConfirmedDeepDreamExtraRewardForUpdate(
+        approval.userCardId(), monthStart, monthStart.plusMonths(1));
+    BenefitAreaRewardCalculator.RewardAllocation allocation =
+        new BenefitAreaRewardCalculator().allocate(BigDecimal.valueOf(approval.amount()),
+            previousMonthSpend, true, topAreaApproval, usedExtra);
+    return new BenefitCalculationResult(
+        result.ruleId(), result.benefitType(), result.rewardUnit(), true,
+        allocation.rawReward(), allocation.appliedReward(), allocation.remainingExtraLimit(),
+        result.rejectionReason());
+  }
+
+  private LocalDate toUsageDate(BenefitApprovalRow approval) {
+    return approval.approvedAt().atZone(java.time.ZoneOffset.UTC)
+        .withZoneSameInstant(SEOUL).toLocalDate();
   }
 
   private BenefitCalculationResult performanceNotMet(BenefitCalculationResult calculated) {

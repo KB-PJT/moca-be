@@ -34046,6 +34046,353 @@ WHERE c.gorilla_card_id = '2422'
   );
 
 -- =================================================================================
+-- 신한카드 Deep Dream 체크 계산 구조
+-- 기본 0.2%만 현재 계산 엔진에서 자동 계산하고, 월간 영역 비교가 필요한 혜택은 안내용 룰로 보존한다.
+CREATE TABLE IF NOT EXISTS benefit_area_groups (
+    area_group_id CHAR(36) NOT NULL PRIMARY KEY,
+    group_key VARCHAR(80) NOT NULL UNIQUE,
+    group_name VARCHAR(150) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS benefit_areas (
+    area_id CHAR(36) NOT NULL PRIMARY KEY,
+    area_group_id CHAR(36) NOT NULL,
+    area_key VARCHAR(80) NOT NULL,
+    area_name VARCHAR(150) NOT NULL,
+    display_order SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_seed_benefit_areas_group FOREIGN KEY (area_group_id) REFERENCES benefit_area_groups(area_group_id),
+    CONSTRAINT uk_seed_benefit_areas_key UNIQUE (area_group_id, area_key),
+    CONSTRAINT uk_seed_benefit_areas_order UNIQUE (area_group_id, display_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS benefit_area_targets (
+    area_target_id CHAR(36) NOT NULL PRIMARY KEY,
+    area_id CHAR(36) NOT NULL,
+    target_type VARCHAR(30) NOT NULL,
+    merchant_category_id CHAR(36) NULL,
+    merchant_id CHAR(36) NULL,
+    target_code VARCHAR(100) NOT NULL,
+    match_mode VARCHAR(10) NOT NULL DEFAULT 'include',
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_seed_area_targets_area FOREIGN KEY (area_id) REFERENCES benefit_areas(area_id),
+    CONSTRAINT fk_seed_area_targets_category FOREIGN KEY (merchant_category_id) REFERENCES merchant_categories(merchant_category_id),
+    CONSTRAINT fk_seed_area_targets_merchant FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id),
+    CONSTRAINT uk_seed_area_targets UNIQUE (area_id, target_type, target_code, match_mode)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_benefit_area_monthly_spends (
+    monthly_spend_id CHAR(36) NOT NULL PRIMARY KEY,
+    user_card_id CHAR(36) NOT NULL,
+    area_group_id CHAR(36) NOT NULL,
+    area_id CHAR(36) NOT NULL,
+    usage_month CHAR(7) NOT NULL,
+    eligible_amount_krw DECIMAL(18,2) NOT NULL DEFAULT 0,
+    transaction_count INT UNSIGNED NOT NULL DEFAULT 0,
+    selected_rank SMALLINT UNSIGNED NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_seed_area_spend_card FOREIGN KEY (user_card_id) REFERENCES user_cards(user_card_id),
+    CONSTRAINT fk_seed_area_spend_group FOREIGN KEY (area_group_id) REFERENCES benefit_area_groups(area_group_id),
+    CONSTRAINT fk_seed_area_spend_area FOREIGN KEY (area_id) REFERENCES benefit_areas(area_id),
+    CONSTRAINT uk_seed_area_spend_period UNIQUE (user_card_id, area_group_id, area_id, usage_month)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_benefit_area_spend_events (
+    event_id CHAR(36) NOT NULL PRIMARY KEY,
+    approval_id CHAR(36) NOT NULL,
+    user_card_id CHAR(36) NOT NULL,
+    area_id CHAR(36) NOT NULL,
+    usage_month CHAR(7) NOT NULL,
+    amount_krw DECIMAL(18,2) NOT NULL,
+    transaction_count INT NOT NULL DEFAULT 1,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_seed_area_event_approval FOREIGN KEY (approval_id) REFERENCES card_payment_approvals(approval_id),
+    CONSTRAINT fk_seed_area_event_card FOREIGN KEY (user_card_id) REFERENCES user_cards(user_card_id),
+    CONSTRAINT fk_seed_area_event_area FOREIGN KEY (area_id) REFERENCES benefit_areas(area_id),
+    CONSTRAINT uk_seed_area_event UNIQUE (approval_id, area_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO benefit_area_groups (area_group_id, group_key, group_name)
+SELECT UUID(), 'DREAM', '신한카드 Deep Dream DREAM 영역'
+WHERE NOT EXISTS (SELECT 1 FROM benefit_area_groups WHERE group_key = 'DREAM');
+
+INSERT INTO benefit_areas (area_id, area_group_id, area_key, area_name, display_order)
+SELECT UUID(), area_group.area_group_id, area.area_key, area.area_name, area.display_order
+FROM benefit_area_groups area_group
+CROSS JOIN (
+    SELECT 'DISCOUNT_STORE' area_key, '할인점' area_name, 1 display_order
+    UNION ALL SELECT 'RETAIL_STORE', '편의점·잡화', 2
+    UNION ALL SELECT 'ENJOY_STORE', '영화·커피', 3
+    UNION ALL SELECT 'ABROAD', '해외', 4
+    UNION ALL SELECT 'MOBILE', '이동통신', 5
+) area
+WHERE area_group.group_key = 'DREAM'
+  AND NOT EXISTS (
+      SELECT 1 FROM benefit_areas existing
+      WHERE existing.area_group_id = area_group.area_group_id AND existing.area_key = area.area_key
+  );
+
+INSERT IGNORE INTO benefit_area_targets
+    (area_target_id, area_id, target_type, merchant_id, target_code, match_mode)
+SELECT UUID(), area.area_id, 'merchant', merchant.merchant_id, merchant.normalized_name, 'include'
+FROM benefit_areas area
+JOIN benefit_area_groups area_group ON area_group.area_group_id = area.area_group_id
+JOIN merchants merchant ON merchant.normalized_name IN (
+    '이마트','홈플러스','롯데마트','하나로마트','이마트 트레이더스','롯데 VIC마켓',
+    'CU','GS25','세븐일레븐','올리브영','다이소',
+    '투썸플레이스','폴바셋','매머드','메가MGC커피','이디야','커피빈','CGV','롯데시네마'
+)
+WHERE area_group.group_key = 'DREAM'
+  AND (
+      (area.area_key = 'DISCOUNT_STORE' AND merchant.normalized_name IN ('이마트','홈플러스','롯데마트','하나로마트','이마트 트레이더스','롯데 VIC마켓'))
+      OR (area.area_key = 'RETAIL_STORE' AND merchant.normalized_name IN ('CU','GS25','세븐일레븐','올리브영','다이소'))
+      OR (area.area_key = 'ENJOY_STORE' AND merchant.normalized_name IN ('투썸플레이스','폴바셋','매머드','메가MGC커피','이디야','커피빈','CGV','롯데시네마'))
+  )
+  AND NOT EXISTS (SELECT 1 FROM benefit_area_targets existing
+                  WHERE existing.area_id = area.area_id AND existing.merchant_id = merchant.merchant_id);
+
+-- 가맹점 master가 seed 후반에 생성되는 대상도 정규화된 코드로 영역을 판별할 수 있게 보존한다.
+INSERT IGNORE INTO benefit_area_targets
+    (area_target_id, area_id, target_type, merchant_id, target_code, match_mode)
+SELECT UUID(), area.area_id, 'merchant', NULL, target.target_code, 'include'
+FROM benefit_areas area
+JOIN benefit_area_groups area_group ON area_group.area_group_id = area.area_group_id
+JOIN (
+    SELECT 'DISCOUNT_STORE' area_key, '이마트' target_code
+    UNION ALL SELECT 'DISCOUNT_STORE','홈플러스'
+    UNION ALL SELECT 'DISCOUNT_STORE','롯데마트'
+    UNION ALL SELECT 'DISCOUNT_STORE','하나로마트'
+    UNION ALL SELECT 'DISCOUNT_STORE','이마트 트레이더스'
+    UNION ALL SELECT 'DISCOUNT_STORE','롯데 VIC마켓'
+    UNION ALL SELECT 'RETAIL_STORE','CU'
+    UNION ALL SELECT 'RETAIL_STORE','GS25'
+    UNION ALL SELECT 'RETAIL_STORE','세븐일레븐'
+    UNION ALL SELECT 'RETAIL_STORE','올리브영'
+    UNION ALL SELECT 'RETAIL_STORE','다이소'
+    UNION ALL SELECT 'ENJOY_STORE','투썸플레이스'
+    UNION ALL SELECT 'ENJOY_STORE','폴바셋'
+    UNION ALL SELECT 'ENJOY_STORE','매머드'
+    UNION ALL SELECT 'ENJOY_STORE','메가MGC커피'
+    UNION ALL SELECT 'ENJOY_STORE','이디야'
+    UNION ALL SELECT 'ENJOY_STORE','커피빈'
+    UNION ALL SELECT 'ENJOY_STORE','CGV'
+    UNION ALL SELECT 'ENJOY_STORE','롯데시네마'
+) target ON target.area_key = area.area_key
+WHERE area_group.group_key = 'DREAM'
+  AND NOT EXISTS (SELECT 1 FROM benefit_area_targets existing
+                  WHERE existing.area_id = area.area_id
+                    AND existing.target_type = 'merchant'
+                    AND existing.target_code = target.target_code
+                    AND existing.match_mode = 'include');
+
+-- 영역별 대상 연결은 가맹점 master의 카드별 분류를 기준으로 후속 계산 Mapper에서 보강한다.
+DELETE tier FROM benefit_limit_tiers tier
+JOIN benefit_limit_policies policy ON policy.limit_policy_id = tier.limit_policy_id
+JOIN benefit_offers offer ON offer.offer_id = policy.offer_id
+JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+JOIN card_content_versions version ON version.content_version_id = benefit.content_version_id
+JOIN cards card ON card.card_id = version.card_id
+WHERE card.gorilla_card_id = '281'
+  AND offer.offer_name IN ('Deep Dream 모두드림 0.2%','Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%',
+                           'Deep Dream 아껴드림 주유소 리터당 40포인트','Deep Dream 아껴드림 택시 3·6·9번째 1,000원 할인','Deep Dream 반겨드림 3,000포인트');
+
+DELETE policy FROM benefit_limit_policies policy
+JOIN benefit_offers offer ON offer.offer_id = policy.offer_id
+JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+JOIN card_content_versions version ON version.content_version_id = benefit.content_version_id
+JOIN cards card ON card.card_id = version.card_id
+WHERE card.gorilla_card_id = '281'
+  AND offer.offer_name IN ('Deep Dream 모두드림 0.2%','Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%',
+                           'Deep Dream 아껴드림 주유소 리터당 40포인트','Deep Dream 아껴드림 택시 3·6·9번째 1,000원 할인','Deep Dream 반겨드림 3,000포인트');
+
+DELETE target FROM benefit_rule_targets target
+JOIN benefit_rules rule_data ON rule_data.rule_id = target.rule_id
+JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+JOIN card_content_versions version ON version.content_version_id = benefit.content_version_id
+JOIN cards card ON card.card_id = version.card_id
+WHERE card.gorilla_card_id = '281'
+  AND offer.offer_name IN ('Deep Dream 모두드림 0.2%','Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%',
+                           'Deep Dream 아껴드림 주유소 리터당 40포인트','Deep Dream 아껴드림 택시 3·6·9번째 1,000원 할인','Deep Dream 반겨드림 3,000포인트');
+
+DELETE rule_data FROM benefit_rules rule_data
+JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+JOIN card_content_versions version ON version.content_version_id = benefit.content_version_id
+JOIN cards card ON card.card_id = version.card_id
+WHERE card.gorilla_card_id = '281'
+  AND offer.offer_name IN ('Deep Dream 모두드림 0.2%','Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%',
+                           'Deep Dream 아껴드림 주유소 리터당 40포인트','Deep Dream 아껴드림 택시 3·6·9번째 1,000원 할인','Deep Dream 반겨드림 3,000포인트');
+
+DELETE offer FROM benefit_offers offer
+JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+JOIN card_content_versions version ON version.content_version_id = benefit.content_version_id
+JOIN cards card ON card.card_id = version.card_id
+WHERE card.gorilla_card_id = '281'
+  AND offer.offer_name IN ('Deep Dream 모두드림 0.2%','Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%');
+
+CREATE TEMPORARY TABLE seed_deep_dream_rules (
+    benefit_position INT NOT NULL,
+    offer_name VARCHAR(150) NOT NULL,
+    reward_value DECIMAL(12,4) NOT NULL,
+    reward_unit VARCHAR(20) NOT NULL,
+    support_status VARCHAR(30) NOT NULL,
+    target_type VARCHAR(30) NOT NULL,
+    target_code VARCHAR(100) NOT NULL,
+    condition_group INT NOT NULL
+) ENGINE=InnoDB;
+
+INSERT INTO seed_deep_dream_rules VALUES
+(1,'Deep Dream 모두드림 0.2%',0.2,'percent','SUPPORTED','all_merchants','ALL',1),
+(2,'Deep Dream 더해드림 0.6%',0.6,'percent','INFORMATION_ONLY','merchant','투썸플레이스',1),
+(2,'Deep Dream 더해드림 0.6%',0.6,'percent','INFORMATION_ONLY','merchant','폴바셋',2),
+(2,'Deep Dream 더해드림 0.6%',0.6,'percent','INFORMATION_ONLY','merchant','매머드',3),
+(2,'Deep Dream 더해드림 0.6%',0.6,'percent','INFORMATION_ONLY','merchant','메가MGC커피',4),
+(2,'Deep Dream 더해드림 0.6%',0.6,'percent','INFORMATION_ONLY','merchant','이디야',5),
+(2,'Deep Dream 더해드림 0.6%',0.6,'percent','INFORMATION_ONLY','merchant','커피빈',6),
+(3,'Deep Dream 챙겨드림 1.0%',1.0,'percent','INFORMATION_ONLY','merchant','투썸플레이스',1),
+(3,'Deep Dream 챙겨드림 1.0%',1.0,'percent','INFORMATION_ONLY','merchant','폴바셋',2),
+(3,'Deep Dream 챙겨드림 1.0%',1.0,'percent','INFORMATION_ONLY','merchant','매머드',3),
+(3,'Deep Dream 챙겨드림 1.0%',1.0,'percent','INFORMATION_ONLY','merchant','메가MGC커피',4),
+(3,'Deep Dream 챙겨드림 1.0%',1.0,'percent','INFORMATION_ONLY','merchant','이디야',5),
+(3,'Deep Dream 챙겨드림 1.0%',1.0,'percent','INFORMATION_ONLY','merchant','커피빈',6),
+(4,'Deep Dream 아껴드림 주유소 리터당 40포인트',40,'point','INFORMATION_ONLY','merchant_category','FUEL',1),
+(5,'Deep Dream 아껴드림 택시 3·6·9번째 1,000원 할인',1000,'KRW','INFORMATION_ONLY','merchant_category','TAXI',1),
+(6,'Deep Dream 반겨드림 3,000포인트',3000,'point','INFORMATION_ONLY','all_merchants','ALL',1);
+
+INSERT INTO benefit_offers
+    (offer_id, benefit_id, offer_name, position, reward_type, value_type, calculation_mode,
+     calculation_basis, stacking_mode, valuation_scope, valuation_method)
+SELECT UUID(), benefit.benefit_id, seed.offer_name, 20 + seed.benefit_position,
+       'points', 'percentage', 'flat', 'transaction_amount', 'standalone', 'transaction', 'direct'
+FROM (SELECT DISTINCT benefit_position, offer_name FROM seed_deep_dream_rules) seed
+JOIN cards card ON card.gorilla_card_id = '281'
+JOIN card_content_versions version ON version.card_id = card.card_id
+JOIN card_benefits benefit ON benefit.content_version_id = version.content_version_id
+  AND benefit.position = seed.benefit_position
+WHERE NOT EXISTS (
+    SELECT 1 FROM benefit_offers existing
+    WHERE existing.benefit_id = benefit.benefit_id AND existing.offer_name = seed.offer_name
+);
+
+INSERT INTO benefit_rules
+    (rule_id, offer_id, position, rule_effect, stacking_mode, reward_value, reward_unit,
+     rule_schema_version, rule_support_status, rule_definition_json)
+SELECT UUID(), offer.offer_id, 1, 'grant', 'standalone',
+       CASE WHEN seed.support_status = 'SUPPORTED' THEN seed.reward_value ELSE NULL END,
+       seed.reward_unit,
+       1, seed.support_status,
+       CASE WHEN seed.support_status = 'SUPPORTED' THEN JSON_OBJECT(
+           'schemaVersion', 1,
+           'conditions', JSON_OBJECT('all', JSON_ARRAY(), 'any', JSON_ARRAY(), 'none', JSON_ARRAY()),
+           'reward', JSON_OBJECT('benefitType','POINT','rewardUnit','POINT','calculation','RATE',
+                                 'rate','0.002','value','0','spendUnitAmount','0'),
+           'limits', JSON_ARRAY())
+       ELSE JSON_OBJECT('schemaVersion',1,'mode','INFORMATION_ONLY',
+                        'reason','DREAM_AREA_MONTHLY_RANKING_NOT_SUPPORTED') END
+FROM (SELECT DISTINCT benefit_position, offer_name, reward_value, reward_unit, support_status
+      FROM seed_deep_dream_rules) seed
+JOIN cards card ON card.gorilla_card_id = '281'
+JOIN card_content_versions version ON version.card_id = card.card_id
+JOIN card_benefits benefit ON benefit.content_version_id = version.content_version_id
+  AND benefit.position = seed.benefit_position
+JOIN benefit_offers offer ON offer.benefit_id = benefit.benefit_id AND offer.offer_name = seed.offer_name
+WHERE NOT EXISTS (SELECT 1 FROM benefit_rules existing WHERE existing.offer_id = offer.offer_id);
+
+DELETE target
+FROM benefit_rule_targets target
+JOIN benefit_rules rule_data ON rule_data.rule_id = target.rule_id
+JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+WHERE offer.offer_name IN ('Deep Dream 모두드림 0.2%','Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%');
+
+INSERT INTO benefit_rule_targets
+    (target_id, rule_id, condition_group, match_mode, target_type, merchant_category_id,
+     merchant_id, target_code, target_name, target_source, target_authority,
+     minimum_place_confidence, created_at, updated_at)
+SELECT UUID(), rule_data.rule_id, seed.condition_group, 'include', seed.target_type,
+       NULL, merchant.merchant_id, seed.target_code, seed.target_code,
+       'CARD_BENEFIT_EXPLICIT', 'MERCHANT_EXACT', 0.990, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM seed_deep_dream_rules seed
+JOIN cards card ON card.gorilla_card_id = '281'
+JOIN card_content_versions version ON version.card_id = card.card_id
+JOIN card_benefits benefit ON benefit.content_version_id = version.content_version_id
+  AND benefit.position = seed.benefit_position
+JOIN benefit_offers offer ON offer.benefit_id = benefit.benefit_id AND offer.offer_name = seed.offer_name
+JOIN benefit_rules rule_data ON rule_data.offer_id = offer.offer_id
+LEFT JOIN merchants merchant ON seed.target_type = 'merchant' AND merchant.normalized_name = seed.target_code
+WHERE seed.target_type = 'merchant'
+  AND seed.support_status = 'SUPPORTED'
+  AND merchant.merchant_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM benefit_rule_targets existing
+      JOIN benefit_rules existing_rule ON existing_rule.rule_id = existing.rule_id
+      JOIN benefit_offers existing_offer ON existing_offer.offer_id = existing_rule.offer_id
+      WHERE existing_offer.offer_name = seed.offer_name
+        AND existing.target_type = seed.target_type
+        AND existing.target_code = seed.target_code
+  );
+
+INSERT INTO benefit_rule_targets
+    (target_id, rule_id, condition_group, match_mode, target_type, target_code,
+     target_name, target_source, target_authority, minimum_place_confidence, created_at, updated_at)
+SELECT UUID(), rule_data.rule_id, 1, 'include', 'all_merchants', 'ALL', '국내외 전체 가맹점',
+       'CARD_BENEFIT_EXPLICIT', 'ALL_MERCHANTS', 0.990, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM benefit_rules rule_data
+JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+WHERE offer.offer_name = 'Deep Dream 모두드림 0.2%'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM benefit_rule_targets existing
+      JOIN benefit_rules existing_rule ON existing_rule.rule_id = existing.rule_id
+      JOIN benefit_offers existing_offer ON existing_offer.offer_id = existing_rule.offer_id
+      WHERE existing_offer.offer_name = offer.offer_name
+        AND existing.target_type = 'all_merchants'
+        AND existing.target_code = 'ALL'
+  );
+
+DELETE duplicate_target
+FROM benefit_rule_targets duplicate_target
+JOIN benefit_rules duplicate_rule ON duplicate_rule.rule_id = duplicate_target.rule_id
+JOIN benefit_offers duplicate_offer ON duplicate_offer.offer_id = duplicate_rule.offer_id
+JOIN benefit_rule_targets keeper_target
+  ON keeper_target.target_code = duplicate_target.target_code
+ AND keeper_target.target_type = duplicate_target.target_type
+ AND keeper_target.target_id < duplicate_target.target_id
+JOIN benefit_rules keeper_rule ON keeper_rule.rule_id = keeper_target.rule_id
+JOIN benefit_offers keeper_offer ON keeper_offer.offer_id = keeper_rule.offer_id
+WHERE duplicate_offer.offer_name IN ('Deep Dream 모두드림 0.2%','Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%')
+  AND keeper_offer.offer_name = duplicate_offer.offer_name;
+
+INSERT INTO benefit_limit_policies
+    (limit_policy_id, offer_id, policy_name, limit_period, limit_type, limit_unit, shared_group_key)
+SELECT UUID(), offer.offer_id, 'Deep Dream 더해드림·챙겨드림 통합 적립한도', 'monthly',
+       'reward_amount', 'point', 'DEEP_DREAM_EXTRA_POINT_LIMIT'
+FROM benefit_offers offer
+WHERE offer.offer_name IN ('Deep Dream 더해드림 0.6%','Deep Dream 챙겨드림 1.0%')
+  AND NOT EXISTS (SELECT 1 FROM benefit_limit_policies existing
+                  WHERE existing.offer_id = offer.offer_id AND existing.shared_group_key = 'DEEP_DREAM_EXTRA_POINT_LIMIT');
+
+INSERT INTO benefit_limit_tiers
+    (limit_tier_id, limit_policy_id, position, limit_value, previous_spend_min_krw)
+SELECT UUID(), policy.limit_policy_id, tier.position, tier.limit_value, tier.previous_spend_min_krw
+FROM benefit_limit_policies policy
+JOIN benefit_offers offer ON offer.offer_id = policy.offer_id
+CROSS JOIN (SELECT 1 position, 5000 limit_value, 200000 previous_spend_min_krw
+            UNION ALL SELECT 2, 15000, 400000
+            UNION ALL SELECT 3, 30000, 800000) tier
+WHERE policy.shared_group_key = 'DEEP_DREAM_EXTRA_POINT_LIMIT'
+  AND NOT EXISTS (SELECT 1 FROM benefit_limit_tiers existing
+                  WHERE existing.limit_policy_id = policy.limit_policy_id AND existing.position = tier.position);
+
+DROP TEMPORARY TABLE seed_deep_dream_rules;
+
 -- POST-SEED INTEGRITY CHECKS
 -- All error queries below should return 0 rows.
 -- =================================================================================
@@ -34340,7 +34687,9 @@ VALUES
     ('FAST_FOOD', '롯데리아', TRUE), ('FAST_FOOD', 'KFC', TRUE),
     ('DRUGSTORE', '올리브영', TRUE),
     ('CAFE', '스타벅스', TRUE), ('CAFE', '투썸플레이스', TRUE),
-    ('CAFE', '이디야', TRUE), ('CAFE', '메가MGC커피', TRUE),
+    ('CAFE', '폴바셋', TRUE), ('CAFE', '매머드', TRUE),
+    ('CAFE', '메가MGC커피', TRUE), ('CAFE', '이디야', TRUE),
+    ('CAFE', '커피빈', TRUE),
     ('CONVENIENCE_STORE', 'GS25', TRUE), ('CONVENIENCE_STORE', 'CU', TRUE),
     ('CONVENIENCE_STORE', '세븐일레븐', TRUE),
     ('CONVENIENCE_STORE', '이마트24', TRUE),
