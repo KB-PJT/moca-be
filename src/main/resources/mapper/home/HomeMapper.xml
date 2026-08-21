@@ -183,7 +183,10 @@
                            AND cv2.content_version_id &gt; cv.content_version_id))
             )
         LEFT JOIN (
-            SELECT user_card_id, SUM(reward_amount_krw) AS received_benefit_amount
+            SELECT user_card_id,
+                   SUM(CASE WHEN reward_original_unit = 'point'
+                            THEN COALESCE(reward_original_value, 0)
+                            ELSE reward_amount_krw END) AS received_benefit_amount
             FROM user_benefit_usages
             WHERE usage_status = 'confirmed'
               AND usage_date &gt;= CONCAT(#{yearMonth}, '-01')
@@ -346,7 +349,9 @@
         ), usage_summary AS (
             SELECT benefit_usage.approval_id,
                    MIN(benefit_usage.usage_id) AS benefit_history_id,
-                   SUM(benefit_usage.reward_amount_krw) AS benefit_amount,
+                   SUM(CASE WHEN benefit_usage.reward_original_unit = 'point'
+                            THEN COALESCE(benefit_usage.reward_original_value, 0)
+                            ELSE benefit_usage.reward_amount_krw END) AS benefit_amount,
                    CASE
                        WHEN COUNT(DISTINCT CASE
                            WHEN benefit_usage.reward_original_unit = 'mile' THEN 'MILEAGE'

@@ -113,7 +113,10 @@
           <if test="benefitType != null">AND history.benefit_type = #{benefitType}</if>
     </select>
     <select id="summarizeHistory" resultType="com.moca.mocabe.domain.benefit.model.BenefitHistorySummaryRow">
-        SELECT CAST(COALESCE(SUM(ubu.reward_amount_krw), 0) AS SIGNED) AS total_benefit_amount,
+        SELECT CAST(COALESCE(SUM(CASE WHEN ubu.reward_original_unit = 'point'
+                                     THEN COALESCE(ubu.reward_original_value, 0)
+                                     ELSE ubu.reward_amount_krw END), 0) AS SIGNED)
+                   AS total_benefit_amount,
                CAST(COALESCE(SUM(CASE WHEN (ubu.reward_original_unit IS NULL
                                           OR ubu.reward_original_unit NOT IN ('point', 'mile'))
                                           AND bo.reward_type = 'discount'

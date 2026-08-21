@@ -302,6 +302,14 @@ class BenefitHistoryMapperIntegrationTest {
     assertEquals(7L, rows.get(0).getBenefitAmount());
     assertEquals("POINT", rows.get(0).getBenefitUnit());
     assertEquals("POINT", rows.get(0).getBenefitType());
+    BenefitHistorySummaryRow summary =
+        mapper.summarizeHistory(
+            USER,
+            LocalDateTime.of(2026, 6, 30, 15, 0),
+            LocalDateTime.of(2026, 7, 31, 15, 0),
+            USER_CARD);
+    assertEquals(1507L, summary.totalBenefitAmount());
+    assertEquals(7L, summary.pointAmount());
     BenefitHistoryDetailRow detail = mapper.findDetail(USER, pointUsage);
     assertEquals(7L, detail.getMonthlyUsedAmount());
     assertEquals(5000L, detail.getMonthlyLimitAmount());

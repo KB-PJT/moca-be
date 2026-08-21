@@ -147,7 +147,9 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                         USER_ID);
         BigDecimal receivedBenefit =
                 queryAmount(
-                        "SELECT SUM(benefit_usage.reward_amount_krw) "
+                        "SELECT SUM(CASE WHEN benefit_usage.reward_original_unit = 'point' "
+                                + "THEN benefit_usage.reward_original_value "
+                                + "ELSE benefit_usage.reward_amount_krw END) "
                                 + "FROM user_benefit_usages benefit_usage "
                                 + "INNER JOIN user_cards card "
                                 + "ON card.user_card_id = benefit_usage.user_card_id "
@@ -393,7 +395,9 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                         + "FROM card_payment_approvals WHERE approved_at >= '2026-08-01' "
                         + "AND approved_at < '2026-09-01' GROUP BY user_card_id) spend "
                         + "ON spend.user_card_id = user_card.user_card_id "
-                        + "LEFT JOIN (SELECT user_card_id, SUM(reward_amount_krw) AS total_benefit "
+                        + "LEFT JOIN (SELECT user_card_id, SUM(CASE "
+                        + "WHEN reward_original_unit = 'point' THEN reward_original_value "
+                        + "ELSE reward_amount_krw END) AS total_benefit "
                         + "FROM user_benefit_usages WHERE usage_date >= '2026-08-01' "
                         + "AND usage_date < '2026-09-01' AND usage_status IN ('pending', 'confirmed') "
                         + "GROUP BY user_card_id) benefit "
