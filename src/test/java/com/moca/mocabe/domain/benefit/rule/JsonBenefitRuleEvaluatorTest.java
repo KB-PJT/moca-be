@@ -195,6 +195,7 @@ class JsonBenefitRuleEvaluatorTest {
             new BigDecimal("10000"),
             BigDecimal.ONE,
             new BigDecimal("500000"),
+            // 계산 컨텍스트는 UTC이며 서울 시간으로는 다음 날 01:30이다.
             LocalDateTime.of(2026, 8, 14, 16, 30),
             "CAFE",
             false,

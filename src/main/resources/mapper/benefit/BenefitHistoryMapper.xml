@@ -107,10 +107,71 @@
         <id property="benefitHistoryId" column="benefit_history_id"/><result property="approvalId" column="approval_id"/><result property="merchantName" column="merchant_name"/><result property="approvedAt" column="approved_at"/><result property="paymentAmount" column="payment_amount"/><result property="benefitAmount" column="benefit_amount"/><result property="benefitUnit" column="benefit_unit"/><result property="benefitType" column="benefit_type"/><result property="benefitTitle" column="benefit_title"/><result property="userCardId" column="user_card_id"/><result property="cardName" column="card_name"/><result property="calculationStatus" column="calculation_status"/><result property="missedBenefitAmount" column="missed_benefit_amount"/><result property="rejectionReason" column="rejection_reason"/><result property="requiredPreviousSpendAmount" column="required_previous_spend_amount"/><result property="previousMonthSpendAmount" column="previous_month_spend_amount"/>
     </resultMap>
     <select id="findHistory" resultMap="historyRow">
-        SELECT history.* FROM (<include refid="historySource"/>) history
-        WHERE history.approved_at &gt;= #{fromUtc} AND history.approved_at &lt; #{toUtc}
-          <if test="userCardId != null">AND history.user_card_id = #{userCardId}</if>
-          <if test="benefitType != null">AND history.benefit_type = #{benefitType}</if>
+        WITH history_rows AS (
+            SELECT history.* FROM (<include refid="historySource"/>) history
+            WHERE history.approved_at &gt;= #{fromUtc} AND history.approved_at &lt; #{toUtc}
+              <if test="userCardId != null">AND history.user_card_id = #{userCardId}</if>
+        ), ranked_history AS (
+            SELECT history_rows.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY approval_id
+                       ORDER BY CASE calculation_status
+                                    WHEN 'APPLIED' THEN 0
+                                    WHEN 'PARTIALLY_APPLIED' THEN 1
+                                    WHEN 'NOT_APPLIED' THEN 2
+                                    ELSE 3 END,
+                                benefit_amount DESC,
+                                missed_benefit_amount DESC,
+                                benefit_history_id ASC) AS representative_rank
+            FROM history_rows
+        ), paged_approvals AS (
+            SELECT approval_id
+            FROM ranked_history
+            WHERE representative_rank = 1
+              <if test="benefitType != null">AND benefit_type = #{benefitType}</if>
+            <choose>
+                <when test="sort == 'BENEFIT_DESC'">
+                    ORDER BY CASE benefit_unit
+                                 WHEN 'KRW' THEN 0
+                                 WHEN 'POINT' THEN 1
+                                 WHEN 'MILEAGE' THEN 2
+                                 ELSE 3 END,
+                             GREATEST(benefit_amount, missed_benefit_amount) DESC,
+                             approved_at DESC, benefit_history_id DESC
+                </when>
+                <otherwise>
+                    ORDER BY approved_at DESC, benefit_history_id DESC
+                </otherwise>
+            </choose>
+            LIMIT #{offset}, #{limit}
+        )
+        SELECT history_rows.*
+        FROM history_rows
+        INNER JOIN paged_approvals ON paged_approvals.approval_id = history_rows.approval_id
+    </select>
+    <select id="countHistory" resultType="long">
+        WITH history_rows AS (
+            SELECT history.* FROM (<include refid="historySource"/>) history
+            WHERE history.approved_at &gt;= #{fromUtc} AND history.approved_at &lt; #{toUtc}
+              <if test="userCardId != null">AND history.user_card_id = #{userCardId}</if>
+        ), ranked_history AS (
+            SELECT history_rows.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY approval_id
+                       ORDER BY CASE calculation_status
+                                    WHEN 'APPLIED' THEN 0
+                                    WHEN 'PARTIALLY_APPLIED' THEN 1
+                                    WHEN 'NOT_APPLIED' THEN 2
+                                    ELSE 3 END,
+                                benefit_amount DESC,
+                                missed_benefit_amount DESC,
+                                benefit_history_id ASC) AS representative_rank
+            FROM history_rows
+        )
+        SELECT COUNT(*)
+        FROM ranked_history
+        WHERE representative_rank = 1
+          <if test="benefitType != null">AND benefit_type = #{benefitType}</if>
     </select>
     <select id="summarizeHistory" resultType="com.moca.mocabe.domain.benefit.model.BenefitHistorySummaryRow">
         SELECT CAST(COALESCE(SUM(CASE WHEN ubu.reward_original_unit = 'point'

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -37,8 +38,13 @@ class BenefitHistoryQueryServiceTest {
             any(),
             any(),
             eq("card-1"),
-            eq(null)))
+            eq("DISCOUNT"),
+            eq("BENEFIT_DESC"),
+            eq(0),
+            eq(20)))
         .thenReturn(List.of(row(), lowerBenefitRow()));
+    when(mapper.countHistory(eq("user-1"), any(), any(), eq("card-1"), eq("DISCOUNT")))
+        .thenReturn(2L);
     when(mapper.summarizeHistory(eq("user-1"), any(), any(), eq("card-1")))
         .thenReturn(new BenefitHistorySummaryRow(13750, 3200, 7500, 3050, 0));
     BenefitHistoryResponse result =
@@ -143,8 +149,9 @@ class BenefitHistoryQueryServiceTest {
 
   @Test
   void defaultsMissingMonthToSeoulCurrentMonth() {
-    when(mapper.findHistory(anyString(), any(), any(), any(), any()))
+    when(mapper.findHistory(anyString(), any(), any(), any(), any(), anyString(), anyInt(), anyInt()))
         .thenReturn(List.of());
+    when(mapper.countHistory(anyString(), any(), any(), any(), any())).thenReturn(0L);
     when(mapper.summarizeHistory(anyString(), any(), any(), any()))
         .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
 
@@ -155,7 +162,9 @@ class BenefitHistoryQueryServiceTest {
 
   @Test
   void defaultsMissingPageAndSize() {
-    when(mapper.findHistory(anyString(), any(), any(), any(), any())).thenReturn(List.of(row()));
+    when(mapper.findHistory(anyString(), any(), any(), any(), any(), anyString(), anyInt(), anyInt()))
+        .thenReturn(List.of(row()));
+    when(mapper.countHistory(anyString(), any(), any(), any(), any())).thenReturn(1L);
     when(mapper.summarizeHistory(anyString(), any(), any(), any()))
         .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
 
@@ -175,8 +184,10 @@ class BenefitHistoryQueryServiceTest {
     rejectedPoint.setBenefitType("POINT");
     rejectedPoint.setCalculationStatus("NOT_APPLIED");
     rejectedPoint.setMissedBenefitAmount(1000);
-    when(mapper.findHistory(anyString(), any(), any(), any(), eq(null)))
+    when(mapper.findHistory(
+            anyString(), any(), any(), any(), eq("POINT"), anyString(), anyInt(), anyInt()))
         .thenReturn(List.of(rejectedPoint, appliedDiscount));
+    when(mapper.countHistory(anyString(), any(), any(), any(), eq("POINT"))).thenReturn(0L);
     when(mapper.summarizeHistory(anyString(), any(), any(), any()))
         .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
 
@@ -206,8 +217,10 @@ class BenefitHistoryQueryServiceTest {
     noUnit.setApprovalId("approval-4");
     noUnit.setBenefitAmount(4000);
     noUnit.setBenefitUnit(null);
-    when(mapper.findHistory(anyString(), any(), any(), any(), eq(null)))
+    when(mapper.findHistory(
+            anyString(), any(), any(), any(), eq(null), anyString(), anyInt(), anyInt()))
         .thenReturn(List.of(noUnit, mileage, point, krw));
+    when(mapper.countHistory(anyString(), any(), any(), any(), eq(null))).thenReturn(4L);
     when(mapper.summarizeHistory(anyString(), any(), any(), any()))
         .thenReturn(new BenefitHistorySummaryRow(0, 0, 0, 0, 0));
 

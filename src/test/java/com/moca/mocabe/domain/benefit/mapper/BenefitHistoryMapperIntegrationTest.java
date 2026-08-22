@@ -196,8 +196,9 @@ class BenefitHistoryMapperIntegrationTest {
     LocalDateTime from = LocalDateTime.of(2026, 6, 30, 15, 0);
     LocalDateTime to = LocalDateTime.of(2026, 7, 31, 15, 0);
     List<BenefitHistoryRow> rows =
-        mapper.findHistory(USER, from, to, null, "DISCOUNT");
+        mapper.findHistory(USER, from, to, null, "DISCOUNT", "LATEST", 0, 20);
     assertEquals(3, rows.size());
+    assertEquals(3L, mapper.countHistory(USER, from, to, null, "DISCOUNT"));
     BenefitHistoryRow performanceOutcome = find(rows, OUTCOME);
     assertEquals("NOT_APPLIED", performanceOutcome.getCalculationStatus());
     assertEquals(2000L, performanceOutcome.getMissedBenefitAmount());
@@ -220,14 +221,21 @@ class BenefitHistoryMapperIntegrationTest {
     assertEquals(0L, summary.pointAmount());
     assertEquals(0L, summary.mileageAmount());
     List<BenefitHistoryRow> allRows =
-        mapper.findHistory(USER, from, to, null, null);
+        mapper.findHistory(USER, from, to, null, null, "LATEST", 0, 20);
     assertEquals(4, allRows.size());
+    assertEquals(4L, mapper.countHistory(USER, from, to, null, null));
+    List<BenefitHistoryRow> secondApprovalPage =
+        mapper.findHistory(USER, from, to, null, null, "LATEST", 1, 1);
+    assertEquals(1L, secondApprovalPage.stream().map(BenefitHistoryRow::getApprovalId).distinct().count());
     BenefitHistoryRow general = find(allRows, GENERAL_APPROVAL);
     assertEquals("NOT_CALCULATED", general.getCalculationStatus());
     assertNull(general.getBenefitType());
     assertNull(general.getBenefitUnit());
     assertNull(general.getBenefitTitle());
-    assertEquals(0L, mapper.findHistory(OTHER_USER, from, to, null, null).size());
+    assertEquals(
+        0L,
+        mapper.findHistory(OTHER_USER, from, to, null, null, "LATEST", 0, 20).size());
+    assertEquals(0L, mapper.countHistory(OTHER_USER, from, to, null, null));
     assertNull(mapper.findDetail(OTHER_USER, USAGE));
     BenefitHistoryDetailRow detail = mapper.findDetail(USER, USAGE);
     assertEquals("카페 할인", detail.getBenefitTitle());
@@ -296,7 +304,10 @@ class BenefitHistoryMapperIntegrationTest {
             LocalDateTime.of(2026, 6, 30, 15, 0),
             LocalDateTime.of(2026, 7, 31, 15, 0),
             USER_CARD,
-            "POINT");
+            "POINT",
+            "LATEST",
+            0,
+            20);
 
     assertEquals(1, rows.size());
     assertEquals(7L, rows.get(0).getBenefitAmount());

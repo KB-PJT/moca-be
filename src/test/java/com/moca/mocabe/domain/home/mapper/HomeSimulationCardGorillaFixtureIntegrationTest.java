@@ -51,6 +51,9 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
     private static final String SELECT_UP_USER_CARD_ID =
             "20000000-0000-0000-0000-000000000004";
     private static final String LOCAL_USER_ID = "37411c29-5adc-4643-8ca5-8fa1c14abf1d";
+    private static final String REWARD_VALUE_EXPRESSION =
+            "CASE WHEN reward_original_unit = 'point' THEN reward_original_value "
+                    + "ELSE reward_amount_krw END";
 
     private MySQLContainer container;
     private JdbcTemplate jdbcTemplate;
@@ -147,9 +150,7 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                         USER_ID);
         BigDecimal receivedBenefit =
                 queryAmount(
-                        "SELECT SUM(CASE WHEN benefit_usage.reward_original_unit = 'point' "
-                                + "THEN benefit_usage.reward_original_value "
-                                + "ELSE benefit_usage.reward_amount_krw END) "
+                        "SELECT SUM(" + REWARD_VALUE_EXPRESSION + ") "
                                 + "FROM user_benefit_usages benefit_usage "
                                 + "INNER JOIN user_cards card "
                                 + "ON card.user_card_id = benefit_usage.user_card_id "
@@ -395,9 +396,8 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                         + "FROM card_payment_approvals WHERE approved_at >= '2026-08-01' "
                         + "AND approved_at < '2026-09-01' GROUP BY user_card_id) spend "
                         + "ON spend.user_card_id = user_card.user_card_id "
-                        + "LEFT JOIN (SELECT user_card_id, SUM(CASE "
-                        + "WHEN reward_original_unit = 'point' THEN reward_original_value "
-                        + "ELSE reward_amount_krw END) AS total_benefit "
+                        + "LEFT JOIN (SELECT user_card_id, SUM(" + REWARD_VALUE_EXPRESSION
+                        + ") AS total_benefit "
                         + "FROM user_benefit_usages WHERE usage_date >= '2026-08-01' "
                         + "AND usage_date < '2026-09-01' AND usage_status IN ('pending', 'confirmed') "
                         + "GROUP BY user_card_id) benefit "
