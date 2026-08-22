@@ -2,10 +2,13 @@ package com.moca.mocabe.domain.merchant.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.moca.mocabe.domain.merchant.model.MerchantBenefitTierRow;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitRuleRow;
 import com.moca.mocabe.global.config.TestcontainersMySqlConfig;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +36,8 @@ class MerchantCardRecommendationMapperIntegrationTest {
   private static final String OFFER = "da000000-0000-4000-8000-000000000001";
   private static final String RULE = "db000000-0000-4000-8000-000000000001";
   private static final String TARGET = "dc000000-0000-4000-8000-000000000001";
+  private static final String LIMIT_POLICY = "dd000000-0000-4000-8000-000000000001";
+  private static final String LIMIT_TIER = "de000000-0000-4000-8000-000000000001";
 
   @org.springframework.beans.factory.annotation.Autowired
   private MerchantCardRecommendationMapper mapper;
@@ -76,10 +81,18 @@ class MerchantCardRecommendationMapperIntegrationTest {
     jdbc.update("INSERT INTO benefit_rule_targets (target_id,rule_id,condition_group,match_mode,target_type,"
         + "merchant_category_id,target_code,target_name) VALUES (?,?,1,'include','merchant_category',?,"
         + "'MART','마트')", TARGET, RULE, CATEGORY);
+    jdbc.update("UPDATE benefit_offers SET reference_value_krw = 2 WHERE offer_id = ?", OFFER);
+    jdbc.update("INSERT INTO benefit_limit_policies (limit_policy_id,offer_id,policy_name,limit_period,"
+        + "limit_type,limit_unit) VALUES (?,?,'마트 포인트 월 한도','monthly','reward_amount','point')",
+        LIMIT_POLICY, OFFER);
+    jdbc.update("INSERT INTO benefit_limit_tiers (limit_tier_id,limit_policy_id,position,limit_value,"
+        + "previous_spend_min_krw) VALUES (?,?,1,1000,NULL)", LIMIT_TIER, LIMIT_POLICY);
   }
 
   @AfterEach
   void tearDown() {
+    jdbc.update("DELETE FROM benefit_limit_tiers WHERE limit_tier_id = ?", LIMIT_TIER);
+    jdbc.update("DELETE FROM benefit_limit_policies WHERE limit_policy_id = ?", LIMIT_POLICY);
     jdbc.update("DELETE FROM benefit_rule_targets WHERE target_id = ?", TARGET);
     jdbc.update("DELETE FROM benefit_rules WHERE rule_id = ?", RULE);
     jdbc.update("DELETE FROM benefit_offers WHERE offer_id = ?", OFFER);
@@ -125,6 +138,22 @@ class MerchantCardRecommendationMapperIntegrationTest {
     assertEquals(1, batchRows.size());
     assertEquals(RULE, batchRows.get(0).ruleId());
     assertEquals(OFFER, batchRows.get(0).offerId());
+  }
+
+  @Test
+  @DisplayName("포인트 단위 월 한도를 offer의 환산율로 KRW로 변환해 반환한다")
+  void convertsPointLimitToKrw() {
+    List<MerchantCardBenefitRuleRow> rows = mapper.findOwnedCardBenefitRules(
+        USER, MERCHANT, CATEGORY, "테스트마트", LocalDate.of(2026, 8, 14), "2026-07");
+
+    assertEquals(1, rows.size());
+    assertEquals(0, new BigDecimal("2000").compareTo(rows.get(0).monthlyLimitKrw()));
+
+    List<MerchantBenefitTierRow> tiers = mapper.findBenefitTiersForOffers(List.of(OFFER));
+
+    assertEquals(1, tiers.size());
+    assertEquals(0, new BigDecimal("2000").compareTo(tiers.get(0).monthlyLimitKrw()));
+    assertNull(tiers.get(0).requiredPreviousSpendKrw());
   }
 
   @Configuration
