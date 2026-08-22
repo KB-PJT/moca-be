@@ -30004,17 +30004,22 @@ WHERE b.content_version_id = @HDZ_CV
       SELECT 1 FROM moca.benefit_offers o WHERE o.benefit_id=b.benefit_id AND o.position=1
   );
 
-UPDATE moca.benefit_offers offer
-INNER JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
-SET offer.report_visible = CASE WHEN benefit.position IN (1, 4) THEN FALSE ELSE TRUE END,
-    offer.report_title = CASE benefit.position
-        WHEN 2 THEN '편의점 청구 할인'
-        WHEN 3 THEN '커피전문점 청구 할인'
-        WHEN 5 THEN '도서 청구 할인'
-        ELSE NULL
-    END,
-    offer.updated_at = CURRENT_TIMESTAMP(6)
-WHERE benefit.content_version_id = @HDZ_CV;
+-- V37 이전 스키마에서도 최종 seed를 실행할 수 있도록 리포트 컬럼이 있을 때만 갱신한다.
+SET @hdz_report_column_count := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'benefit_offers'
+      AND column_name IN ('report_visible', 'report_title')
+);
+SET @hdz_report_update_sql := IF(
+    @hdz_report_column_count = 2,
+    'UPDATE moca.benefit_offers offer INNER JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id SET offer.report_visible = CASE WHEN benefit.position IN (1, 4) THEN FALSE ELSE TRUE END, offer.report_title = CASE benefit.position WHEN 2 THEN ''편의점 청구 할인'' WHEN 3 THEN ''커피전문점 청구 할인'' WHEN 5 THEN ''도서 청구 할인'' ELSE NULL END, offer.updated_at = CURRENT_TIMESTAMP(6) WHERE benefit.content_version_id = @HDZ_CV',
+    'SELECT 1'
+);
+PREPARE hdz_report_update_statement FROM @hdz_report_update_sql;
+EXECUTE hdz_report_update_statement;
+DEALLOCATE PREPARE hdz_report_update_statement;
 
 INSERT INTO moca.benefit_rules
 (rule_id, offer_id, position, rule_effect, stacking_mode, reward_value, reward_unit, previous_spend_min_krw)
