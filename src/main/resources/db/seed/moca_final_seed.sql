@@ -35578,3 +35578,161 @@ WHERE EXISTS (SELECT 1 FROM benefit_limit_policies policy
   AND NOT EXISTS (SELECT 1 FROM benefit_limit_tiers existing
                   WHERE existing.limit_policy_id = source.limit_policy_id
                     AND existing.position = 1);
+
+-- Point Plan 체크 캐릭터형: 일상 생활비 적립과 일반월·가족행사월 한도.
+INSERT INTO benefit_offers
+    (offer_id, benefit_id, offer_name, position, priority, exclusive_group_key,
+     reward_type, value_type, value_unit, calculation_mode, calculation_basis,
+     stacking_mode, reward_timing, valuation_scope, valuation_method,
+     created_at, updated_at)
+SELECT UUID(), benefit.benefit_id,
+       '일상 생활비 포인트 적립', 1, 90,
+       'SHINHAN_POINT_PLAN_CHECK_DAILY_LIVING', 'points', 'percentage', 'percent',
+       'flat', 'transaction_amount', 'standalone', 'point_accrual', 'transaction',
+       'direct', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+FROM card_benefits benefit
+WHERE benefit.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+  AND NOT EXISTS (
+      SELECT 1 FROM benefit_offers existing
+      WHERE existing.benefit_id = benefit.benefit_id
+        AND existing.position = 1);
+
+UPDATE benefit_offers offer
+SET offer.offer_name = '일상 생활비 포인트 적립', offer.priority = 90,
+    offer.exclusive_group_key = 'SHINHAN_POINT_PLAN_CHECK_DAILY_LIVING',
+    offer.reward_type = 'points', offer.value_type = 'percentage',
+    offer.value_unit = 'percent', offer.calculation_mode = 'flat',
+    offer.calculation_basis = 'transaction_amount', offer.stacking_mode = 'standalone',
+    offer.reward_timing = 'point_accrual', offer.valuation_scope = 'transaction',
+    offer.valuation_method = 'direct', offer.updated_at = UTC_TIMESTAMP(6)
+WHERE offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+  AND offer.position = 1;
+
+INSERT INTO benefit_rules
+    (rule_id, offer_id, position, priority, rule_name, rule_effect, stacking_mode,
+     reward_value, reward_unit, previous_spend_min_krw, rounding_type, rounding_unit,
+     rule_schema_version, rule_support_status, rule_definition_json,
+     created_at, updated_at)
+SELECT CONCAT('28900000-0000-4000-8000-0000000001', LPAD(source.position, 2, '0')),
+       offer.offer_id, source.position, source.position,
+       source.rule_name, 'grant', 'standalone', source.rate * 100, 'percent',
+       200000, 'floor', 1, 1, 'SUPPORTED',
+       JSON_OBJECT(
+           'schemaVersion', 1,
+           'conditions', JSON_OBJECT(
+               'all', JSON_ARRAY(
+                   JSON_OBJECT('type', 'PAYMENT_AMOUNT', 'operator', 'GTE',
+                               'value', CAST(source.minimum_amount AS CHAR),
+                               'rejectionReason', 'MIN_PAYMENT_NOT_MET'),
+                   JSON_OBJECT('type', 'PAYMENT_AMOUNT', 'operator', 'LT',
+                               'value', CAST(source.maximum_amount AS CHAR),
+                               'rejectionReason', 'CATEGORY_NOT_MATCHED'),
+                   JSON_OBJECT('type', 'PREVIOUS_MONTH_SPEND', 'operator', 'GTE',
+                               'value', '200000',
+                               'rejectionReason', 'PERFORMANCE_NOT_MET')),
+               'any', JSON_ARRAY(),
+               'none', JSON_ARRAY(JSON_OBJECT(
+                   'type', 'MERCHANT_CATEGORY', 'operator', 'IN',
+                   'values', JSON_ARRAY('CONVENIENCE_STORE'),
+                   'rejectionReason', 'TARGET_NOT_MATCHED'))),
+           'reward', JSON_OBJECT('benefitType', 'POINT', 'rewardUnit', 'POINT',
+                                 'calculation', 'RATE',
+                                 'rate', CAST(source.rate AS CHAR)),
+           'limits', JSON_ARRAY()),
+       UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+FROM (
+    SELECT 1 position, '2만원 미만 0.2% 적립' rule_name,
+           0 minimum_amount, 20000 maximum_amount, 0.002 rate UNION ALL
+    SELECT 2, '2만원 이상 10만원 미만 0.4% 적립', 20000, 100000, 0.004 UNION ALL
+    SELECT 3, '10만원 이상 50만원 미만 0.8% 적립', 100000, 500000, 0.008 UNION ALL
+    SELECT 4, '50만원 이상 1% 적립', 500000, 999999999999, 0.01
+) source
+INNER JOIN benefit_offers offer
+    ON offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+   AND offer.position = 1
+WHERE 1 = 1
+  AND NOT EXISTS (
+      SELECT 1 FROM benefit_rules existing
+      WHERE existing.offer_id = offer.offer_id
+        AND existing.position = source.position);
+
+INSERT INTO benefit_rule_targets
+    (target_id, rule_id, condition_group, match_mode, target_type,
+     target_code, target_name, target_source, target_authority,
+     minimum_place_confidence, created_at, updated_at)
+SELECT UUID(), rule_data.rule_id, 1, 'include', 'all_merchants',
+       'ALL', '국내 오프라인 전체 가맹점', 'ALL_MERCHANTS', 'ALL_MERCHANTS',
+       0.000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+FROM benefit_rules rule_data
+INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+WHERE offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+  AND offer.position = 1
+  AND NOT EXISTS (
+      SELECT 1 FROM benefit_rule_targets existing
+      WHERE existing.rule_id = rule_data.rule_id
+        AND existing.match_mode = 'include'
+        AND existing.target_type = 'all_merchants');
+
+INSERT INTO benefit_limit_policies
+    (limit_policy_id, offer_id, policy_name, limit_period, limit_type, limit_unit,
+     shared_group_key, created_at, updated_at)
+SELECT source.limit_policy_id, offer.offer_id,
+       source.policy_name, 'monthly', 'reward_amount', 'point', NULL,
+       UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+FROM (
+    SELECT '28900000-0000-4000-8000-000000000201' limit_policy_id,
+           '일상 생활비 일반월 한도' policy_name UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000202',
+           '일상 생활비 가족행사월 한도'
+) source
+INNER JOIN benefit_offers offer
+    ON offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+   AND offer.position = 1
+WHERE 1 = 1
+  AND NOT EXISTS (
+      SELECT 1 FROM benefit_limit_policies existing
+      WHERE existing.limit_policy_id = source.limit_policy_id);
+
+-- V23 스키마에서도 seed를 먼저 적재할 수 있도록 월 컬럼 갱신은 동적 SQL로 수행한다.
+SET @point_plan_month_column_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'benefit_limit_policies'
+      AND column_name = 'applicable_months_json'
+);
+SET @point_plan_month_sql := IF(
+    @point_plan_month_column_exists > 0,
+    'UPDATE benefit_limit_policies SET applicable_months_json = CASE policy_name WHEN ''일상 생활비 일반월 한도'' THEN JSON_ARRAY(1,2,3,4,6,7,8,9,10,11) WHEN ''일상 생활비 가족행사월 한도'' THEN JSON_ARRAY(5,12) ELSE applicable_months_json END WHERE limit_policy_id IN (''28900000-0000-4000-8000-000000000201'',''28900000-0000-4000-8000-000000000202'')',
+    'SELECT 1'
+);
+PREPARE point_plan_month_statement FROM @point_plan_month_sql;
+EXECUTE point_plan_month_statement;
+DEALLOCATE PREPARE point_plan_month_statement;
+
+INSERT INTO benefit_limit_tiers
+    (limit_tier_id, limit_policy_id, position, limit_value,
+     previous_spend_min_krw, created_at, updated_at)
+SELECT UUID(), source.limit_policy_id, source.position, source.limit_value,
+       source.minimum_spend, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+FROM (
+    SELECT '28900000-0000-4000-8000-000000000201' limit_policy_id,
+           1 position, 5000 limit_value, 200000 minimum_spend UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000201', 2, 10000, 500000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000201', 3, 15000, 800000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000202', 1, 10000, 200000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000202', 2, 15000, 500000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000202', 3, 20000, 800000
+) source
+WHERE EXISTS (
+    SELECT 1 FROM benefit_limit_policies policy
+    WHERE policy.limit_policy_id = source.limit_policy_id)
+  AND NOT EXISTS (
+      SELECT 1 FROM benefit_limit_tiers existing
+      WHERE existing.limit_policy_id = source.limit_policy_id
+        AND existing.position = source.position);
+
+UPDATE card_benefits
+SET structuring_status = 'STRUCTURED', structuring_note = NULL,
+    updated_at = UTC_TIMESTAMP(6)
+WHERE benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402';
