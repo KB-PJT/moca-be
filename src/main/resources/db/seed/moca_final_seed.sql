@@ -30004,6 +30004,18 @@ WHERE b.content_version_id = @HDZ_CV
       SELECT 1 FROM moca.benefit_offers o WHERE o.benefit_id=b.benefit_id AND o.position=1
   );
 
+UPDATE moca.benefit_offers offer
+INNER JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+SET offer.report_visible = CASE WHEN benefit.position IN (1, 4) THEN FALSE ELSE TRUE END,
+    offer.report_title = CASE benefit.position
+        WHEN 2 THEN '편의점 청구 할인'
+        WHEN 3 THEN '커피전문점 청구 할인'
+        WHEN 5 THEN '도서 청구 할인'
+        ELSE NULL
+    END,
+    offer.updated_at = CURRENT_TIMESTAMP(6)
+WHERE benefit.content_version_id = @HDZ_CV;
+
 INSERT INTO moca.benefit_rules
 (rule_id, offer_id, position, rule_effect, stacking_mode, reward_value, reward_unit, previous_spend_min_krw)
 SELECT UUID(), o.offer_id, 1, 'grant', 'standalone', 10.0000, 'percent', 500000.00

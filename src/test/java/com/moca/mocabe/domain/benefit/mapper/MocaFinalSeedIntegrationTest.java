@@ -43,6 +43,7 @@ class MocaFinalSeedIntegrationTest {
       JdbcTemplate jdbc = new JdbcTemplate(dataSource);
       assertSupportedRulesHaveIncludeTarget(jdbc);
       assertZWorkMapBenefitTargets(jdbc);
+      assertZWorkReportVisibility(jdbc);
       assertSolPlanAllMerchantTargets(jdbc);
       assertPointPlanReportTitles(jdbc);
       assertShinhanNarasarangStructure(jdbc);
@@ -82,6 +83,7 @@ class MocaFinalSeedIntegrationTest {
       assertMapVisibilityFlags(jdbc);
       assertMerchantPhysicalLocationFlags(jdbc);
       assertRepresentativeRewardTargets(jdbc);
+      assertZWorkReportVisibility(jdbc);
       assertPointPlanReportTitles(jdbc);
       assertShinhanNarasarangStructure(jdbc);
       assertFlatMerchantTaxonomy(jdbc);
@@ -388,6 +390,20 @@ class MocaFinalSeedIntegrationTest {
         + "WHERE card.gorilla_card_id='2890' "
         + "AND offer.exclusive_group_key='SHINHAN_POINT_PLAN_CHECK_CONVENIENCE' "
         + "AND (rule_data.rule_name IS NULL OR rule_data.rule_name<>'편의점')"));
+  }
+
+  private void assertZWorkReportVisibility(JdbcTemplate jdbc) {
+    String base = "SELECT COUNT(*) FROM benefit_offers offer "
+        + "INNER JOIN card_benefits benefit ON benefit.benefit_id=offer.benefit_id "
+        + "INNER JOIN card_content_versions version "
+        + "ON version.content_version_id=benefit.content_version_id "
+        + "INNER JOIN cards card ON card.card_id=version.card_id "
+        + "WHERE card.gorilla_card_id='2680' ";
+    assertEquals(3, count(jdbc, base + "AND offer.report_visible=TRUE"));
+    assertEquals(2, count(jdbc, base + "AND offer.report_visible=FALSE"));
+    assertEquals(1, count(jdbc, base + "AND offer.report_title='편의점 청구 할인'"));
+    assertEquals(1, count(jdbc, base + "AND offer.report_title='커피전문점 청구 할인'"));
+    assertEquals(1, count(jdbc, base + "AND offer.report_title='도서 청구 할인'"));
   }
 
   private void assertShinhanNarasarangStructure(JdbcTemplate jdbc) {
