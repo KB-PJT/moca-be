@@ -106,10 +106,13 @@
                r.transaction_min_krw, r.previous_spend_min_krw,
                COALESCE(ps.current_spend_amount, 0) AS previous_month_spend_krw,
                COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) AS krw_per_reward_unit,
-               (SELECT MAX(tier.limit_value) FROM benefit_limit_policies policy
+               (SELECT MAX(CASE WHEN policy.limit_unit = 'KRW' THEN tier.limit_value
+                                ELSE tier.limit_value
+                                     * COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) END)
+                FROM benefit_limit_policies policy
                 INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
                 WHERE policy.offer_id = o.offer_id AND policy.limit_period = 'monthly'
-                  AND policy.limit_type = 'reward_amount' AND policy.limit_unit = 'KRW'
+                  AND policy.limit_type = 'reward_amount' AND policy.limit_unit IN ('KRW', 'point', 'mile')
                   AND (tier.previous_spend_min_krw IS NULL
                        OR tier.previous_spend_min_krw &lt;= COALESCE(ps.current_spend_amount, 0)))
                    AS monthly_limit_krw,
@@ -175,10 +178,13 @@
                r.transaction_min_krw, r.previous_spend_min_krw,
                COALESCE(ps.current_spend_amount, 0) AS previous_month_spend_krw,
                COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) AS krw_per_reward_unit,
-               (SELECT MAX(tier.limit_value) FROM benefit_limit_policies policy
+               (SELECT MAX(CASE WHEN policy.limit_unit = 'KRW' THEN tier.limit_value
+                                ELSE tier.limit_value
+                                     * COALESCE(o.reference_value_krw, conversion.krw_per_unit, 1) END)
+                FROM benefit_limit_policies policy
                 INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
                 WHERE policy.offer_id = o.offer_id AND policy.limit_period = 'monthly'
-                  AND policy.limit_type = 'reward_amount' AND policy.limit_unit = 'KRW'
+                  AND policy.limit_type = 'reward_amount' AND policy.limit_unit IN ('KRW', 'point', 'mile')
                   AND (tier.previous_spend_min_krw IS NULL
                        OR tier.previous_spend_min_krw &lt;= COALESCE(ps.current_spend_amount, 0)))
                    AS monthly_limit_krw,
@@ -244,15 +250,24 @@
     </resultMap>
 
     <!-- 현재 실적 조건으로 필터링하지 않고 offer에 연결된 전체 tier를 반환한다. -->
+    <!-- point/mile 단위 한도는 findOwnedCardBenefitRules와 동일한 환산율로 KRW로 변환해 반환한다. -->
     <select id="findBenefitTiersForOffers" resultMap="benefitTierRowMap">
         SELECT policy.offer_id, tier.position,
                tier.previous_spend_min_krw AS required_previous_spend_krw,
-               tier.limit_value AS monthly_limit_krw
+               CASE WHEN policy.limit_unit = 'KRW' THEN tier.limit_value
+                    ELSE tier.limit_value * COALESCE(o.reference_value_krw,
+                        (SELECT conversion.krw_per_unit
+                         FROM reward_conversion_policies conversion
+                         WHERE conversion.reward_program_id = o.reward_program_id
+                           AND conversion.valid_to IS NULL
+                         LIMIT 1), 1) END
+                   AS monthly_limit_krw
         FROM benefit_limit_policies policy
         INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
+        INNER JOIN benefit_offers o ON o.offer_id = policy.offer_id
         WHERE policy.limit_period = 'monthly'
           AND policy.limit_type = 'reward_amount'
-          AND policy.limit_unit = 'KRW'
+          AND policy.limit_unit IN ('KRW', 'point', 'mile')
           AND policy.offer_id IN
         <foreach collection="offerIds" item="offerId" open="(" separator="," close=")">
             #{offerId}
