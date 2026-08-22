@@ -370,6 +370,24 @@ class MocaFinalSeedIntegrationTest {
         + "WHERE card.gorilla_card_id='2890' "
         + "AND offer.exclusive_group_key='SHINHAN_POINT_PLAN_CHECK_CONVENIENCE' "
         + "AND rule_data.rule_name='편의점'"));
+    assertEquals(0, count(jdbc, "SELECT COUNT(*) FROM benefit_rules rule_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+        + "INNER JOIN card_benefits benefit ON benefit.benefit_id=offer.benefit_id "
+        + "INNER JOIN card_content_versions version "
+        + "ON version.content_version_id=benefit.content_version_id "
+        + "INNER JOIN cards card ON card.card_id=version.card_id "
+        + "WHERE card.gorilla_card_id='2890' "
+        + "AND offer.exclusive_group_key='SHINHAN_POINT_PLAN_CHECK_DAILY_LIVING' "
+        + "AND (rule_data.rule_name IS NULL OR rule_data.rule_name<>'일상 생활비')"));
+    assertEquals(0, count(jdbc, "SELECT COUNT(*) FROM benefit_rules rule_data "
+        + "INNER JOIN benefit_offers offer ON offer.offer_id=rule_data.offer_id "
+        + "INNER JOIN card_benefits benefit ON benefit.benefit_id=offer.benefit_id "
+        + "INNER JOIN card_content_versions version "
+        + "ON version.content_version_id=benefit.content_version_id "
+        + "INNER JOIN cards card ON card.card_id=version.card_id "
+        + "WHERE card.gorilla_card_id='2890' "
+        + "AND offer.exclusive_group_key='SHINHAN_POINT_PLAN_CHECK_CONVENIENCE' "
+        + "AND (rule_data.rule_name IS NULL OR rule_data.rule_name<>'편의점')"));
   }
 
   private void assertShinhanNarasarangStructure(JdbcTemplate jdbc) {

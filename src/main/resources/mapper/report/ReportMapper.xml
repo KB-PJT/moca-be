@@ -187,12 +187,12 @@
             SELECT user_card_id,
                    limit_group_key,
                    MIN(rule_id) AS benefit_rule_id,
-                   title,
-                   benefit_type,
+                   MIN(title) AS title,
+                   MIN(benefit_type) AS benefit_type,
                    MAX(limit_amount) AS limit_amount
             FROM eligible_limit_rows
             WHERE limit_amount &gt; 0
-            GROUP BY user_card_id, limit_group_key, title, benefit_type
+            GROUP BY user_card_id, limit_group_key
         ), eligible_offer_limits AS (
             SELECT DISTINCT user_card_id, offer_id, limit_group_key
             FROM eligible_limit_rows
