@@ -232,6 +232,66 @@ class ReportMapperIntegrationTest {
   }
 
   @Test
+  void aggregatesSameMonthlyLimitRulesAndMapsUsageWithoutLimitPolicy() {
+    String secondOffer = "aa000000-0000-4000-8000-000000000002";
+    String secondRule = "bb000000-0000-4000-8000-000000000002";
+    String secondPolicy = "cc000000-0000-4000-8000-000000000002";
+    jdbc.update(
+        "INSERT INTO benefit_offers"
+            + " (offer_id,benefit_id,offer_name,position,reward_type,value_type,calculation_mode,"
+            + "calculation_basis,stacking_mode,valuation_scope,valuation_method)"
+            + " VALUES (?,?,'공유 카페 혜택',2,'discount','percentage','flat','transaction_amount',"
+            + "'standalone','transaction','direct')",
+        secondOffer,
+        BENEFIT);
+    jdbc.update(
+        "INSERT INTO benefit_rules"
+            + " (rule_id,offer_id,position,rule_name,rule_effect,stacking_mode,reward_value,reward_unit)"
+            + " VALUES (?,?,1,'공유 카페 혜택','grant','standalone',20,'percent')",
+        secondRule,
+        secondOffer);
+    jdbc.update(
+        "INSERT INTO benefit_limit_policies"
+            + " (limit_policy_id,offer_id,policy_name,limit_period,limit_type,limit_unit,shared_group_key)"
+            + " VALUES (?,?, '공유 월 한도','monthly','reward_amount','KRW','SHARED_CAFE')",
+        secondPolicy,
+        secondOffer);
+    jdbc.update(
+        "INSERT INTO benefit_limit_tiers (limit_tier_id,limit_policy_id,position,limit_value)"
+            + " VALUES ('ee000000-0000-4000-8000-000000000002',?,?,5000)",
+        secondPolicy,
+        1);
+    jdbc.update(
+        "UPDATE benefit_limit_policies SET shared_group_key='SHARED_CAFE' WHERE limit_policy_id=?",
+        POLICY);
+    jdbc.update(
+        "UPDATE user_benefit_calculation_outcomes SET limit_policy_id=NULL"
+            + " WHERE user_card_id=?",
+        USER_CARD);
+    jdbc.update(
+        "UPDATE user_benefit_usages SET limit_policy_id=NULL WHERE user_card_id=?",
+        USER_CARD);
+    jdbc.update(
+        "INSERT INTO user_benefit_usages"
+            + " (usage_id,user_card_id,offer_id,rule_id,usage_date,eligible_amount_krw,reward_amount_krw,"
+            + "usage_status,approved_at,confirmed_at) VALUES"
+            + " ('ff000000-0000-4000-8000-000000000002',?,?,?,?,5000,500,'confirmed',"
+            + "'2026-07-18 05:30:00','2026-07-18 05:30:01')",
+        USER_CARD,
+        secondOffer,
+        secondRule,
+        "2026-07-18");
+
+    List<MissedBenefitRow> rows =
+        mapper.findMonthlyRemainingBenefits(USER, USER_CARD, "2026-07");
+
+    assertEquals(1, rows.size());
+    assertEquals("공유 카페 혜택", rows.get(0).title());
+    assertEquals(2_000L, rows.get(0).usedAmount());
+    assertEquals(5_000L, rows.get(0).limitAmount());
+  }
+
+  @Test
   void capsAggregatedOutcomeAmountAtTheMonthlyLimit() {
     jdbc.update(
         "INSERT INTO card_payment_approvals"
