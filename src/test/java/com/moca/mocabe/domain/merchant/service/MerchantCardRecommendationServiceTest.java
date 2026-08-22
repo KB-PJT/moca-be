@@ -23,6 +23,7 @@ import com.moca.mocabe.global.exception.merchant.MerchantNotFoundException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -196,9 +197,11 @@ class MerchantCardRecommendationServiceTest {
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.any())).thenReturn(tiers);
-        when(mapper.findBenefitTiersForOffers(List.of("offer-tier"))).thenReturn(List.of(
-                new MerchantBenefitTierRow("offer-tier", 2, new BigDecimal("500000"), new BigDecimal("10000")),
-                new MerchantBenefitTierRow("offer-tier", 1, new BigDecimal("200000"), new BigDecimal("5000"))));
+        when(mapper.findBenefitTiersForOffers(List.of("offer-tier"), LocalDate.of(2026, 8, 10))).thenReturn(
+                List.of(new MerchantBenefitTierRow("offer-tier", 2, new BigDecimal("500000"),
+                                new BigDecimal("10000")),
+                        new MerchantBenefitTierRow("offer-tier", 1, new BigDecimal("200000"),
+                                new BigDecimal("5000"))));
 
         var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
                 .recommendedCard();

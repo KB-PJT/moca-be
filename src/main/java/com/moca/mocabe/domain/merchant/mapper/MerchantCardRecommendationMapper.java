@@ -35,5 +35,5 @@ public interface MerchantCardRecommendationMapper {
             @Param("usageDate") LocalDate usageDate, @Param("performanceMonth") String performanceMonth);
 
     List<MerchantBenefitTierRow> findBenefitTiersForOffers(
-            @Param("offerIds") List<String> offerIds);
+            @Param("offerIds") List<String> offerIds, @Param("usageDate") LocalDate usageDate);
 }

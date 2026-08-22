@@ -149,11 +149,38 @@ class MerchantCardRecommendationMapperIntegrationTest {
     assertEquals(1, rows.size());
     assertEquals(0, new BigDecimal("2000").compareTo(rows.get(0).monthlyLimitKrw()));
 
-    List<MerchantBenefitTierRow> tiers = mapper.findBenefitTiersForOffers(List.of(OFFER));
+    List<MerchantBenefitTierRow> tiers = mapper.findBenefitTiersForOffers(
+        List.of(OFFER), LocalDate.of(2026, 8, 14));
 
     assertEquals(1, tiers.size());
     assertEquals(0, new BigDecimal("2000").compareTo(tiers.get(0).monthlyLimitKrw()));
     assertNull(tiers.get(0).requiredPreviousSpendKrw());
+  }
+
+  @Test
+  @DisplayName("이번 달에 적용되지 않는 월별 한도 정책은 제외한다")
+  void excludesLimitPolicyNotApplicableToUsageMonth() {
+    String decemberOnlyPolicy = "df000000-0000-4000-8000-000000000001";
+    String decemberOnlyTier = "e0000000-0000-4000-8000-000000000001";
+    jdbc.update("INSERT INTO benefit_limit_policies (limit_policy_id,offer_id,policy_name,limit_period,"
+        + "limit_type,limit_unit,applicable_months_json) VALUES (?,?,'12월 전용 한도','monthly',"
+        + "'reward_amount','point',JSON_ARRAY(12))", decemberOnlyPolicy, OFFER);
+    jdbc.update("INSERT INTO benefit_limit_tiers (limit_tier_id,limit_policy_id,position,limit_value,"
+        + "previous_spend_min_krw) VALUES (?,?,1,9999,NULL)", decemberOnlyTier, decemberOnlyPolicy);
+
+    try {
+      List<MerchantCardBenefitRuleRow> rows = mapper.findOwnedCardBenefitRules(
+          USER, MERCHANT, CATEGORY, "테스트마트", LocalDate.of(2026, 8, 14), "2026-07");
+      assertEquals(0, new BigDecimal("2000").compareTo(rows.get(0).monthlyLimitKrw()));
+
+      List<MerchantBenefitTierRow> tiers = mapper.findBenefitTiersForOffers(
+          List.of(OFFER), LocalDate.of(2026, 8, 14));
+      assertEquals(1, tiers.size());
+      assertEquals(0, new BigDecimal("2000").compareTo(tiers.get(0).monthlyLimitKrw()));
+    } finally {
+      jdbc.update("DELETE FROM benefit_limit_tiers WHERE limit_tier_id = ?", decemberOnlyTier);
+      jdbc.update("DELETE FROM benefit_limit_policies WHERE limit_policy_id = ?", decemberOnlyPolicy);
+    }
   }
 
   @Configuration
