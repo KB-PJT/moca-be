@@ -32,6 +32,8 @@ import org.testcontainers.utility.DockerImageName;
 class HomeFinalSeedBenefitLimitIntegrationTest {
 
   private static final String USER_ID = "89000000-0000-4000-8000-000000000001";
+  private static final String TARGET_CARD_IDS =
+      "'360','2933','281','2422','2899','2890','733','2680'";
 
   private MySQLContainer container;
   private SqlSession sqlSession;
@@ -121,8 +123,7 @@ class HomeFinalSeedBenefitLimitIntegrationTest {
             + "'active', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6) "
             + "FROM issuers issuer WHERE issuer.issuer_id IN "
             + "(SELECT DISTINCT card.issuer_id FROM cards card "
-            + "WHERE card.gorilla_card_id IN "
-            + "('360','2933','281','2422','2899','2890','733','2680'))",
+            + "WHERE card.gorilla_card_id IN (" + TARGET_CARD_IDS + "))",
         USER_ID);
     jdbc.update(
         "INSERT INTO user_cards (user_card_id, user_id, card_id, "
@@ -137,22 +138,21 @@ class HomeFinalSeedBenefitLimitIntegrationTest {
             + "ON content.card_id = card.card_id "
             + "INNER JOIN codef_account_credentials credential "
             + "ON credential.user_id = ? AND credential.issuer_id = card.issuer_id "
-            + "WHERE card.gorilla_card_id IN ('360','2933','281','2422','2899','2890','733','2680')",
+            + "WHERE card.gorilla_card_id IN (" + TARGET_CARD_IDS + ")",
         USER_ID,
         USER_ID);
+    insertPerformanceSnapshots(jdbc, "2026-03");
+    insertPerformanceSnapshots(jdbc, "2026-04");
+  }
+
+  private void insertPerformanceSnapshots(JdbcTemplate jdbc, String performanceMonth) {
     jdbc.update(
         "INSERT INTO user_card_performance_snapshots "
             + "(performance_snapshot_id, user_card_id, performance_month, "
             + "current_spend_amount, updated_at, created_at) "
-            + "SELECT UUID(), user_card_id, '2026-03', 600000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6) "
+            + "SELECT UUID(), user_card_id, ?, 600000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6) "
             + "FROM user_cards WHERE user_id = ?",
-        USER_ID);
-    jdbc.update(
-        "INSERT INTO user_card_performance_snapshots "
-            + "(performance_snapshot_id, user_card_id, performance_month, "
-            + "current_spend_amount, updated_at, created_at) "
-            + "SELECT UUID(), user_card_id, '2026-04', 600000, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6) "
-            + "FROM user_cards WHERE user_id = ?",
+        performanceMonth,
         USER_ID);
   }
 

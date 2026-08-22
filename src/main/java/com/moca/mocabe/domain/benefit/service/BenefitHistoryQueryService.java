@@ -59,18 +59,16 @@ public class BenefitHistoryQueryService {
     LocalDateTime from = toUtc(month);
     LocalDateTime to = toUtc(month.plusMonths(1));
     String cardId = blankToNull(userCardId);
+    int offset = (page - 1) * size;
     List<BenefitHistoryRow> representatives =
-        representativeSelector.select(benefitHistoryMapper.findHistory(userId, from, to, cardId, null));
-    List<BenefitHistoryRow> ordered =
+        representativeSelector.select(
+            benefitHistoryMapper.findHistory(
+                userId, from, to, cardId, type, sort, offset, size));
+    long total = benefitHistoryMapper.countHistory(userId, from, to, cardId, type);
+    List<BenefitHistoryItemResponse> data =
         representatives.stream()
             .filter(row -> type == null || type.equals(row.getBenefitType()))
             .sorted(historyOrder(sort))
-            .toList();
-    long total = ordered.size();
-    List<BenefitHistoryItemResponse> data =
-        ordered.stream()
-            .skip((long) (page - 1) * size)
-            .limit(size)
             .map(this::toItem)
             .toList();
     BenefitHistorySummaryRow summary =

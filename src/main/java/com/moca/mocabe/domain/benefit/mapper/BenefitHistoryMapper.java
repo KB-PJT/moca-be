@@ -17,6 +17,16 @@ public interface BenefitHistoryMapper {
       @Param("fromUtc") LocalDateTime fromUtc,
       @Param("toUtc") LocalDateTime toUtc,
       @Param("userCardId") String userCardId,
+      @Param("benefitType") String benefitType,
+      @Param("sort") String sort,
+      @Param("offset") int offset,
+      @Param("limit") int limit);
+
+  long countHistory(
+      @Param("userId") String userId,
+      @Param("fromUtc") LocalDateTime fromUtc,
+      @Param("toUtc") LocalDateTime toUtc,
+      @Param("userCardId") String userCardId,
       @Param("benefitType") String benefitType);
 
   BenefitHistorySummaryRow summarizeHistory(

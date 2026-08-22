@@ -110,6 +110,25 @@
                         AND integrated_policy.limit_type = 'reward_amount'
                         AND integrated_policy.shared_group_key IS NOT NULL
                         AND integrated_policy.shared_group_key NOT LIKE 'OFFER:%'
+                        AND (integrated_policy.valid_from IS NULL
+                             OR integrated_policy.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
+                        AND (integrated_policy.valid_to IS NULL
+                             OR integrated_policy.valid_to &gt;= CONCAT(#{yearMonth}, '-01'))
+                        AND (integrated_policy.applicable_months_json IS NULL
+                             OR JSON_CONTAINS(
+                                 integrated_policy.applicable_months_json,
+                                 CAST(CAST(SUBSTRING(#{yearMonth}, 6, 2) AS UNSIGNED) AS JSON),
+                                 '$'))
+                        AND EXISTS (
+                            SELECT 1
+                            FROM benefit_limit_tiers integrated_tier
+                            WHERE integrated_tier.limit_policy_id =
+                                  integrated_policy.limit_policy_id
+                              AND integrated_tier.current_spend_min_krw IS NULL
+                              AND (integrated_tier.previous_spend_min_krw IS NULL
+                                   OR integrated_tier.previous_spend_min_krw &lt;=
+                                      COALESCE(previous_performance.current_spend_amount, 0))
+                        )
                   )
               )
               AND (
@@ -227,7 +246,8 @@
             SELECT uc.user_card_id,
                    COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
                    CASE
-                       WHEN policy.limit_type = 'reward_amount' AND policy.limit_unit = 'KRW'
+                       WHEN policy.limit_type = 'reward_amount'
+                            AND policy.limit_unit IN ('KRW', 'point')
                            THEN tier.limit_value
                        WHEN policy.limit_type = 'usage_count'
                             AND policy.limit_unit = 'count'
@@ -268,6 +288,11 @@
               AND policy.limit_period = 'monthly'
               AND (policy.valid_from IS NULL OR policy.valid_from &lt;= CONCAT(#{yearMonth}, '-01'))
               AND (policy.valid_to IS NULL OR policy.valid_to &gt;= CONCAT(#{yearMonth}, '-01'))
+              AND (policy.applicable_months_json IS NULL
+                   OR JSON_CONTAINS(
+                       policy.applicable_months_json,
+                       CAST(CAST(SUBSTRING(#{yearMonth}, 6, 2) AS UNSIGNED) AS JSON),
+                       '$'))
               AND tier.current_spend_min_krw IS NULL
               AND (tier.previous_spend_min_krw IS NULL
                    OR tier.previous_spend_min_krw &lt;= COALESCE(previous_performance.current_spend_amount, 0))
@@ -312,7 +337,9 @@
         ), monthly_usage_groups AS (
             SELECT benefit_usage.user_card_id,
                    COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
-                   SUM(benefit_usage.reward_amount_krw) AS used_amount
+                   SUM(CASE WHEN benefit_usage.reward_original_unit = 'point'
+                            THEN COALESCE(benefit_usage.reward_original_value, 0)
+                            ELSE benefit_usage.reward_amount_krw END) AS used_amount
             FROM user_benefit_usages benefit_usage
             INNER JOIN user_cards uc ON uc.user_card_id = benefit_usage.user_card_id
             INNER JOIN benefit_limit_policies policy

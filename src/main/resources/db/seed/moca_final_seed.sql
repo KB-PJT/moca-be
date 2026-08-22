@@ -35656,6 +35656,52 @@ WHERE 1 = 1
       WHERE existing.offer_id = offer.offer_id
         AND existing.position = source.position);
 
+UPDATE benefit_rules rule_data
+INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+INNER JOIN (
+    SELECT 1 position, '2만원 미만 0.2% 적립' rule_name,
+           0 minimum_amount, 20000 maximum_amount, 0.002 rate UNION ALL
+    SELECT 2, '2만원 이상 10만원 미만 0.4% 적립', 20000, 100000, 0.004 UNION ALL
+    SELECT 3, '10만원 이상 50만원 미만 0.8% 적립', 100000, 500000, 0.008 UNION ALL
+    SELECT 4, '50만원 이상 1% 적립', 500000, 999999999999, 0.01
+) source ON source.position = rule_data.position
+SET rule_data.priority = source.position,
+    rule_data.rule_name = source.rule_name,
+    rule_data.rule_effect = 'grant',
+    rule_data.stacking_mode = 'standalone',
+    rule_data.reward_value = source.rate * 100,
+    rule_data.reward_unit = 'percent',
+    rule_data.previous_spend_min_krw = 200000,
+    rule_data.rounding_type = 'floor',
+    rule_data.rounding_unit = 1,
+    rule_data.rule_schema_version = 1,
+    rule_data.rule_support_status = 'SUPPORTED',
+    rule_data.rule_definition_json = JSON_OBJECT(
+        'schemaVersion', 1,
+        'conditions', JSON_OBJECT(
+            'all', JSON_ARRAY(
+                JSON_OBJECT('type', 'PAYMENT_AMOUNT', 'operator', 'GTE',
+                            'value', CAST(source.minimum_amount AS CHAR),
+                            'rejectionReason', 'MIN_PAYMENT_NOT_MET'),
+                JSON_OBJECT('type', 'PAYMENT_AMOUNT', 'operator', 'LT',
+                            'value', CAST(source.maximum_amount AS CHAR),
+                            'rejectionReason', 'CATEGORY_NOT_MATCHED'),
+                JSON_OBJECT('type', 'PREVIOUS_MONTH_SPEND', 'operator', 'GTE',
+                            'value', '200000',
+                            'rejectionReason', 'PERFORMANCE_NOT_MET')),
+            'any', JSON_ARRAY(),
+            'none', JSON_ARRAY(JSON_OBJECT(
+                'type', 'MERCHANT_CATEGORY', 'operator', 'IN',
+                'values', JSON_ARRAY('CONVENIENCE_STORE'),
+                'rejectionReason', 'TARGET_NOT_MATCHED'))),
+        'reward', JSON_OBJECT('benefitType', 'POINT', 'rewardUnit', 'POINT',
+                              'calculation', 'RATE',
+                              'rate', CAST(source.rate AS CHAR)),
+        'limits', JSON_ARRAY()),
+    rule_data.updated_at = UTC_TIMESTAMP(6)
+WHERE offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+  AND offer.position = 1;
+
 INSERT INTO benefit_rule_targets
     (target_id, rule_id, condition_group, match_mode, target_type,
      target_code, target_name, target_source, target_authority,
@@ -35672,6 +35718,31 @@ WHERE offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
       WHERE existing.rule_id = rule_data.rule_id
         AND existing.match_mode = 'include'
         AND existing.target_type = 'all_merchants');
+
+DELETE target
+FROM benefit_rule_targets target
+INNER JOIN benefit_rules rule_data ON rule_data.rule_id = target.rule_id
+INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+WHERE offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+  AND offer.position = 1
+  AND NOT (target.match_mode = 'include' AND target.target_type = 'all_merchants');
+
+UPDATE benefit_rule_targets target
+INNER JOIN benefit_rules rule_data ON rule_data.rule_id = target.rule_id
+INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+SET target.condition_group = 1,
+    target.match_mode = 'include',
+    target.target_type = 'all_merchants',
+    target.merchant_category_id = NULL,
+    target.merchant_id = NULL,
+    target.target_code = 'ALL',
+    target.target_name = '국내 오프라인 전체 가맹점',
+    target.target_source = 'ALL_MERCHANTS',
+    target.target_authority = 'ALL_MERCHANTS',
+    target.minimum_place_confidence = 0.000,
+    target.updated_at = UTC_TIMESTAMP(6)
+WHERE offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+  AND offer.position = 1;
 
 INSERT INTO benefit_limit_policies
     (limit_policy_id, offer_id, policy_name, limit_period, limit_type, limit_unit,
@@ -35692,6 +35763,23 @@ WHERE 1 = 1
   AND NOT EXISTS (
       SELECT 1 FROM benefit_limit_policies existing
       WHERE existing.limit_policy_id = source.limit_policy_id);
+
+UPDATE benefit_limit_policies
+SET offer_id = (
+        SELECT offer_id FROM benefit_offers
+        WHERE benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
+          AND position = 1),
+    policy_name = CASE limit_policy_id
+        WHEN '28900000-0000-4000-8000-000000000201' THEN '일상 생활비 일반월 한도'
+        ELSE '일상 생활비 가족행사월 한도' END,
+    limit_period = 'monthly',
+    limit_type = 'reward_amount',
+    limit_unit = 'point',
+    shared_group_key = NULL,
+    updated_at = UTC_TIMESTAMP(6)
+WHERE limit_policy_id IN (
+    '28900000-0000-4000-8000-000000000201',
+    '28900000-0000-4000-8000-000000000202');
 
 -- V23 스키마에서도 seed를 먼저 적재할 수 있도록 월 컬럼 갱신은 동적 SQL로 수행한다.
 SET @point_plan_month_column_exists := (
@@ -35731,6 +35819,22 @@ WHERE EXISTS (
       SELECT 1 FROM benefit_limit_tiers existing
       WHERE existing.limit_policy_id = source.limit_policy_id
         AND existing.position = source.position);
+
+UPDATE benefit_limit_tiers tier
+INNER JOIN (
+    SELECT '28900000-0000-4000-8000-000000000201' limit_policy_id,
+           1 position, 5000 limit_value, 200000 minimum_spend UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000201', 2, 10000, 500000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000201', 3, 15000, 800000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000202', 1, 10000, 200000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000202', 2, 15000, 500000 UNION ALL
+    SELECT '28900000-0000-4000-8000-000000000202', 3, 20000, 800000
+) source ON source.limit_policy_id = tier.limit_policy_id
+        AND source.position = tier.position
+SET tier.limit_value = source.limit_value,
+    tier.previous_spend_min_krw = source.minimum_spend,
+    tier.current_spend_min_krw = NULL,
+    tier.updated_at = UTC_TIMESTAMP(6);
 
 UPDATE card_benefits
 SET structuring_status = 'STRUCTURED', structuring_note = NULL,
