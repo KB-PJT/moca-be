@@ -147,7 +147,7 @@ public class MerchantCardRecommendationService {
             }
             List<MerchantCardBenefitCandidate> candidates = eligibilityEvaluator.evaluate(
                     rules.getOrDefault(id, List.of()), id, lineages.getOrDefault(id, List.of()), null, today);
-            List<RankedCardBenefitResponse> ranked = rank(candidates, amount, preference);
+            List<RankedCardBenefitResponse> ranked = rank(candidates, amount, preference, today);
             return new MerchantCardRecommendationResponse(
                     new MerchantSummaryResponse(id, merchant.name(), merchant.categoryCode(),
                             merchant.categoryName()), preference, ranked.isEmpty() ? null : ranked.get(0), ranked);
@@ -172,7 +172,7 @@ public class MerchantCardRecommendationService {
                 today, performanceMonth);
         List<MerchantCardBenefitCandidate> candidates = eligibilityEvaluator.evaluate(
                 ruleRows, merchant.merchantId(), categoryLineageIds, placeConfidence, today);
-        List<RankedCardBenefitResponse> rankedCards = rank(candidates, normalizedAmount, preference);
+        List<RankedCardBenefitResponse> rankedCards = rank(candidates, normalizedAmount, preference, today);
         return new MerchantCardRecommendationResponse(
                 new MerchantSummaryResponse(merchant.merchantId(), merchant.name(), merchant.categoryCode(),
                         merchant.categoryName()), preference,
@@ -191,7 +191,8 @@ public class MerchantCardRecommendationService {
 
     private List<RankedCardBenefitResponse> rank(List<MerchantCardBenefitCandidate> candidates,
                                                  BigDecimal paymentAmount,
-                                                 BenefitPreferenceType preference) {
+                                                 BenefitPreferenceType preference,
+                                                 LocalDate usageDate) {
         CardBenefitRankingStrategy strategy = rankingStrategies.get(preference);
         Map<String, ScoredCandidate> bestByCard = new LinkedHashMap<>();
         for (MerchantCardBenefitCandidate candidate : candidates) {
@@ -216,7 +217,7 @@ public class MerchantCardRecommendationService {
                 bestByCard.put(candidate.userCardId(), scored);
             }
         }
-        Map<String, List<BenefitTierResponse>> tiersByOffer = benefitTiersByOffer(candidates);
+        Map<String, List<BenefitTierResponse>> tiersByOffer = benefitTiersByOffer(candidates, usageDate);
         List<ScoredCandidate> sorted = new ArrayList<>(bestByCard.values());
         sorted.sort(Comparator.comparing(ScoredCandidate::score).reversed());
         List<RankedCardBenefitResponse> result = new ArrayList<>();
@@ -298,13 +299,13 @@ public class MerchantCardRecommendationService {
      * 선택된 룰의 실적 기준이 현재 구간이고, 달성 뒤에는 다음 구간까지 남은 금액을 반환한다.
      */
     private Map<String, List<BenefitTierResponse>> benefitTiersByOffer(
-            List<MerchantCardBenefitCandidate> candidates) {
+            List<MerchantCardBenefitCandidate> candidates, LocalDate usageDate) {
         List<String> offerIds = candidates.stream().map(MerchantCardBenefitCandidate::offerId)
                 .filter(Objects::nonNull).distinct().toList();
         if (offerIds.isEmpty()) {
             return Map.of();
         }
-        List<MerchantBenefitTierRow> rows = recommendationMapper.findBenefitTiersForOffers(offerIds);
+        List<MerchantBenefitTierRow> rows = recommendationMapper.findBenefitTiersForOffers(offerIds, usageDate);
         if (rows == null || rows.isEmpty()) {
             return Map.of();
         }

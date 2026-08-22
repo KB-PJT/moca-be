@@ -113,6 +113,9 @@
                 INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
                 WHERE policy.offer_id = o.offer_id AND policy.limit_period = 'monthly'
                   AND policy.limit_type = 'reward_amount' AND policy.limit_unit IN ('KRW', 'point', 'mile')
+                  AND (policy.applicable_months_json IS NULL
+                       OR JSON_CONTAINS(policy.applicable_months_json,
+                                         CAST(MONTH(#{usageDate}) AS JSON)))
                   AND (tier.previous_spend_min_krw IS NULL
                        OR tier.previous_spend_min_krw &lt;= COALESCE(ps.current_spend_amount, 0)))
                    AS monthly_limit_krw,
@@ -185,6 +188,9 @@
                 INNER JOIN benefit_limit_tiers tier ON tier.limit_policy_id = policy.limit_policy_id
                 WHERE policy.offer_id = o.offer_id AND policy.limit_period = 'monthly'
                   AND policy.limit_type = 'reward_amount' AND policy.limit_unit IN ('KRW', 'point', 'mile')
+                  AND (policy.applicable_months_json IS NULL
+                       OR JSON_CONTAINS(policy.applicable_months_json,
+                                         CAST(MONTH(#{usageDate}) AS JSON)))
                   AND (tier.previous_spend_min_krw IS NULL
                        OR tier.previous_spend_min_krw &lt;= COALESCE(ps.current_spend_amount, 0)))
                    AS monthly_limit_krw,
@@ -249,7 +255,7 @@
         </constructor>
     </resultMap>
 
-    <!-- 현재 실적 조건으로 필터링하지 않고 offer에 연결된 전체 tier를 반환한다. -->
+    <!-- 현재 실적 조건으로 필터링하지 않고 offer에 연결된, 이번 달에 적용되는 policy의 전체 tier를 반환한다. -->
     <!-- point/mile 단위 한도는 findOwnedCardBenefitRules와 동일한 환산율로 KRW로 변환해 반환한다. -->
     <select id="findBenefitTiersForOffers" resultMap="benefitTierRowMap">
         SELECT policy.offer_id, tier.position,
@@ -268,6 +274,8 @@
         WHERE policy.limit_period = 'monthly'
           AND policy.limit_type = 'reward_amount'
           AND policy.limit_unit IN ('KRW', 'point', 'mile')
+          AND (policy.applicable_months_json IS NULL
+               OR JSON_CONTAINS(policy.applicable_months_json, CAST(MONTH(#{usageDate}) AS JSON)))
           AND policy.offer_id IN
         <foreach collection="offerIds" item="offerId" open="(" separator="," close=")">
             #{offerId}
