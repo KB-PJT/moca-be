@@ -79,6 +79,7 @@
         WITH eligible_limit_rows AS (
             SELECT uc.user_card_id,
                    COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
+                   offer.offer_id,
                    rule.rule_id,
                    COALESCE(NULLIF(rule.rule_name, ''), offer.offer_name) AS title,
                    CASE offer.reward_type
@@ -185,21 +186,25 @@
         ), eligible_limit_rules AS (
             SELECT user_card_id,
                    limit_group_key,
-                   rule_id AS benefit_rule_id,
+                   MIN(rule_id) AS benefit_rule_id,
                    title,
                    benefit_type,
                    MAX(limit_amount) AS limit_amount
             FROM eligible_limit_rows
             WHERE limit_amount &gt; 0
-            GROUP BY user_card_id, limit_group_key, rule_id, title, benefit_type
+            GROUP BY user_card_id, limit_group_key, title, benefit_type
+        ), eligible_offer_limits AS (
+            SELECT DISTINCT user_card_id, offer_id, limit_group_key
+            FROM eligible_limit_rows
+            WHERE limit_amount &gt; 0
         ), monthly_usage_rows AS (
             SELECT outcome.user_card_id,
-                   outcome.rule_id,
-                   COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
+                   eligible_limit.limit_group_key,
                    outcome.applied_reward_value AS used_amount
             FROM user_benefit_calculation_outcomes outcome
-            INNER JOIN benefit_limit_policies policy
-                ON policy.limit_policy_id = outcome.limit_policy_id
+            INNER JOIN eligible_offer_limits eligible_limit
+                ON eligible_limit.user_card_id = outcome.user_card_id
+               AND eligible_limit.offer_id = outcome.offer_id
             WHERE outcome.user_card_id = #{userCardId}
               AND outcome.outcome_status IN ('applied', 'partially_applied')
               AND LOWER(outcome.reward_unit) IN ('krw', 'point')
@@ -207,14 +212,14 @@
               AND outcome.usage_date &lt; DATE_ADD(CONCAT(#{yearMonth}, '-01'), INTERVAL 1 MONTH)
             UNION ALL
             SELECT benefit_usage.user_card_id,
-                   benefit_usage.rule_id,
-                   COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
+                   eligible_limit.limit_group_key,
                    CASE WHEN benefit_usage.reward_original_unit = 'point'
                         THEN COALESCE(benefit_usage.reward_original_value, 0)
                         ELSE benefit_usage.reward_amount_krw END AS used_amount
             FROM user_benefit_usages benefit_usage
-            INNER JOIN benefit_limit_policies policy
-                ON policy.limit_policy_id = benefit_usage.limit_policy_id
+            INNER JOIN eligible_offer_limits eligible_limit
+                ON eligible_limit.user_card_id = benefit_usage.user_card_id
+               AND eligible_limit.offer_id = benefit_usage.offer_id
             WHERE benefit_usage.user_card_id = #{userCardId}
               AND benefit_usage.usage_status = 'confirmed'
               AND benefit_usage.usage_date &gt;= CONCAT(#{yearMonth}, '-01')
@@ -225,11 +230,11 @@
                   WHERE outcome.approval_id = benefit_usage.approval_id
                     AND outcome.rule_id = benefit_usage.rule_id
               )
-        ), monthly_usage_by_rule AS (
-            SELECT user_card_id, rule_id AS benefit_rule_id,
+        ), monthly_usage_by_limit AS (
+            SELECT user_card_id, limit_group_key,
                    SUM(used_amount) AS used_amount
             FROM monthly_usage_rows
-            GROUP BY user_card_id, rule_id
+            GROUP BY user_card_id, limit_group_key
         )
         SELECT limits.benefit_rule_id,
                limits.title,
@@ -238,9 +243,9 @@
                    AS used_amount,
                CAST(limits.limit_amount AS SIGNED) AS limit_amount
         FROM eligible_limit_rules limits
-        LEFT JOIN monthly_usage_by_rule usage_data
+        LEFT JOIN monthly_usage_by_limit usage_data
             ON usage_data.user_card_id = limits.user_card_id
-           AND usage_data.benefit_rule_id = limits.benefit_rule_id
+           AND usage_data.limit_group_key = limits.limit_group_key
         ORDER BY GREATEST(limits.limit_amount - COALESCE(usage_data.used_amount, 0), 0) DESC,
                  limits.title ASC
     </select>

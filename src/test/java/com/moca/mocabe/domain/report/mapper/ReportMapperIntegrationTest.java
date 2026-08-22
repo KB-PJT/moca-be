@@ -232,6 +232,32 @@ class ReportMapperIntegrationTest {
   }
 
   @Test
+  void aggregatesSameMonthlyLimitRulesAndMapsUsageWithoutLimitPolicy() {
+    String secondRule = "bb000000-0000-4000-8000-000000000002";
+    jdbc.update(
+        "INSERT INTO benefit_rules"
+            + " (rule_id,offer_id,position,rule_name,rule_effect,stacking_mode,reward_value,reward_unit)"
+            + " VALUES (?,?,2,'카페 할인','grant','standalone',20,'percent')",
+        secondRule,
+        OFFER);
+    jdbc.update(
+        "UPDATE user_benefit_calculation_outcomes SET limit_policy_id=NULL"
+            + " WHERE user_card_id=?",
+        USER_CARD);
+    jdbc.update(
+        "UPDATE user_benefit_usages SET limit_policy_id=NULL WHERE user_card_id=?",
+        USER_CARD);
+
+    List<MissedBenefitRow> rows =
+        mapper.findMonthlyRemainingBenefits(USER, USER_CARD, "2026-07");
+
+    assertEquals(1, rows.size());
+    assertEquals("카페 할인", rows.get(0).title());
+    assertEquals(1_500L, rows.get(0).usedAmount());
+    assertEquals(5_000L, rows.get(0).limitAmount());
+  }
+
+  @Test
   void capsAggregatedOutcomeAmountAtTheMonthlyLimit() {
     jdbc.update(
         "INSERT INTO card_payment_approvals"

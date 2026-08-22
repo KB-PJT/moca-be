@@ -35175,7 +35175,7 @@ INSERT INTO benefit_rules
     (rule_id, offer_id, position, priority, rule_name, rule_effect, stacking_mode,
      reward_value, reward_unit, previous_spend_min_krw, rounding_type, rounding_unit,
      rule_schema_version, rule_support_status, rule_definition_json, created_at, updated_at)
-SELECT UUID(), offer.offer_id, 1, 100, 'CU·GS25·세븐일레븐 5% 포인트 적립',
+SELECT UUID(), offer.offer_id, 1, 100, '편의점',
        'grant', 'standalone', 5, 'percent', 200000, 'floor', 1, 1, 'SUPPORTED',
        JSON_OBJECT(
            'schemaVersion', 1,
@@ -35199,6 +35199,14 @@ WHERE offer.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
       WHERE existing.offer_id = offer.offer_id
         AND existing.position = 1
   );
+
+UPDATE benefit_rules rule_data
+INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
+SET rule_data.rule_name = '편의점',
+    rule_data.updated_at = UTC_TIMESTAMP(6)
+WHERE offer.benefit_id = '4da2cd93-b8e1-585c-bae4-7118aef652f8'
+  AND offer.position = 1
+  AND rule_data.position = 1;
 
 DELETE target
 FROM benefit_rule_targets target
@@ -35641,11 +35649,11 @@ SELECT CONCAT('28900000-0000-4000-8000-0000000001', LPAD(source.position, 2, '0'
            'limits', JSON_ARRAY()),
        UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
 FROM (
-    SELECT 1 position, '2만원 미만 0.2% 적립' rule_name,
+    SELECT 1 position, '일상 생활비' rule_name,
            0 minimum_amount, 20000 maximum_amount, 0.002 rate UNION ALL
-    SELECT 2, '2만원 이상 10만원 미만 0.4% 적립', 20000, 100000, 0.004 UNION ALL
-    SELECT 3, '10만원 이상 50만원 미만 0.8% 적립', 100000, 500000, 0.008 UNION ALL
-    SELECT 4, '50만원 이상 1% 적립', 500000, 999999999999, 0.01
+    SELECT 2, '일상 생활비', 20000, 100000, 0.004 UNION ALL
+    SELECT 3, '일상 생활비', 100000, 500000, 0.008 UNION ALL
+    SELECT 4, '일상 생활비', 500000, 999999999999, 0.01
 ) source
 INNER JOIN benefit_offers offer
     ON offer.benefit_id = '44b5ee1e-3227-552b-846e-ff21dda17402'
@@ -35659,11 +35667,11 @@ WHERE 1 = 1
 UPDATE benefit_rules rule_data
 INNER JOIN benefit_offers offer ON offer.offer_id = rule_data.offer_id
 INNER JOIN (
-    SELECT 1 position, '2만원 미만 0.2% 적립' rule_name,
+    SELECT 1 position, '일상 생활비' rule_name,
            0 minimum_amount, 20000 maximum_amount, 0.002 rate UNION ALL
-    SELECT 2, '2만원 이상 10만원 미만 0.4% 적립', 20000, 100000, 0.004 UNION ALL
-    SELECT 3, '10만원 이상 50만원 미만 0.8% 적립', 100000, 500000, 0.008 UNION ALL
-    SELECT 4, '50만원 이상 1% 적립', 500000, 999999999999, 0.01
+    SELECT 2, '일상 생활비', 20000, 100000, 0.004 UNION ALL
+    SELECT 3, '일상 생활비', 100000, 500000, 0.008 UNION ALL
+    SELECT 4, '일상 생활비', 500000, 999999999999, 0.01
 ) source ON source.position = rule_data.position
 SET rule_data.priority = source.position,
     rule_data.rule_name = source.rule_name,
