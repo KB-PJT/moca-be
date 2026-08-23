@@ -34,7 +34,12 @@ INNER JOIN (
     SELECT '스타벅스' AS merchant_name, 1 AS condition_group
     UNION ALL SELECT '커피빈', 2
 ) source ON 1 = 1
-INNER JOIN merchants merchant ON merchant.normalized_name = source.merchant_name
+INNER JOIN merchant_categories category
+    ON category.category_code = 'CAFE'
+INNER JOIN merchants merchant
+    ON merchant.normalized_name = source.merchant_name
+   AND merchant.merchant_category_id = category.merchant_category_id
+   AND merchant.status = 'active'
 WHERE card.gorilla_card_id = '2422'
   AND offer.offer_name = '스타벅스·커피빈 10% 할인'
   AND rule_data.position = 1
@@ -54,6 +59,14 @@ WHERE card.gorilla_card_id = '2422'
         AND existing.match_mode = 'include'
         AND existing.target_type = 'merchant'
         AND existing.merchant_id = merchant.merchant_id
+  )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM merchants duplicate
+      WHERE duplicate.normalized_name = merchant.normalized_name
+        AND duplicate.merchant_category_id = merchant.merchant_category_id
+        AND duplicate.status = 'active'
+        AND duplicate.merchant_id < merchant.merchant_id
   );
 
 UPDATE benefit_offers offer
