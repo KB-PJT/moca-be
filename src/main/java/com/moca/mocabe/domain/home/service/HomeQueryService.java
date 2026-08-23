@@ -7,6 +7,9 @@ import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
 import com.moca.mocabe.domain.home.dto.RecentHistoryItemResponse;
 import com.moca.mocabe.domain.home.dto.RecentHistoryResponse;
+import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
+import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
+import com.moca.mocabe.domain.benefit.service.BenefitHistoryRepresentativeSelector;
 import com.moca.mocabe.domain.home.mapper.HomeMapper;
 import com.moca.mocabe.domain.home.model.HomeCardRow;
 import com.moca.mocabe.domain.home.model.RecentHistoryRow;
@@ -38,10 +41,19 @@ public class HomeQueryService {
 
   private final UserMapper userMapper;
   private final HomeMapper homeMapper;
+  private final BenefitHistoryMapper benefitHistoryMapper;
+  private final BenefitHistoryRepresentativeSelector representativeSelector;
 
   public HomeQueryService(UserMapper userMapper, HomeMapper homeMapper) {
+    this(userMapper, homeMapper, null);
+  }
+
+  public HomeQueryService(
+      UserMapper userMapper, HomeMapper homeMapper, BenefitHistoryMapper benefitHistoryMapper) {
     this.userMapper = userMapper;
     this.homeMapper = homeMapper;
+    this.benefitHistoryMapper = benefitHistoryMapper;
+    this.representativeSelector = new BenefitHistoryRepresentativeSelector();
   }
 
   @Transactional(readOnly = true)
@@ -90,12 +102,39 @@ public class HomeQueryService {
             .atStartOfDay(SEOUL)
             .withZoneSameInstant(ZoneOffset.UTC)
             .toLocalDateTime();
-    List<RecentHistoryRow> rows =
-        homeMapper.findRecentHistory(userId, fromUtc, toUtc, limit, userCardId);
+    List<RecentHistoryRow> rows = findRecentHistory(userId, fromUtc, toUtc, limit, userCardId);
     List<RecentHistoryItemResponse> history =
         (rows == null ? List.<RecentHistoryRow>of() : rows)
             .stream().map(this::toRecentHistory).toList();
     return new RecentHistoryResponse(history);
+  }
+
+  private List<RecentHistoryRow> findRecentHistory(
+      String userId, LocalDateTime fromUtc, LocalDateTime toUtc, int limit, String userCardId) {
+    if (benefitHistoryMapper == null) {
+      return homeMapper.findRecentHistory(userId, fromUtc, toUtc, limit, userCardId);
+    }
+    List<BenefitHistoryRow> candidates =
+        benefitHistoryMapper.findHistory(
+            userId, fromUtc, toUtc, userCardId, null, "LATEST", 0, limit);
+    return representativeSelector.select(candidates).stream().map(this::toRecentHistoryRow).toList();
+  }
+
+  private RecentHistoryRow toRecentHistoryRow(BenefitHistoryRow source) {
+    RecentHistoryRow target = new RecentHistoryRow();
+    target.setApprovalId(source.getApprovalId());
+    target.setBenefitHistoryId(source.getBenefitHistoryId());
+    target.setMerchantName(source.getMerchantName());
+    target.setBenefitType(source.getBenefitType());
+    target.setBenefitTitle(source.getBenefitTitle());
+    target.setCardName(source.getCardName());
+    target.setPaymentAmount(source.getPaymentAmount());
+    target.setBenefitAmount(source.getBenefitAmount());
+    target.setMissedBenefitAmount(source.getMissedBenefitAmount());
+    target.setCalculationStatus(source.getCalculationStatus());
+    target.setRejectionReason(source.getRejectionReason());
+    target.setOccurredAt(source.getApprovedAt());
+    return target;
   }
 
   private UserProfile requireProfile(String userId) {

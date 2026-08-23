@@ -13,9 +13,9 @@ SET offer.report_visible = CASE
         ELSE TRUE
     END,
     offer.report_title = CASE benefit.position
-        WHEN 2 THEN '편의점 청구 할인'
-        WHEN 3 THEN '커피전문점 청구 할인'
-        WHEN 5 THEN '도서 청구 할인'
+        WHEN 2 THEN '편의점'
+        WHEN 3 THEN '커피전문점'
+        WHEN 5 THEN '도서'
         ELSE NULL
     END,
     offer.updated_at = UTC_TIMESTAMP(6)
