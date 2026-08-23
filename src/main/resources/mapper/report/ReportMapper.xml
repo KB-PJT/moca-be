@@ -67,7 +67,10 @@
     <resultMap id="missedBenefitRowMap" type="com.moca.mocabe.domain.report.model.MissedBenefitRow">
         <constructor>
             <arg column="benefit_rule_id" javaType="java.lang.String"/>
-            <arg column="title" javaType="java.lang.String"/>
+            <arg column="report_title" javaType="java.lang.String"/>
+            <arg column="benefit_title" javaType="java.lang.String"/>
+            <arg column="rule_title" javaType="java.lang.String"/>
+            <arg column="offer_name" javaType="java.lang.String"/>
             <arg column="benefit_type" javaType="java.lang.String"/>
             <arg column="used_amount" javaType="_long"/>
             <arg column="limit_amount" javaType="_long"/>
@@ -81,12 +84,10 @@
                    COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
                    offer.offer_id,
                    rule.rule_id,
-                   COALESCE(
-                       NULLIF(offer.report_title, ''),
-                       NULLIF(benefit.title, ''),
-                       NULLIF(rule.rule_name, ''),
-                       offer.offer_name
-                   ) AS title,
+                   offer.report_title,
+                   benefit.title AS benefit_title,
+                   rule.rule_name AS rule_title,
+                   offer.offer_name,
                    CASE offer.reward_type
                        WHEN 'discount' THEN 'DISCOUNT'
                        WHEN 'cashback' THEN 'CASHBACK'
@@ -193,7 +194,10 @@
             SELECT user_card_id,
                    limit_group_key,
                    MIN(rule_id) AS benefit_rule_id,
-                   MIN(title) AS title,
+                   MIN(report_title) AS report_title,
+                   MIN(benefit_title) AS benefit_title,
+                   MIN(rule_title) AS rule_title,
+                   MIN(offer_name) AS offer_name,
                    MIN(benefit_type) AS benefit_type,
                    MAX(limit_amount) AS limit_amount
             FROM eligible_limit_rows
@@ -243,7 +247,10 @@
             GROUP BY user_card_id, limit_group_key
         )
         SELECT limits.benefit_rule_id,
-               limits.title,
+               limits.report_title,
+               limits.benefit_title,
+               limits.rule_title,
+               limits.offer_name,
                limits.benefit_type,
                CAST(LEAST(limits.limit_amount, COALESCE(usage_data.used_amount, 0)) AS SIGNED)
                    AS used_amount,
@@ -253,7 +260,7 @@
             ON usage_data.user_card_id = limits.user_card_id
            AND usage_data.limit_group_key = limits.limit_group_key
         ORDER BY GREATEST(limits.limit_amount - COALESCE(usage_data.used_amount, 0), 0) DESC,
-                 limits.title ASC
+                  limits.benefit_rule_id ASC
     </select>
 
     <resultMap id="missedBenefitDataCountsMap" type="com.moca.mocabe.domain.report.model.MissedBenefitDataCounts">

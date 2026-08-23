@@ -45,10 +45,12 @@ public class ReportQueryService {
 
   private final UserMapper userMapper;
   private final ReportMapper reportMapper;
+  private final BenefitReportTitleResolver titleResolver;
 
   public ReportQueryService(UserMapper userMapper, ReportMapper reportMapper) {
     this.userMapper = userMapper;
     this.reportMapper = reportMapper;
+    this.titleResolver = new BenefitReportTitleResolver();
   }
 
   @Transactional(readOnly = true)
@@ -117,7 +119,7 @@ public class ReportQueryService {
                 row ->
                     new MissedBenefitItemResponse(
                         row.benefitRuleId(),
-                        row.title(),
+                        titleResolver.resolve(row),
                         row.benefitType(),
                         row.usedAmount(),
                         row.limitAmount(),

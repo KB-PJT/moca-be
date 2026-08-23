@@ -401,9 +401,10 @@ class MocaFinalSeedIntegrationTest {
         + "WHERE card.gorilla_card_id='2680' ";
     assertEquals(3, count(jdbc, base + "AND offer.report_visible=TRUE"));
     assertEquals(2, count(jdbc, base + "AND offer.report_visible=FALSE"));
-    assertEquals(1, count(jdbc, base + "AND offer.report_title='편의점'"));
-    assertEquals(1, count(jdbc, base + "AND offer.report_title='커피전문점'"));
-    assertEquals(1, count(jdbc, base + "AND offer.report_title='도서'"));
+    String visible = "AND offer.report_visible=TRUE ";
+    assertEquals(1, count(jdbc, base + visible + "AND offer.report_title='편의점'"));
+    assertEquals(1, count(jdbc, base + visible + "AND offer.report_title='커피전문점'"));
+    assertEquals(1, count(jdbc, base + visible + "AND offer.report_title='도서'"));
   }
 
   private void assertShinhanNarasarangStructure(JdbcTemplate jdbc) {
