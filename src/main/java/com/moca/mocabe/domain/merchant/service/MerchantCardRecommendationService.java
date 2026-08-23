@@ -327,20 +327,22 @@ public class MerchantCardRecommendationService {
     private BenefitTierProgress tierProgress(MerchantCardBenefitCandidate candidate,
                                              List<MerchantCardBenefitCandidate> candidates,
                                              List<BenefitTierResponse> allTiers) {
-        if (!allTiers.isEmpty()) {
+        List<BenefitTierResponse> performanceTiers = allTiers.stream()
+                .filter(tier -> tier.requiredPreviousSpendKrw() != null)
+                .toList();
+        if (!performanceTiers.isEmpty()) {
             BigDecimal spend = candidate.previousMonthSpendKrw() == null
                     ? BigDecimal.ZERO : candidate.previousMonthSpendKrw();
             int achievedIndex = -1;
-            for (int index = 0; index < allTiers.size(); index++) {
-                BigDecimal target = allTiers.get(index).requiredPreviousSpendKrw();
-                if (target != null && spend.compareTo(target) >= 0) {
+            for (int index = 0; index < performanceTiers.size(); index++) {
+                if (spend.compareTo(performanceTiers.get(index).requiredPreviousSpendKrw()) >= 0) {
                     achievedIndex = index;
                 }
             }
-            int currentTier = achievedIndex < 0 ? 0 : allTiers.get(achievedIndex).tier();
+            int currentTier = achievedIndex < 0 ? 0 : performanceTiers.get(achievedIndex).tier();
             int nextIndex = achievedIndex + 1;
-            BenefitTierResponse next = nextIndex < allTiers.size() ? allTiers.get(nextIndex) : null;
-            BenefitTierResponse current = achievedIndex < 0 ? null : allTiers.get(achievedIndex);
+            BenefitTierResponse next = nextIndex < performanceTiers.size() ? performanceTiers.get(nextIndex) : null;
+            BenefitTierResponse current = achievedIndex < 0 ? null : performanceTiers.get(achievedIndex);
             BigDecimal target = current == null ? (next == null ? null : next.requiredPreviousSpendKrw())
                     : current.requiredPreviousSpendKrw();
             BigDecimal remaining = next == null ? BigDecimal.ZERO
