@@ -34437,6 +34437,15 @@ FROM moca.benefit_limit_tiers tier
 JOIN moca.benefit_limit_policies policy ON policy.limit_policy_id=tier.limit_policy_id
 WHERE policy.shared_group_key='NORI2_MONTHLY_TOTAL';
 
+DELETE tier
+FROM moca.benefit_limit_tiers tier
+JOIN moca.benefit_limit_policies policy ON policy.limit_policy_id=tier.limit_policy_id
+WHERE policy.shared_group_key='NORI2_CAFE_MONTHLY';
+
+DELETE policy
+FROM moca.benefit_limit_policies policy
+WHERE policy.shared_group_key='NORI2_CAFE_MONTHLY';
+
 DELETE policy
 FROM moca.benefit_limit_policies policy
 WHERE policy.shared_group_key='NORI2_MONTHLY_TOTAL';
@@ -34588,6 +34597,27 @@ JOIN moca.cards card ON card.card_id=version.card_id
 CROSS JOIN (SELECT 1 position,20000 limit_value,200000 previous_spend_min_krw UNION ALL SELECT 2,30000,400000 UNION ALL SELECT 3,40000,600000 UNION ALL SELECT 4,50000,800000) tiers
 WHERE card.gorilla_card_id='2422' AND policy.shared_group_key='NORI2_MONTHLY_TOTAL'
   AND NOT EXISTS (SELECT 1 FROM moca.benefit_limit_tiers existing WHERE existing.limit_policy_id=policy.limit_policy_id AND existing.position=tiers.position);
+
+-- 카페 혜택은 전월 실적 조건이 없으므로 통합 실적 tier와 분리해 월 3,000원 한도를 적용한다.
+INSERT INTO moca.benefit_limit_policies
+    (limit_policy_id, offer_id, policy_name, limit_period, limit_type, limit_unit, shared_group_key)
+SELECT UUID(), offer.offer_id, '노리2 카페 월 할인한도', 'monthly', 'reward_amount', 'KRW', 'NORI2_CAFE_MONTHLY'
+FROM moca.benefit_offers offer
+JOIN moca.card_benefits benefit ON benefit.benefit_id=offer.benefit_id
+JOIN moca.card_content_versions version ON version.content_version_id=benefit.content_version_id
+JOIN moca.cards card ON card.card_id=version.card_id
+WHERE card.gorilla_card_id='2422'
+  AND offer.offer_name='스타벅스·커피빈 10% 할인'
+  AND NOT EXISTS (SELECT 1 FROM moca.benefit_limit_policies existing WHERE existing.offer_id=offer.offer_id AND existing.shared_group_key='NORI2_CAFE_MONTHLY');
+
+INSERT INTO moca.benefit_limit_tiers
+    (limit_tier_id, limit_policy_id, position, limit_value, previous_spend_min_krw)
+SELECT UUID(), policy.limit_policy_id, 1, 3000, NULL
+FROM moca.benefit_limit_policies policy
+JOIN moca.benefit_offers offer ON offer.offer_id=policy.offer_id
+WHERE policy.shared_group_key='NORI2_CAFE_MONTHLY'
+  AND offer.offer_name='스타벅스·커피빈 10% 할인'
+  AND NOT EXISTS (SELECT 1 FROM moca.benefit_limit_tiers existing WHERE existing.limit_policy_id=policy.limit_policy_id AND existing.position=1);
 
 DROP TEMPORARY TABLE seed_nori2_offline_benefits;
 
