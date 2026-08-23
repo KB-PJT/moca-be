@@ -493,7 +493,10 @@ class MocaFinalSeedIntegrationTest {
             "SELECT COUNT(*) > 0 "
                 + nhPointRules
                 + "AND offer.offer_name='전 가맹점 기본적립 0.2%' "
-                + "AND target.target_type='all_merchants'"));
+                + "AND target.target_type='all_merchants' "
+                + "AND offer.reward_type='points' "
+                + "AND offer.valuation_scope='transaction' "
+                + "AND offer.valuation_method='direct'"));
     assertEquals(
         1,
         count(
