@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
 import com.moca.mocabe.domain.home.dto.RecentHistoryResponse;
+import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
+import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
 import com.moca.mocabe.domain.home.mapper.HomeMapper;
 import com.moca.mocabe.domain.home.model.HomeCardRow;
 import com.moca.mocabe.domain.home.model.RecentHistoryRow;
@@ -34,6 +36,8 @@ class HomeQueryServiceTest {
   @Mock private UserMapper userMapper;
 
   @Mock private HomeMapper homeMapper;
+
+  @Mock private BenefitHistoryMapper benefitHistoryMapper;
 
   private HomeQueryService homeQueryService;
 
@@ -165,6 +169,32 @@ class HomeQueryServiceTest {
   }
 
   @Test
+  @DisplayName("최근 내역은 전체 혜택 이력과 동일한 승인별 대표 결과를 사용한다")
+  void usesBenefitHistoryRepresentativeForRecentHistory() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+    BenefitHistoryRow special = benefitHistoryRow("special", "TARGET_NOT_MATCHED", 0);
+    BenefitHistoryRow basic = benefitHistoryRow("basic", "PERFORMANCE_NOT_MET", 2_355);
+    when(benefitHistoryMapper.findHistory(
+            org.mockito.ArgumentMatchers.eq(USER_ID),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq("card-1"),
+            org.mockito.ArgumentMatchers.isNull(),
+            org.mockito.ArgumentMatchers.eq("LATEST"),
+            org.mockito.ArgumentMatchers.eq(0),
+            org.mockito.ArgumentMatchers.eq(5)))
+        .thenReturn(List.of(special, basic));
+
+    RecentHistoryResponse response =
+        new HomeQueryService(userMapper, homeMapper, benefitHistoryMapper)
+            .getRecentHistory(USER_ID, "2026-08", 5, "card-1");
+
+    assertEquals("basic", response.getHistory().get(0).getBenefitHistoryId());
+    assertEquals(2_355, response.getHistory().get(0).getMissedBenefitAmount());
+    assertEquals("PERFORMANCE_NOT_MET", response.getHistory().get(0).getRejectionReason());
+  }
+
+  @Test
   @DisplayName("존재하지 않는 사용자의 홈 조회는 사용자 없음 오류로 거절한다")
   void rejectsUnknownUser() {
     when(userMapper.findProfileById(USER_ID)).thenReturn(null);
@@ -254,6 +284,24 @@ class HomeQueryServiceTest {
 
     assertEquals("target", response.getCards().get(0).getUserCardId());
     assertEquals(0, response.getCards().get(1).getSummary().getPerformanceRate());
+  }
+
+  private BenefitHistoryRow benefitHistoryRow(
+      String historyId, String rejectionReason, long missedBenefitAmount) {
+    BenefitHistoryRow row = new BenefitHistoryRow();
+    row.setBenefitHistoryId(historyId);
+    row.setApprovalId("approval-1");
+    row.setMerchantName("마당족발");
+    row.setApprovedAt(LocalDateTime.of(2026, 8, 3, 10, 51));
+    row.setPaymentAmount(157_000);
+    row.setBenefitAmount(0);
+    row.setBenefitType("POINT");
+    row.setBenefitTitle("국내/외 전가맹점 기본 적립");
+    row.setCardName("신한카드 SOL Plan");
+    row.setCalculationStatus("NOT_APPLIED");
+    row.setMissedBenefitAmount(missedBenefitAmount);
+    row.setRejectionReason(rejectionReason);
+    return row;
   }
 
   private HomeCardRow card(

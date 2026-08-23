@@ -121,8 +121,9 @@ public class AppConfig {
     }
 
     @Bean
-    public HomeQueryService homeQueryService(UserMapper userMapper, HomeMapper homeMapper) {
-        return new HomeQueryService(userMapper, homeMapper);
+    public HomeQueryService homeQueryService(
+            UserMapper userMapper, HomeMapper homeMapper, BenefitHistoryMapper benefitHistoryMapper) {
+        return new HomeQueryService(userMapper, homeMapper, benefitHistoryMapper);
     }
 
     @Bean
