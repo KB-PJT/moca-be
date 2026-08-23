@@ -215,9 +215,9 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
 
         assertEquals(2, missedBenefits.size());
         assertRemainingBenefit(
-                missedBenefits.get("패키지 1 전월 30만원 이상 스타벅스 50%"), 0, 10_000);
+                missedBenefits.get("패키지 1 스타벅스 할인"), 0, 10_000);
         assertRemainingBenefit(
-                missedBenefits.get("패키지 1 전월 30만원 이상 오픈마켓 7%"), 0, 5_000);
+                missedBenefits.get("패키지 1 오픈마켓 할인"), 0, 5_000);
     }
 
     @Test
@@ -246,8 +246,8 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
                                         LinkedHashMap::new));
 
         assertEquals(2, benefitsByTitle.size());
-        assertRemainingBenefit(benefitsByTitle.get("기본 여가 2%"), 0, 500_000);
-        assertRemainingBenefit(benefitsByTitle.get("SELECT 의료 20%"), 0, 10_000);
+        assertRemainingBenefit(benefitsByTitle.get("기본 여가 할인"), 0, 500_000);
+        assertRemainingBenefit(benefitsByTitle.get("SELECT 의료 할인"), 0, 10_000);
         assertEquals(525_000L, homeMapper.sumMissedBenefitAmount(USER_ID, "2026-08"));
     }
 
