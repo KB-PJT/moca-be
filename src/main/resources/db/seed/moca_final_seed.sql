@@ -35034,7 +35034,7 @@ WHERE card.gorilla_card_id = '2852'
         AND target.merchant_id = merchant.merchant_id
   );
 
--- 올바른POINT체크카드: 확정 가능한 기본 0.2%와 생활 영역 추가 0.3%만 분리한다.
+-- 올바른POINT체크카드: 전월 실적 없는 기본 0.2%와 생활 영역 추가 0.3%를 분리한다.
 INSERT INTO moca.benefit_offers
     (offer_id, benefit_id, offer_name, position, priority, reward_type, value_type,
      calculation_mode, calculation_basis, stacking_mode, reward_timing,
@@ -35081,6 +35081,19 @@ WHERE card.gorilla_card_id = '360'
       SELECT 1 FROM moca.benefit_rules rule_data
       WHERE rule_data.offer_id = offer.offer_id AND rule_data.position = 1
   );
+
+UPDATE moca.benefit_rules rule_data
+INNER JOIN moca.benefit_offers offer ON offer.offer_id = rule_data.offer_id
+INNER JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+INNER JOIN moca.card_content_versions version
+    ON version.content_version_id = benefit.content_version_id
+INNER JOIN moca.cards card ON card.card_id = version.card_id
+SET rule_data.previous_spend_min_krw = NULL,
+    rule_data.updated_at = UTC_TIMESTAMP(6)
+WHERE card.gorilla_card_id = '360'
+  AND benefit.title = '모든가맹점'
+  AND offer.offer_name = '전 가맹점 기본적립 0.2%'
+  AND rule_data.position = 1;
 
 INSERT INTO moca.benefit_rule_targets
     (target_id, rule_id, condition_group, match_mode, target_type,

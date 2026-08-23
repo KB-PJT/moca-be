@@ -11,7 +11,6 @@ import com.moca.mocabe.domain.benefit.type.BenefitBasis;
 import com.moca.mocabe.domain.benefit.type.BenefitPromotionCondition;
 import com.moca.mocabe.domain.benefit.type.BenefitType;
 import com.moca.mocabe.domain.benefit.type.RewardUnit;
-import com.moca.mocabe.domain.benefit.type.BenefitRejectionReason;
 
 
 @DisplayName("체크 30위 올바른POINT체크카드")
@@ -20,7 +19,7 @@ class CheckRank030Card360BenefitTest {
     private final CardBenefitTestFixture fixture = new CardBenefitTestFixture();
 
     @Test
-    @DisplayName("모든가맹점: 0.7000000000000001% 포인트 정상 적용")
+    @DisplayName("모든가맹점: 전월 실적 없이 0.2% 포인트 정상 적용")
     void appliesBenefit001() {
         // 테스트에 사용한 계산 규칙이 카드고릴라의 해당 혜택 상세에서 만들어졌는지 확인한다.
         fixture.assertSourceDetail(
@@ -36,45 +35,44 @@ class CheckRank030Card360BenefitTest {
                 fixture.context(
                         /* 결제금액 */ "100000",
                         /* 리터·횟수 등 사용량 */ "0",
-                        /* 전월 실적 */ "10000000",
+                        /* 전월 실적 */ "0",
                         /* 카드 승인 시각 */ "2026-07-25T22:00:00",
                         /* MOCA 가맹점 카테고리 */ ""));
 
         // 월 한도 반영 전 혜택, 실제 적용 혜택, 계산 후 남은 월 한도를 차례로 검증한다.
         fixture.assertApplied(
                 result,
-                /* 월 한도 반영 전 혜택 */ "700",
-                /* 실제 적용 혜택 */ "700",
+                /* 월 한도 반영 전 혜택 */ "200",
+                /* 실제 적용 혜택 */ "200",
                 /* 남은 월 한도 */ "0");
     }
 
     @Test
-    @DisplayName("모든가맹점: 전월 실적 300,000원보다 1원 적으면 적용하지 않는다")
-    void rejectsBenefit001WhenPerformanceIsOneWonBelowRequirement() {
-        // 미적용 경계값을 결제 상황에 넣어 계산기가 거절 사유를 구분하는지 확인한다.
+    @DisplayName("모든가맹점: 전월 실적이 없어도 기본 적립을 적용한다")
+    void appliesBenefit001WithoutPreviousMonthSpend() {
         BenefitCalculationResult result = fixture.calculator.calculate(
                 benefit001Rule(/* 이번 달에 이미 사용한 혜택 */ "0"),
                 fixture.context(
                         /* 결제금액 */ "100000",
                         /* 리터·횟수 등 사용량 */ "0",
-                        /* 전월 실적 */ "299999",
+                        /* 전월 실적 */ "0",
                         /* 카드 승인 시각 */ "2026-07-25T22:00:00",
                         /* MOCA 가맹점 카테고리 */ ""));
 
         // 단순 미적용 여부뿐 아니라 사용자에게 안내할 구체적인 사유까지 검증한다.
-        fixture.assertRejected(result, BenefitRejectionReason.PERFORMANCE_NOT_MET);
+        fixture.assertApplied(result);
     }
 
     @Test
-    @DisplayName("모든가맹점: 전월 실적 300,000원부터 적용한다")
-    void appliesBenefit001WhenPerformanceEqualsRequirement() {
+    @DisplayName("모든가맹점: 전월 실적 300,000원 이상에서도 기본 적립률을 유지한다")
+    void appliesBenefit001WhenPerformanceIsHigh() {
         // 적용 가능한 마지막 경계값 또는 최초 경계값을 결제 상황에 넣어 계산한다.
         BenefitCalculationResult result = fixture.calculator.calculate(
                 benefit001Rule(/* 이번 달에 이미 사용한 혜택 */ "0"),
                 fixture.context(
                         /* 결제금액 */ "100000",
                         /* 리터·횟수 등 사용량 */ "0",
-                        /* 전월 실적 */ "300000",
+                /* 전월 실적 */ "300000",
                         /* 카드 승인 시각 */ "2026-07-25T22:00:00",
                         /* MOCA 가맹점 카테고리 */ ""));
 
@@ -97,7 +95,7 @@ class CheckRank030Card360BenefitTest {
 
         // 카드 혜택은 원 미만 금액을 올림하지 않고 버린 결과와 같아야 한다.
         fixture.assertApplied(result);
-        fixture.assertBigDecimalEquals("70", result.rawRewardValue());
+        fixture.assertBigDecimalEquals("20", result.rawRewardValue());
     }
 
     @Test
@@ -148,12 +146,12 @@ class CheckRank030Card360BenefitTest {
                 /* 할인·캐시백·포인트·마일리지 구분 */ BenefitType.POINT,
                 /* 정률·정액·결제 단위·사용량 단위 구분 */ BenefitBasis.RATE,
                 /* 혜택 결과 단위 */ RewardUnit.POINT,
-                /* 정률 계산 비율 */ "0.007",
+                /* 정률 계산 비율 */ "0.002",
                 /* 정액 또는 단위당 혜택값 */ "0",
                 /* 단위 적립 기준 결제금액 */ "0",
                 /* 1회 혜택 인정금액 상한 */ "0",
                 /* 혜택 적용 최소 결제금액 */ "0",
-                /* 필요한 전월 실적 */ "300000",
+                /* 필요한 전월 실적 */ "0",
                 /* 월 혜택 한도 */ "0",
                 /* 이번 달에 이미 사용한 혜택 */ usedMonthlyValue,
                 /* 시간·요일 조건 */ BenefitPromotionCondition.NONE,
