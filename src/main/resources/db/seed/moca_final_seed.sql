@@ -30014,7 +30014,7 @@ SET @hdz_report_column_count := (
 );
 SET @hdz_report_update_sql := IF(
     @hdz_report_column_count = 2,
-    'UPDATE moca.benefit_offers offer INNER JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id SET offer.report_visible = CASE WHEN benefit.position IN (1, 4) THEN FALSE ELSE TRUE END, offer.report_title = CASE benefit.position WHEN 2 THEN ''편의점 청구 할인'' WHEN 3 THEN ''커피전문점 청구 할인'' WHEN 5 THEN ''도서 청구 할인'' ELSE NULL END, offer.updated_at = CURRENT_TIMESTAMP(6) WHERE benefit.content_version_id = @HDZ_CV',
+    'UPDATE moca.benefit_offers offer INNER JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id SET offer.report_visible = CASE WHEN benefit.position IN (1, 4) THEN FALSE ELSE TRUE END, offer.report_title = CASE benefit.position WHEN 2 THEN ''편의점'' WHEN 3 THEN ''커피전문점'' WHEN 5 THEN ''도서'' ELSE NULL END, offer.updated_at = CURRENT_TIMESTAMP(6) WHERE benefit.content_version_id = @HDZ_CV',
     'SELECT 1'
 );
 PREPARE hdz_report_update_statement FROM @hdz_report_update_sql;

@@ -286,7 +286,7 @@ class ReportMapperIntegrationTest {
         mapper.findMonthlyRemainingBenefits(USER, USER_CARD, "2026-07");
 
     assertEquals(1, rows.size());
-    assertEquals("공유 카페 혜택", rows.get(0).title());
+    assertEquals("카페 할인", rows.get(0).title());
     assertEquals(2_000L, rows.get(0).usedAmount());
     assertEquals(5_000L, rows.get(0).limitAmount());
   }

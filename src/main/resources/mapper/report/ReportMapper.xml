@@ -81,7 +81,12 @@
                    COALESCE(policy.shared_group_key, policy.limit_policy_id) AS limit_group_key,
                    offer.offer_id,
                    rule.rule_id,
-                   COALESCE(NULLIF(rule.rule_name, ''), offer.report_title, offer.offer_name) AS title,
+                   COALESCE(
+                       NULLIF(offer.report_title, ''),
+                       NULLIF(benefit.title, ''),
+                       NULLIF(rule.rule_name, ''),
+                       offer.offer_name
+                   ) AS title,
                    CASE offer.reward_type
                        WHEN 'discount' THEN 'DISCOUNT'
                        WHEN 'cashback' THEN 'CASHBACK'
