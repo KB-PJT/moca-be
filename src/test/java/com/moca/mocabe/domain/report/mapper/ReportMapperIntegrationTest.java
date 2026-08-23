@@ -264,6 +264,7 @@ class ReportMapperIntegrationTest {
     jdbc.update(
         "UPDATE benefit_limit_policies SET shared_group_key='SHARED_CAFE' WHERE limit_policy_id=?",
         POLICY);
+    jdbc.update("UPDATE benefit_offers SET report_title='  카페 대표 혜택  ' WHERE offer_id=?", OFFER);
     jdbc.update(
         "UPDATE user_benefit_calculation_outcomes SET limit_policy_id=NULL"
             + " WHERE user_card_id=?",
@@ -286,7 +287,8 @@ class ReportMapperIntegrationTest {
         mapper.findMonthlyRemainingBenefits(USER, USER_CARD, "2026-07");
 
     assertEquals(1, rows.size());
-    assertEquals("공유 카페 혜택", rows.get(0).title());
+    assertEquals("  카페 대표 혜택  ", rows.get(0).reportTitle());
+    assertEquals("카페 할인", rows.get(0).benefitTitle());
     assertEquals(2_000L, rows.get(0).usedAmount());
     assertEquals(5_000L, rows.get(0).limitAmount());
   }
