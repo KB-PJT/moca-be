@@ -90,7 +90,11 @@ class HomeSimulationCardGorillaFixtureIntegrationTest {
         sqlSession = sqlSessionFactory.openSession();
         homeMapper = sqlSession.getMapper(HomeMapper.class);
         reportMapper = sqlSession.getMapper(ReportMapper.class);
-        homeQueryService = new HomeQueryService(sqlSession.getMapper(UserMapper.class), homeMapper);
+        homeQueryService =
+            new HomeQueryService(
+                sqlSession.getMapper(UserMapper.class),
+                homeMapper,
+                sqlSession.getMapper(com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper.class));
     }
 
     @AfterAll
