@@ -84,7 +84,7 @@ class HomeFinalSeedBenefitLimitIntegrationTest {
     assertEquals(0, cards.get("올바른POINT체크카드").getMaximumMonthlyBenefitAmount());
     assertEquals(30_000, cards.get("신한카드 나라사랑카드 체크").getMaximumMonthlyBenefitAmount());
     assertEquals(15_000, cards.get("신한카드 Deep Dream 체크").getMaximumMonthlyBenefitAmount());
-    assertEquals(40_000, cards.get("노리2 체크카드(KB Pay)").getMaximumMonthlyBenefitAmount());
+    assertEquals(43_000, cards.get("노리2 체크카드(KB Pay)").getMaximumMonthlyBenefitAmount());
     assertEquals(50_000, cards.get("신한카드 SOL Plan").getMaximumMonthlyBenefitAmount());
     assertEquals(
         13_000,
