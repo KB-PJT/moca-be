@@ -277,11 +277,12 @@ public class AppConfig {
                                            CardCatalogMatcher cardCatalogMatcher,
                                            CardCatalogMapper cardCatalogMapper,
                                            LinkedCardMapper linkedCardMapper,
-                                           PlatformTransactionManager transactionManager) {
+                                           PlatformTransactionManager transactionManager,
+                                           HomeCardsCache homeCardsCache) {
         return new CardLinkService(
                 codefClient, codefCredentialMapper, codefCredentialStore,
                 issuerMapper, codefEncryptor, credentialHasher,
-                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager);
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager, homeCardsCache);
     }
 
     @Bean
