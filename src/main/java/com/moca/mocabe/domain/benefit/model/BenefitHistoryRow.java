@@ -20,6 +20,8 @@ public class BenefitHistoryRow {
   private String rejectionReason;
   private Long requiredPreviousSpendAmount;
   private Long previousMonthSpendAmount;
+  private long monthlyUsedAmount;
+  private long monthlyLimitAmount;
 
   public String getBenefitHistoryId() {
     return benefitHistoryId;
@@ -147,5 +149,21 @@ public class BenefitHistoryRow {
 
   public void setPreviousMonthSpendAmount(Long value) {
     previousMonthSpendAmount = value;
+  }
+
+  public long getMonthlyUsedAmount() {
+    return monthlyUsedAmount;
+  }
+
+  public void setMonthlyUsedAmount(long value) {
+    monthlyUsedAmount = value;
+  }
+
+  public long getMonthlyLimitAmount() {
+    return monthlyLimitAmount;
+  }
+
+  public void setMonthlyLimitAmount(long value) {
+    monthlyLimitAmount = value;
   }
 }

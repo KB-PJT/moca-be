@@ -63,7 +63,7 @@ class HomeControllerTest {
                 .thenReturn(new RecentHistoryResponse(List.of(new RecentHistoryItemResponse(
                         "approval-1", "benefit-1", "스타벅스", "DISCOUNT", "카페 10% 할인",
                         "신한 Mr.Life", 15000, 1500, 0, "APPLIED", null,
-                        "2026-07-27T14:30:00+09:00"))));
+                        "2026-07-27T14:30:00+09:00", null, null, null))));
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode greeting = objectMapper.readTree(mockMvc.perform(get("/home/greeting")

@@ -174,6 +174,8 @@ class HomeQueryServiceTest {
     when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
     BenefitHistoryRow special = benefitHistoryRow("special", "TARGET_NOT_MATCHED", 0);
     BenefitHistoryRow basic = benefitHistoryRow("basic", "PERFORMANCE_NOT_MET", 2_355);
+    basic.setRequiredPreviousSpendAmount(300_000L);
+    basic.setPreviousMonthSpendAmount(120_000L);
     when(benefitHistoryMapper.findHistory(
             org.mockito.ArgumentMatchers.eq(USER_ID),
             org.mockito.ArgumentMatchers.any(),
@@ -192,6 +194,9 @@ class HomeQueryServiceTest {
     assertEquals("basic", response.getHistory().get(0).getBenefitHistoryId());
     assertEquals(2_355, response.getHistory().get(0).getMissedBenefitAmount());
     assertEquals("PERFORMANCE_NOT_MET", response.getHistory().get(0).getRejectionReason());
+    assertEquals(300_000, response.getHistory().get(0).getPerformanceShortfall().requiredAmount());
+    assertEquals(120_000, response.getHistory().get(0).getPerformanceShortfall().achievedAmount());
+    assertEquals(180_000, response.getHistory().get(0).getPerformanceShortfall().remainingAmount());
   }
 
   @Test

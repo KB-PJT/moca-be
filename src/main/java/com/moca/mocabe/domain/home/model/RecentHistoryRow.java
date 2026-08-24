@@ -17,6 +17,10 @@ public class RecentHistoryRow {
   private String calculationStatus;
   private String rejectionReason;
   private LocalDateTime occurredAt;
+  private Long requiredPreviousSpendAmount;
+  private Long previousMonthSpendAmount;
+  private long monthlyUsedAmount;
+  private long monthlyLimitAmount;
 
   public String getApprovalId() {
     return approvalId;
@@ -112,5 +116,37 @@ public class RecentHistoryRow {
 
   public void setOccurredAt(LocalDateTime occurredAt) {
     this.occurredAt = occurredAt;
+  }
+
+  public Long getRequiredPreviousSpendAmount() {
+    return requiredPreviousSpendAmount;
+  }
+
+  public void setRequiredPreviousSpendAmount(Long requiredPreviousSpendAmount) {
+    this.requiredPreviousSpendAmount = requiredPreviousSpendAmount;
+  }
+
+  public Long getPreviousMonthSpendAmount() {
+    return previousMonthSpendAmount;
+  }
+
+  public void setPreviousMonthSpendAmount(Long previousMonthSpendAmount) {
+    this.previousMonthSpendAmount = previousMonthSpendAmount;
+  }
+
+  public long getMonthlyUsedAmount() {
+    return monthlyUsedAmount;
+  }
+
+  public void setMonthlyUsedAmount(long monthlyUsedAmount) {
+    this.monthlyUsedAmount = monthlyUsedAmount;
+  }
+
+  public long getMonthlyLimitAmount() {
+    return monthlyLimitAmount;
+  }
+
+  public void setMonthlyLimitAmount(long monthlyLimitAmount) {
+    this.monthlyLimitAmount = monthlyLimitAmount;
   }
 }

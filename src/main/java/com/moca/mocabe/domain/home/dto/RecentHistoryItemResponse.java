@@ -1,5 +1,7 @@
 package com.moca.mocabe.domain.home.dto;
 
+import com.moca.mocabe.domain.benefit.dto.PerformanceShortfallResponse;
+
 /** 홈에 표시할 최근 결제 내역 한 건이다. */
 public class RecentHistoryItemResponse {
 
@@ -15,6 +17,9 @@ public class RecentHistoryItemResponse {
   private final String calculationStatus;
   private final String rejectionReason;
   private final String occurredAt;
+  private final PerformanceShortfallResponse performanceShortfall;
+  private final Long monthlyBenefitUsed;
+  private final Long monthlyBenefitLimit;
 
   public RecentHistoryItemResponse(
       String approvalId,
@@ -28,7 +33,10 @@ public class RecentHistoryItemResponse {
       long missedBenefitAmount,
       String calculationStatus,
       String rejectionReason,
-      String occurredAt) {
+      String occurredAt,
+      PerformanceShortfallResponse performanceShortfall,
+      Long monthlyBenefitUsed,
+      Long monthlyBenefitLimit) {
     this.approvalId = approvalId;
     this.benefitHistoryId = benefitHistoryId;
     this.merchantName = merchantName;
@@ -41,6 +49,9 @@ public class RecentHistoryItemResponse {
     this.calculationStatus = calculationStatus;
     this.rejectionReason = rejectionReason;
     this.occurredAt = occurredAt;
+    this.performanceShortfall = performanceShortfall;
+    this.monthlyBenefitUsed = monthlyBenefitUsed;
+    this.monthlyBenefitLimit = monthlyBenefitLimit;
   }
 
   public String getApprovalId() {
@@ -89,5 +100,17 @@ public class RecentHistoryItemResponse {
 
   public String getOccurredAt() {
     return occurredAt;
+  }
+
+  public PerformanceShortfallResponse getPerformanceShortfall() {
+    return performanceShortfall;
+  }
+
+  public Long getMonthlyBenefitUsed() {
+    return monthlyBenefitUsed;
+  }
+
+  public Long getMonthlyBenefitLimit() {
+    return monthlyBenefitLimit;
   }
 }

@@ -160,6 +160,8 @@ paths:
         인증 사용자의 기준 월 카드 결제 승인 전체에서 최근 내역을 승인 시각 내림차순으로 반환합니다.
         혜택이 적용되지 않았거나 계산 결과가 없는 승인도 제외하지 않습니다.
         `calculationStatus`로 적용·부분 적용·미적용·미계산을 구분하며, 혜택이 없으면 혜택 관련 필드는 null 또는 0입니다.
+        전월 실적 미충족으로 미적용된 건은 `performanceShortfall`을 제공합니다. 적용 또는 부분 적용 건 중 월 한도가 있는 경우에만
+        `monthlyBenefitUsed`, `monthlyBenefitLimit`을 제공하며, 그 외에는 세 필드 모두 null입니다.
         yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하고, limit을 생략하면 최대 5건을 반환합니다.
         userCardId를 지정하면 사용자가 보유한 해당 카드의 내역으로 제한하며, 생략하면 모든 보유카드를 조회합니다.
         승인내역이 없으면 `history`는 빈 배열입니다.
@@ -203,6 +205,8 @@ paths:
         보유카드와 혜택 유형으로 필터링할 수 있으며, type을 지정하면 혜택이 있는 내역만 반환합니다. 최신 승인순 또는 혜택 금액순으로 정렬할 수 있습니다.
         `data.data`에는 승인·가맹점·카드·혜택·실적 부족 정보가, `data.summary`에는 실제 확정 혜택의 월·카드 조건별 합계가,
         `data.meta`에는 페이지 번호·크기·전체 건수·다음 페이지 여부가 담깁니다.
+        적용 또는 부분 적용 건 중 월 한도가 있는 경우에만 각 항목의 `monthlyBenefitUsed`, `monthlyBenefitLimit`을 제공하며,
+        그 외에는 두 필드 모두 null입니다.
         yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하며, 조회 결과가 없으면 목록은 빈 배열입니다.
       operationId: getBenefitHistory
       security:
@@ -2142,6 +2146,9 @@ components:
           description: '결제 승인 시각입니다.'
           type: string
           format: date-time
+        performanceShortfall: { $ref: '#/components/schemas/PerformanceShortfallResponse' }
+        monthlyBenefitUsed: { type: integer, format: int64, nullable: true, description: '이번 달 혜택 한도 사용액입니다. APPLIED 또는 PARTIALLY_APPLIED이면서 월 한도가 있는 경우에만 값을 반환하고, 그 외에는 null입니다. 단위는 monthlyBenefitLimit과 동일합니다.' }
+        monthlyBenefitLimit: { type: integer, format: int64, nullable: true, description: '이번 달 혜택 한도입니다. APPLIED 또는 PARTIALLY_APPLIED이면서 월 한도가 있는 경우에만 값을 반환하고, 그 외에는 null입니다.' }
     BenefitHistoryApiResponse:
       description: 'BenefitHistory API의 공통 성공 응답입니다.'
       type: object
@@ -2188,6 +2195,8 @@ components:
         calculationStatus: { type: string, enum: [APPLIED, PARTIALLY_APPLIED, NOT_APPLIED, NOT_CALCULATED], description: 'APPLIED는 실제 적용, PARTIALLY_APPLIED는 한도 등으로 일부 적용, NOT_APPLIED는 혜택 미적용, NOT_CALCULATED는 혜택 계산 결과가 없는 일반 결제입니다.' }
         rejectionReason: { type: string, nullable: true, description: '미적용 또는 부분 적용 사유입니다. 적용 또는 미계산 일반 결제는 null입니다.' }
         performanceShortfall: { $ref: '#/components/schemas/PerformanceShortfallResponse' }
+        monthlyBenefitUsed: { type: integer, format: int64, nullable: true, description: '이번 달 혜택 한도 사용액입니다. APPLIED 또는 PARTIALLY_APPLIED이면서 월 한도가 있는 경우에만 값을 반환하고, 그 외에는 null입니다. 단위는 monthlyBenefitLimit과 동일합니다.' }
+        monthlyBenefitLimit: { type: integer, format: int64, nullable: true, description: '이번 달 혜택 한도입니다. APPLIED 또는 PARTIALLY_APPLIED이면서 월 한도가 있는 경우에만 값을 반환하고, 그 외에는 null입니다.' }
     BenefitHistoryMetaResponse:
       description: '혜택 이력 목록의 페이지 번호·크기·전체 건수·다음 페이지 여부입니다.'
       type: object
