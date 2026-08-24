@@ -1586,6 +1586,13 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            data: null
+            error:
+              code: INVALID_BENEFIT_RECALCULATION
+              message: yearMonth는 YYYY-MM 형식이어야 합니다.
+              fields: {}
     HomeDataNotFound:
       description: 홈 화면에 표시할 데이터가 없음
       content:
