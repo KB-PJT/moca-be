@@ -35060,16 +35060,16 @@ WHERE card.gorilla_card_id = '360'
 INSERT INTO moca.benefit_rules
     (rule_id, offer_id, position, priority, rule_name, rule_effect, stacking_mode,
      reward_value, reward_unit, previous_spend_min_krw,
-     rounding_type, rounding_unit, created_at, updated_at)
+     rounding_type, rounding_unit, rule_support_status, created_at, updated_at)
 SELECT UUID(), offer.offer_id, 1, offer.priority,
        CASE offer.position
            WHEN 2 THEN '조건 없는 전 가맹점 기본적립'
            ELSE '전월 30만원 이상 생활 영역 추가적립'
        END,
-       'grant', 'additive',
+       'grant', 'standalone',
        CASE offer.position WHEN 2 THEN 0.2 ELSE 0.3 END,
        'percent', CASE offer.position WHEN 2 THEN NULL ELSE 300000 END,
-       'floor', 1, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+       'floor', 1, 'SUPPORTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM moca.benefit_offers offer
 INNER JOIN moca.card_benefits benefit ON benefit.benefit_id = offer.benefit_id
 INNER JOIN moca.card_content_versions version
