@@ -57,21 +57,38 @@ public class NotificationService {
 
     public void sendTimeBasedBenefitNotifications(TimeSlot timeSlot) {
         LocalDate today = LocalDate.now(clock);
+        sendTimeBasedBenefitNotifications(timeSlot, null, today);
+    }
+
+    /** 당일 한정 아침 알림 점검용 발송이다. 실행 시각별로 delivery key를 분리한다. */
+    public void sendMorningPreviewNotifications() {
+        LocalDate today = LocalDate.now(clock);
+        String runReference = "preview-" + java.time.LocalTime.now(clock).withSecond(0).withNano(0);
+        sendTimeBasedBenefitNotifications(TimeSlot.MORNING, runReference, today);
+    }
+
+    private void sendTimeBasedBenefitNotifications(TimeSlot timeSlot, String referenceId, LocalDate today) {
         for (UserDevice device : deviceMapper.findActiveNearbyBenefitDevices()) {
-            sendTimeBasedBenefitNotification(device, timeSlot, today);
+            sendTimeBasedBenefitNotification(device, timeSlot, referenceId, today);
         }
     }
 
-    private void sendTimeBasedBenefitNotification(UserDevice device, TimeSlot timeSlot, LocalDate today) {
+    private void sendTimeBasedBenefitNotification(UserDevice device, TimeSlot timeSlot, String referenceId,
+                                                  LocalDate today) {
         try {
-            if (mapper.existsSent(device.userId(), device.userDeviceId(), "TIME_BASED_BENEFIT", null,
+            if (mapper.existsSent(device.userId(), device.userDeviceId(), "TIME_BASED_BENEFIT", referenceId,
                     today.toString(), timeSlot.name())) {
                 return;
             }
             locationService.find(device.userId()).ifPresent(location -> {
                 if (hasEligibleNearbyMerchant(device.userId(), location)) {
-                    send(device.userId(), device, "TIME_BASED_BENEFIT", null, timeSlot, today,
-                            "지금 결제 전 혜택 확인해보세요", "주변에서 받을 수 있는 카드 혜택이 있어요.",
+                    String title = switch (timeSlot) {
+                        case MORNING -> "출근길, 커피 혜택을 확인해보세요";
+                        case LUNCH -> "점심시간, 놓치고 있는 혜택을 확인해보세요";
+                        case DINNER -> "오늘 마지막 결제도 혜택 놓치지 마세요";
+                    };
+                    send(device.userId(), device, "TIME_BASED_BENEFIT", referenceId, timeSlot, today,
+                            title, "주변에서 받을 수 있는 카드 혜택이 있어요.",
                             Map.of("type", "TIME_BASED_BENEFIT", "target", "MAP"));
                 }
             });

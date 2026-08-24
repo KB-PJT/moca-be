@@ -181,6 +181,39 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("시간대별 알림은 지정된 제목을 사용한다")
+    void usesTimeSlotTitles() throws Exception {
+        Fixture fixture = fixture();
+        fixture.eligibleNearbyBenefit();
+        fixture.claims();
+        when(fixture.fcm.send(any(), any(), any(), any())).thenReturn("message");
+
+        fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.MORNING);
+        fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.LUNCH);
+        fixture.service.sendTimeBasedBenefitNotifications(TimeSlot.DINNER);
+
+        ArgumentCaptor<String> titles = ArgumentCaptor.forClass(String.class);
+        verify(fixture.fcm, times(3)).send(eq("token"), titles.capture(), any(), any());
+        assertEquals(List.of("출근길, 커피 혜택을 확인해보세요", "점심시간, 놓치고 있는 혜택을 확인해보세요",
+                "오늘 마지막 결제도 혜택 놓치지 마세요"), titles.getAllValues());
+    }
+
+    @Test
+    @DisplayName("아침 미리보기는 실행 시각을 delivery 식별자로 사용한다")
+    void sendsMorningPreviewWithRunReference() throws Exception {
+        Fixture fixture = fixture();
+        fixture.eligibleNearbyBenefit();
+        fixture.claims();
+        when(fixture.fcm.send(any(), any(), any(), any())).thenReturn("message");
+
+        fixture.service.sendMorningPreviewNotifications();
+
+        verify(fixture.history).existsSent("user", "device", "TIME_BASED_BENEFIT", "preview-20:00",
+                "2026-08-28", "MORNING");
+        verify(fixture.fcm).send(eq("token"), eq("출근길, 커피 혜택을 확인해보세요"), any(), any());
+    }
+
+    @Test
     @DisplayName("주변 가맹점에 추천 가능한 보유 카드가 없으면 발송하지 않는다")
     void skipsNearbyMerchantWithoutEligibleCard() throws Exception {
         Fixture fixture = fixture();
