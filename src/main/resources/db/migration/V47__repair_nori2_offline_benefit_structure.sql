@@ -127,7 +127,10 @@ INNER JOIN benefit_offers offer
     ON offer.offer_name COLLATE utf8mb4_0900_ai_ci
        = repair.offer_name COLLATE utf8mb4_0900_ai_ci
 INNER JOIN benefit_rules rule_data ON rule_data.offer_id = offer.offer_id
-INNER JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
+INNER JOIN card_benefits benefit
+    ON benefit.benefit_id = offer.benefit_id
+   AND benefit.title COLLATE utf8mb4_0900_ai_ci
+       = repair.benefit_title COLLATE utf8mb4_0900_ai_ci
 INNER JOIN card_content_versions version
     ON version.content_version_id = benefit.content_version_id
 INNER JOIN cards card ON card.card_id = version.card_id
