@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import javax.sql.DataSource;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -39,9 +40,10 @@ class DeepDreamBenefitIntegrationTest {
           .withStartupTimeout(Duration.ofMinutes(3));
   private static DataSource dataSource;
   private static JdbcTemplate jdbc;
+  private static SqlSessionFactory sqlSessionFactory;
 
   @BeforeAll
-  static void setUpDatabase() {
+  static void setUpDatabase() throws Exception {
     CONTAINER.start();
     DriverManagerDataSource source = new DriverManagerDataSource();
     source.setDriverClassName(CONTAINER.getDriverClassName());
@@ -53,6 +55,7 @@ class DeepDreamBenefitIntegrationTest {
     new ResourceDatabasePopulator(new ClassPathResource("db/seed/moca_final_seed.sql"))
         .execute(dataSource);
     jdbc = new JdbcTemplate(dataSource);
+    sqlSessionFactory = createSqlSessionFactory();
   }
 
   @AfterAll
@@ -201,12 +204,16 @@ class DeepDreamBenefitIntegrationTest {
         () -> "approval=" + approvalId + ", expected=" + expected + ", actual=" + actual);
   }
 
-  private SqlSession sqlSession() throws Exception {
+  private static SqlSessionFactory createSqlSessionFactory() throws Exception {
     SqlSessionFactoryBean factory = new SqlSessionFactoryBean();
     factory.setDataSource(dataSource);
     factory.setMapperLocations(new PathMatchingResourcePatternResolver()
         .getResources("classpath*:mapper/benefit/*Mapper.xml"));
-    return factory.getObject().openSession(false);
+    return factory.getObject();
+  }
+
+  private SqlSession sqlSession() {
+    return sqlSessionFactory.openSession(false);
   }
 
   private record TestCard(String userId, String userCardId) { }
