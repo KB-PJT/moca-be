@@ -104,7 +104,7 @@
           )
     </sql>
     <resultMap id="historyRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryRow">
-        <id property="benefitHistoryId" column="benefit_history_id"/><result property="approvalId" column="approval_id"/><result property="merchantName" column="merchant_name"/><result property="approvedAt" column="approved_at"/><result property="paymentAmount" column="payment_amount"/><result property="benefitAmount" column="benefit_amount"/><result property="benefitUnit" column="benefit_unit"/><result property="benefitType" column="benefit_type"/><result property="benefitTitle" column="benefit_title"/><result property="userCardId" column="user_card_id"/><result property="cardName" column="card_name"/><result property="calculationStatus" column="calculation_status"/><result property="missedBenefitAmount" column="missed_benefit_amount"/><result property="rejectionReason" column="rejection_reason"/><result property="requiredPreviousSpendAmount" column="required_previous_spend_amount"/><result property="previousMonthSpendAmount" column="previous_month_spend_amount"/>
+        <id property="benefitHistoryId" column="benefit_history_id"/><result property="approvalId" column="approval_id"/><result property="merchantName" column="merchant_name"/><result property="approvedAt" column="approved_at"/><result property="paymentAmount" column="payment_amount"/><result property="benefitAmount" column="benefit_amount"/><result property="benefitUnit" column="benefit_unit"/><result property="benefitType" column="benefit_type"/><result property="benefitTitle" column="benefit_title"/><result property="userCardId" column="user_card_id"/><result property="cardName" column="card_name"/><result property="calculationStatus" column="calculation_status"/><result property="missedBenefitAmount" column="missed_benefit_amount"/><result property="rejectionReason" column="rejection_reason"/><result property="requiredPreviousSpendAmount" column="required_previous_spend_amount"/><result property="previousMonthSpendAmount" column="previous_month_spend_amount"/><result property="monthlyUsedAmount" column="monthly_used_amount"/><result property="monthlyLimitAmount" column="monthly_limit_amount"/>
     </resultMap>
     <select id="findHistory" resultMap="historyRow">
         WITH history_rows AS (
@@ -145,7 +145,17 @@
             </choose>
             LIMIT #{offset}, #{limit}
         )
-        SELECT history_rows.*
+        SELECT history_rows.*,
+            CASE WHEN history_rows.limit_policy_id IS NULL THEN 0 ELSE COALESCE((SELECT SUM(
+                CASE WHEN history_rows.benefit_unit = 'KRW' THEN u2.reward_amount_krw
+                     ELSE COALESCE(u2.reward_original_value, 0) END)
+                FROM user_benefit_usages u2
+                WHERE u2.user_card_id = history_rows.user_card_id
+                  AND u2.limit_policy_id = history_rows.limit_policy_id
+                  AND u2.usage_status = 'confirmed'
+                  AND DATE_FORMAT(u2.usage_date, '%Y-%m') = DATE_FORMAT(history_rows.usage_date, '%Y-%m')), 0)
+            END AS monthly_used_amount,
+            COALESCE((SELECT MAX(t.limit_value) FROM benefit_limit_tiers t WHERE t.limit_policy_id = history_rows.limit_policy_id), 0) AS monthly_limit_amount
         FROM history_rows
         INNER JOIN paged_approvals ON paged_approvals.approval_id = history_rows.approval_id
     </select>
@@ -204,7 +214,7 @@
           <if test="userCardId != null">AND ubu.user_card_id = #{userCardId}</if>
     </select>
     <resultMap id="detailRow" type="com.moca.mocabe.domain.benefit.model.BenefitHistoryDetailRow" extends="historyRow">
-        <result property="monthlyUsedAmount" column="monthly_used_amount"/><result property="monthlyLimitAmount" column="monthly_limit_amount"/><result property="earnedMileage" column="earned_mileage"/>
+        <result property="earnedMileage" column="earned_mileage"/>
     </resultMap>
     <select id="findDetail" resultMap="detailRow">
         SELECT history.*,

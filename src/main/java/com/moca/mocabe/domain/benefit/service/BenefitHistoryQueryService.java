@@ -154,7 +154,9 @@ public class BenefitHistoryQueryService {
         row.getCalculationStatus(),
         row.getMissedBenefitAmount(),
         row.getRejectionReason(),
-        performanceShortfall(row));
+        performanceShortfall(row),
+        monthlyBenefitUsed(row),
+        monthlyBenefitLimit(row));
   }
 
   private PerformanceShortfallResponse performanceShortfall(BenefitHistoryRow row) {
@@ -165,6 +167,22 @@ public class BenefitHistoryQueryService {
     long required = row.getRequiredPreviousSpendAmount();
     long achieved = row.getPreviousMonthSpendAmount() == null ? 0 : row.getPreviousMonthSpendAmount();
     return new PerformanceShortfallResponse(required, achieved, Math.max(0, required - achieved));
+  }
+
+  private boolean hasMonthlyBenefitUsage(BenefitHistoryRow row) {
+    return isAppliedStatus(row.getCalculationStatus()) && row.getMonthlyLimitAmount() > 0;
+  }
+
+  private boolean isAppliedStatus(String status) {
+    return "APPLIED".equals(status) || "PARTIALLY_APPLIED".equals(status);
+  }
+
+  private Long monthlyBenefitUsed(BenefitHistoryRow row) {
+    return hasMonthlyBenefitUsage(row) ? row.getMonthlyUsedAmount() : null;
+  }
+
+  private Long monthlyBenefitLimit(BenefitHistoryRow row) {
+    return hasMonthlyBenefitUsage(row) ? row.getMonthlyLimitAmount() : null;
   }
 
   private String format(LocalDateTime value) {
