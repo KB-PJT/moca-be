@@ -97,6 +97,8 @@ class CardLinkServiceTest {
     private LinkedCardMapper linkedCardMapper;
     @Mock
     private PlatformTransactionManager transactionManager;
+    @Mock
+    private com.moca.mocabe.domain.home.service.HomeCardsCache homeCardsCache;
 
     private CardLinkService cardLinkService;
 
@@ -796,6 +798,24 @@ class CardLinkServiceTest {
         verify(linkedCardMapper).activateCards(linkId, USER_ID, List.of("uc-1", "uc-2"), 0);
         verify(linkedCardMapper).upsertOptionSelection("uc-1", "group-1", "card-1", "choice-1");
         verify(linkedCardMapper, never()).upsertOptionSelection(eq("uc-2"), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("카드를 활성화하면 홈 카드 캐시를 비운다")
+    void activatingCardsEvictsHomeCardsCache() {
+        String linkId = "link-1";
+        CardLinkService cachedService = new CardLinkService(
+                codefClient, codefCredentialMapper, codefCredentialStore,
+                issuerMapper, encryptor, credentialHasher,
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager, homeCardsCache);
+        when(codefCredentialMapper.lockOwnedLink(linkId, USER_ID)).thenReturn(linkId);
+        when(linkedCardMapper.findByLinkIdAndUserId(linkId, USER_ID)).thenReturn(List.of(
+                linkedCardRow("uc-1", "card-1")));
+        when(cardCatalogMapper.findVerifiedOptionsByCardId("card-1")).thenReturn(List.of());
+
+        cachedService.activateCards(USER_ID, linkId, activateRequest(List.of("uc-1")));
+
+        verify(homeCardsCache).evictAll(USER_ID);
     }
 
     @Test

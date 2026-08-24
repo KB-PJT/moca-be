@@ -10,6 +10,7 @@ import com.moca.mocabe.domain.card.mapper.UserCardMapper;
 import com.moca.mocabe.domain.card.model.CardBenefitRow;
 import com.moca.mocabe.domain.card.model.UserCardListRow;
 import com.moca.mocabe.domain.codef.exception.UserCardNotFoundException;
+import com.moca.mocabe.domain.home.service.HomeCardsCache;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -21,10 +22,17 @@ public class CardQueryService {
 
     private final UserCardMapper userCardMapper;
     private final CardBenefitMapper cardBenefitMapper;
+    private final HomeCardsCache homeCardsCache;
 
     public CardQueryService(UserCardMapper userCardMapper, CardBenefitMapper cardBenefitMapper) {
+        this(userCardMapper, cardBenefitMapper, null);
+    }
+
+    public CardQueryService(
+            UserCardMapper userCardMapper, CardBenefitMapper cardBenefitMapper, HomeCardsCache homeCardsCache) {
         this.userCardMapper = userCardMapper;
         this.cardBenefitMapper = cardBenefitMapper;
+        this.homeCardsCache = homeCardsCache;
     }
 
     @Transactional(readOnly = true)
@@ -48,6 +56,7 @@ public class CardQueryService {
         if (userCardMapper.updateMemo(userCardId, userId, memo) == 0) {
             throw new UserCardNotFoundException();
         }
+        evictHomeCardsCache(userId);
         return new MeCardItemResponse(userCardMapper.findByUserCardId(userCardId, userId));
     }
 
@@ -56,6 +65,7 @@ public class CardQueryService {
         if (userCardMapper.deactivateUserCard(userCardId, userId) == 0) {
             throw new UserCardNotFoundException();
         }
+        evictHomeCardsCache(userId);
     }
 
     @Transactional
@@ -72,6 +82,7 @@ public class CardQueryService {
         }
 
         userCardMapper.updateDisplayOrders(userId, userCardIds);
+        evictHomeCardsCache(userId);
         return getMyCards(userId, false);
     }
 
@@ -89,6 +100,7 @@ public class CardQueryService {
         if (userCardMapper.deleteUserCard(userCardId, userId) == 0) {
             throw new UserCardNotFoundException();
         }
+        evictHomeCardsCache(userId);
     }
 
     /** 회원 탈퇴 시 user_cards와 그 자식 테이블을 모두 정리한다. */
@@ -123,6 +135,13 @@ public class CardQueryService {
                 .toList();
 
         return new CardDetailResponse(cardRow, benefits, notices);
+    }
+
+    /** 카드 목록·순서·별칭이 바뀌면 모든 월의 홈 카드 캐시가 즉시 최신값을 반영해야 한다. */
+    private void evictHomeCardsCache(String userId) {
+        if (homeCardsCache != null) {
+            homeCardsCache.evictAll(userId);
+        }
     }
 
     private List<MeCardItemResponse> mapCards(List<UserCardListRow> cardRows) {

@@ -39,6 +39,10 @@ class HomeQueryServiceTest {
 
   @Mock private BenefitHistoryMapper benefitHistoryMapper;
 
+  @Mock private HomeCardsCache homeCardsCache;
+
+  @Mock private HomeGreetingCache homeGreetingCache;
+
   private HomeQueryService homeQueryService;
 
   @BeforeEach
@@ -326,6 +330,67 @@ class HomeQueryServiceTest {
     row.setPerformanceCurrentAmount(currentSpend);
     row.setPerformanceTargetAmount(targetSpend);
     return row;
+  }
+
+  @Test
+  @DisplayName("인사 정보는 캐시에 있으면 DB 조회 없이 캐시값을 사용한다")
+  void usesCachedMissedBenefitAmount() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+    when(homeGreetingCache.get(USER_ID, "2026-07")).thenReturn(8_200L);
+    HomeQueryService cachedService =
+        new HomeQueryService(userMapper, homeMapper, null, homeCardsCache, homeGreetingCache);
+
+    HomeGreetingResponse response = cachedService.getGreeting(USER_ID, "2026-07");
+
+    assertEquals(8_200L, response.getMissedBenefitAmount());
+    org.mockito.Mockito.verifyNoInteractions(homeMapper);
+  }
+
+  @Test
+  @DisplayName("인사 정보는 캐시 미스면 DB에서 조회한 뒤 캐시에 저장한다")
+  void populatesGreetingCacheOnMiss() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "AUTO"));
+    when(homeGreetingCache.get(USER_ID, "2026-07")).thenReturn(null);
+    when(homeMapper.sumMissedBenefitAmount(USER_ID, "2026-07")).thenReturn(8_200L);
+    HomeQueryService cachedService =
+        new HomeQueryService(userMapper, homeMapper, null, homeCardsCache, homeGreetingCache);
+
+    HomeGreetingResponse response = cachedService.getGreeting(USER_ID, "2026-07");
+
+    assertEquals(8_200L, response.getMissedBenefitAmount());
+    org.mockito.Mockito.verify(homeGreetingCache).put(USER_ID, "2026-07", 8_200L);
+  }
+
+  @Test
+  @DisplayName("카드 목록은 캐시에 있으면 DB 조회 없이 캐시값을 사용한다")
+  void usesCachedHomeCardRows() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "MANUAL"));
+    HomeCardRow row = card("card-1", "신한 Mr.Life", 1, 0, 0, 0, 0);
+    when(homeCardsCache.get(USER_ID, "2026-07")).thenReturn(List.of(row));
+    HomeQueryService cachedService =
+        new HomeQueryService(userMapper, homeMapper, null, homeCardsCache, homeGreetingCache);
+
+    HomeCardsResponse response = cachedService.getCards(USER_ID, "2026-07", null);
+
+    assertEquals("card-1", response.getCards().get(0).getUserCardId());
+    org.mockito.Mockito.verify(homeMapper, org.mockito.Mockito.never())
+        .findHomeCards(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+  }
+
+  @Test
+  @DisplayName("카드 목록은 캐시 미스면 DB에서 조회한 뒤 캐시에 저장한다")
+  void populatesHomeCardsCacheOnMiss() {
+    when(userMapper.findProfileById(USER_ID)).thenReturn(profile("지민", "MANUAL"));
+    HomeCardRow row = card("card-1", "신한 Mr.Life", 1, 0, 0, 0, 0);
+    when(homeCardsCache.get(USER_ID, "2026-07")).thenReturn(null);
+    when(homeMapper.findHomeCards(USER_ID, "2026-07")).thenReturn(List.of(row));
+    HomeQueryService cachedService =
+        new HomeQueryService(userMapper, homeMapper, null, homeCardsCache, homeGreetingCache);
+
+    HomeCardsResponse response = cachedService.getCards(USER_ID, "2026-07", null);
+
+    assertEquals("card-1", response.getCards().get(0).getUserCardId());
+    org.mockito.Mockito.verify(homeCardsCache).put(USER_ID, "2026-07", List.of(row));
   }
 
   private UserProfile profile(String nickname, String cardSortMode) {

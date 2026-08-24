@@ -42,6 +42,7 @@ import com.moca.mocabe.domain.codef.model.LinkedCardInsert;
 import com.moca.mocabe.domain.codef.model.LinkedCardKeyRow;
 import com.moca.mocabe.domain.codef.model.LinkedCardRow;
 import com.moca.mocabe.domain.codef.model.PendingCardDiscoveryTarget;
+import com.moca.mocabe.domain.home.service.HomeCardsCache;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -84,12 +85,23 @@ public class CardLinkService {
     private final CardCatalogMapper cardCatalogMapper;
     private final LinkedCardMapper linkedCardMapper;
     private final TransactionTemplate transactionTemplate;
+    private final HomeCardsCache homeCardsCache;
 
     public CardLinkService(CodefClient codefClient, CodefCredentialMapper codefCredentialMapper,
                            CodefCredentialStore codefCredentialStore, IssuerMapper issuerMapper,
                            Encryptor encryptor, CredentialHasher credentialHasher,
                            CardCatalogMatcher cardCatalogMatcher, CardCatalogMapper cardCatalogMapper,
                            LinkedCardMapper linkedCardMapper, PlatformTransactionManager transactionManager) {
+        this(codefClient, codefCredentialMapper, codefCredentialStore, issuerMapper, encryptor, credentialHasher,
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager, null);
+    }
+
+    public CardLinkService(CodefClient codefClient, CodefCredentialMapper codefCredentialMapper,
+                           CodefCredentialStore codefCredentialStore, IssuerMapper issuerMapper,
+                           Encryptor encryptor, CredentialHasher credentialHasher,
+                           CardCatalogMatcher cardCatalogMatcher, CardCatalogMapper cardCatalogMapper,
+                           LinkedCardMapper linkedCardMapper, PlatformTransactionManager transactionManager,
+                           HomeCardsCache homeCardsCache) {
         this.codefClient = codefClient;
         this.codefCredentialMapper = codefCredentialMapper;
         this.codefCredentialStore = codefCredentialStore;
@@ -100,6 +112,7 @@ public class CardLinkService {
         this.cardCatalogMapper = cardCatalogMapper;
         this.linkedCardMapper = linkedCardMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.homeCardsCache = homeCardsCache;
     }
 
     public CardLinkResponse createLink(String userId, CreateCardLinkRequest request) {
@@ -478,6 +491,9 @@ public class CardLinkService {
                 linkedCardMapper.upsertOptionSelection(
                         userCardId, selection.getOptionGroupId(), cardId, selection.getOptionChoiceId());
             }
+        }
+        if (homeCardsCache != null) {
+            homeCardsCache.evictAll(userId);
         }
         return new ActivateCardLinkCardsResponse(linkId, new ArrayList<>(activeIds), activeIds.size());
     }

@@ -54,6 +54,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moca.mocabe.domain.notification.service.UserLocationService;
 import com.moca.mocabe.domain.user.service.UserDomainService;
+import com.moca.mocabe.domain.home.service.HomeCardsCache;
+import com.moca.mocabe.domain.home.service.HomeGreetingCache;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
 import com.moca.mocabe.domain.home.mapper.HomeMapper;
 import com.moca.mocabe.domain.report.mapper.ReportMapper;
@@ -117,14 +119,26 @@ public class AppConfig {
     }
 
     @Bean
-    public CardQueryService cardQueryService(UserCardMapper userCardMapper, CardBenefitMapper cardBenefitMapper) {
-        return new CardQueryService(userCardMapper, cardBenefitMapper);
+    public HomeCardsCache homeCardsCache(StringRedisTemplate redis, ObjectMapper objectMapper) {
+        return new HomeCardsCache(redis, objectMapper);
+    }
+
+    @Bean
+    public HomeGreetingCache homeGreetingCache(StringRedisTemplate redis) {
+        return new HomeGreetingCache(redis);
+    }
+
+    @Bean
+    public CardQueryService cardQueryService(UserCardMapper userCardMapper, CardBenefitMapper cardBenefitMapper,
+            HomeCardsCache homeCardsCache) {
+        return new CardQueryService(userCardMapper, cardBenefitMapper, homeCardsCache);
     }
 
     @Bean
     public HomeQueryService homeQueryService(
-            UserMapper userMapper, HomeMapper homeMapper, BenefitHistoryMapper benefitHistoryMapper) {
-        return new HomeQueryService(userMapper, homeMapper, benefitHistoryMapper);
+            UserMapper userMapper, HomeMapper homeMapper, BenefitHistoryMapper benefitHistoryMapper,
+            HomeCardsCache homeCardsCache, HomeGreetingCache homeGreetingCache) {
+        return new HomeQueryService(userMapper, homeMapper, benefitHistoryMapper, homeCardsCache, homeGreetingCache);
     }
 
     @Bean
@@ -176,8 +190,9 @@ public class AppConfig {
 
     @Bean
     public BenefitUsageCalculationService benefitUsageCalculationService(
-            BenefitCalculationMapper benefitCalculationMapper) {
-        return new BenefitUsageCalculationService(benefitCalculationMapper);
+            BenefitCalculationMapper benefitCalculationMapper,
+            HomeCardsCache homeCardsCache, HomeGreetingCache homeGreetingCache) {
+        return new BenefitUsageCalculationService(benefitCalculationMapper, homeCardsCache, homeGreetingCache);
     }
 
     @Bean
@@ -262,11 +277,12 @@ public class AppConfig {
                                            CardCatalogMatcher cardCatalogMatcher,
                                            CardCatalogMapper cardCatalogMapper,
                                            LinkedCardMapper linkedCardMapper,
-                                           PlatformTransactionManager transactionManager) {
+                                           PlatformTransactionManager transactionManager,
+                                           HomeCardsCache homeCardsCache) {
         return new CardLinkService(
                 codefClient, codefCredentialMapper, codefCredentialStore,
                 issuerMapper, codefEncryptor, credentialHasher,
-                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager);
+                cardCatalogMatcher, cardCatalogMapper, linkedCardMapper, transactionManager, homeCardsCache);
     }
 
     @Bean
