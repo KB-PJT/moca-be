@@ -14,6 +14,13 @@ SET offer.report_visible = TRUE,
 WHERE card.gorilla_card_id = '360'
   AND benefit.title = '모든가맹점'
   AND offer.offer_name IN ('전 가맹점 기본적립 0.2%', '생활 영역 추가적립 0.3%')
+  AND NOT (
+      offer.report_visible <=> TRUE
+      AND offer.report_title <=> CASE
+          WHEN offer.offer_name = '전 가맹점 기본적립 0.2%' THEN '모든 가맹점'
+          ELSE '생활 영역'
+      END
+  )
   AND NOT EXISTS (
       SELECT 1
       FROM card_content_versions newer
@@ -34,6 +41,7 @@ SET rule_data.stacking_mode = 'standalone',
 WHERE card.gorilla_card_id = '360'
   AND benefit.title = '모든가맹점'
   AND offer.offer_name IN ('전 가맹점 기본적립 0.2%', '생활 영역 추가적립 0.3%')
+  AND NOT (rule_data.stacking_mode <=> 'standalone')
   AND NOT EXISTS (
       SELECT 1
       FROM card_content_versions newer
