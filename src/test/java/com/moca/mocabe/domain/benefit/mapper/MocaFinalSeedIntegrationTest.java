@@ -498,6 +498,14 @@ class MocaFinalSeedIntegrationTest {
                 + "AND offer.valuation_scope='transaction' "
                 + "AND offer.valuation_method='direct'"));
     assertEquals(
+        2,
+        count(
+            jdbc,
+            "SELECT COUNT(DISTINCT rule_data.rule_id) "
+                + nhPointRules
+                + "AND offer.offer_name IN ('전 가맹점 기본적립 0.2%', '생활 영역 추가적립 0.3%') "
+                + "AND rule_data.rule_support_status='SUPPORTED'"));
+    assertEquals(
         1,
         count(
             jdbc,
