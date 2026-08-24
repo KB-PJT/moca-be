@@ -12,7 +12,9 @@ CREATE TEMPORARY TABLE nori2_offline_benefit_repair (
     target_code VARCHAR(100) NOT NULL,
     target_name VARCHAR(150) NOT NULL,
     condition_group INT NOT NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 
 INSERT INTO nori2_offline_benefit_repair VALUES
 ('드럭스토어', '올리브영·미용실 5% 할인', 5, 'percent', 200000, NULL, 2000, NULL,
@@ -43,10 +45,13 @@ FROM (
     UNION ALL SELECT 'GS25', 'CONVENIENCE_STORE'
     UNION ALL SELECT 'CU', 'CONVENIENCE_STORE'
 ) source
-INNER JOIN merchant_categories category ON category.category_code = source.category_code
+INNER JOIN merchant_categories category
+    ON category.category_code COLLATE utf8mb4_unicode_ci
+       = source.category_code COLLATE utf8mb4_unicode_ci
 WHERE NOT EXISTS (
     SELECT 1 FROM merchants existing
-    WHERE existing.normalized_name = source.merchant_name
+    WHERE existing.normalized_name COLLATE utf8mb4_unicode_ci
+          = source.merchant_name COLLATE utf8mb4_unicode_ci
 );
 
 INSERT INTO benefit_offers
@@ -64,11 +69,13 @@ INNER JOIN cards card ON card.gorilla_card_id = '2422'
 INNER JOIN card_content_versions version ON version.card_id = card.card_id
 INNER JOIN card_benefits benefit
     ON benefit.content_version_id = version.content_version_id
-   AND benefit.title = repair.benefit_title
+   AND benefit.title COLLATE utf8mb4_unicode_ci
+       = repair.benefit_title COLLATE utf8mb4_unicode_ci
 WHERE NOT EXISTS (
     SELECT 1 FROM benefit_offers existing
     WHERE existing.benefit_id = benefit.benefit_id
-      AND existing.offer_name = repair.offer_name
+      AND existing.offer_name COLLATE utf8mb4_unicode_ci
+          = repair.offer_name COLLATE utf8mb4_unicode_ci
 );
 
 INSERT INTO benefit_rules
@@ -91,13 +98,16 @@ SELECT UUID(), offer.offer_id, 1, 'grant', 'standalone', repair.reward_value,
                     ELSE JSON_ARRAY(JSON_OBJECT('type', 'MONTHLY_USAGE_COUNT',
                                                 'value', CAST(repair.monthly_usage_count AS CHAR))) END)
 FROM nori2_offline_benefit_repair repair
-INNER JOIN benefit_offers offer ON offer.offer_name = repair.offer_name
+INNER JOIN benefit_offers offer
+    ON offer.offer_name COLLATE utf8mb4_unicode_ci
+       = repair.offer_name COLLATE utf8mb4_unicode_ci
 INNER JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
 INNER JOIN card_content_versions version
     ON version.content_version_id = benefit.content_version_id
 INNER JOIN cards card ON card.card_id = version.card_id
 WHERE card.gorilla_card_id = '2422'
-  AND benefit.title = repair.benefit_title
+  AND benefit.title COLLATE utf8mb4_unicode_ci
+      = repair.benefit_title COLLATE utf8mb4_unicode_ci
   AND NOT EXISTS (
       SELECT 1 FROM benefit_rules existing
       WHERE existing.offer_id = offer.offer_id
@@ -113,7 +123,9 @@ SELECT UUID(), rule_data.rule_id, repair.condition_group, 'include', repair.targ
        CASE WHEN repair.target_type = 'merchant' THEN 'MERCHANT_EXACT' ELSE 'ISSUER_CATEGORY' END,
        0.990
 FROM nori2_offline_benefit_repair repair
-INNER JOIN benefit_offers offer ON offer.offer_name = repair.offer_name
+INNER JOIN benefit_offers offer
+    ON offer.offer_name COLLATE utf8mb4_unicode_ci
+       = repair.offer_name COLLATE utf8mb4_unicode_ci
 INNER JOIN benefit_rules rule_data ON rule_data.offer_id = offer.offer_id
 INNER JOIN card_benefits benefit ON benefit.benefit_id = offer.benefit_id
 INNER JOIN card_content_versions version
@@ -121,18 +133,22 @@ INNER JOIN card_content_versions version
 INNER JOIN cards card ON card.card_id = version.card_id
 LEFT JOIN merchant_categories category
     ON repair.target_type = 'merchant_category'
-   AND category.category_code = repair.target_code
+   AND category.category_code COLLATE utf8mb4_unicode_ci
+       = repair.target_code COLLATE utf8mb4_unicode_ci
 LEFT JOIN merchants merchant
     ON repair.target_type = 'merchant'
-   AND merchant.normalized_name = repair.target_code
+   AND merchant.normalized_name COLLATE utf8mb4_unicode_ci
+       = repair.target_code COLLATE utf8mb4_unicode_ci
    AND merchant.status = 'active'
 WHERE card.gorilla_card_id = '2422'
   AND NOT EXISTS (
       SELECT 1 FROM benefit_rule_targets existing
       WHERE existing.rule_id = rule_data.rule_id
         AND existing.condition_group = repair.condition_group
-        AND existing.target_type = repair.target_type
-        AND existing.target_code = repair.target_code
+        AND existing.target_type COLLATE utf8mb4_unicode_ci
+            = repair.target_type COLLATE utf8mb4_unicode_ci
+        AND existing.target_code COLLATE utf8mb4_unicode_ci
+            = repair.target_code COLLATE utf8mb4_unicode_ci
   )
   AND ((repair.target_type = 'merchant' AND merchant.merchant_id IS NOT NULL)
        OR (repair.target_type = 'merchant_category' AND category.merchant_category_id IS NOT NULL));
