@@ -23,6 +23,7 @@ import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
 import com.moca.mocabe.global.exception.benefit.InvalidBenefitHistoryQueryException;
+import com.moca.mocabe.global.exception.benefit.InvalidBenefitRecalculationException;
 import com.moca.mocabe.global.exception.report.InvalidReportQueryException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.user.UserNotFoundException;
@@ -132,6 +133,11 @@ class GlobalExceptionHandlerTest {
                 handler.handleInvalidReportQuery(new InvalidReportQueryException("invalid report")),
                 HttpStatus.BAD_REQUEST,
                 "INVALID_REPORT_QUERY");
+        assertError(
+                handler.handleInvalidBenefitRecalculation(
+                        new InvalidBenefitRecalculationException("invalid recalculation")),
+                HttpStatus.BAD_REQUEST,
+                "INVALID_BENEFIT_RECALCULATION");
     }
 
     @Test

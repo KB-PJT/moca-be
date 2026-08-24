@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
+import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
@@ -174,6 +175,11 @@ class MerchantAuthenticationContractTest {
         @Bean
         public BenefitHistoryQueryService benefitHistoryQueryService() {
             return mock(BenefitHistoryQueryService.class);
+        }
+
+        @Bean
+        public BenefitUsageCalculationService benefitUsageCalculationService() {
+            return mock(BenefitUsageCalculationService.class);
         }
 
         @Bean

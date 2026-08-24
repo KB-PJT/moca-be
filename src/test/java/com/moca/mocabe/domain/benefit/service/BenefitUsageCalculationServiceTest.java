@@ -6,6 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.moca.mocabe.domain.benefit.mapper.BenefitCalculationMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitApprovalRow;
@@ -16,6 +17,7 @@ import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
+import com.moca.mocabe.global.exception.benefit.InvalidBenefitRecalculationException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -53,6 +55,37 @@ class BenefitUsageCalculationServiceTest {
         LocalDateTime.parse("2026-09-01T00:00:00"));
 
     verify(mapper, never()).findApprovalsForCalculation(any());
+  }
+
+  @Test
+  void recalculatesRequestedMonthUsingAuthenticatedUserAndSeoulMonthBounds() {
+    when(mapper.findApprovalIdsForPeriod(eq("user-1"), any(LocalDateTime.class), any(LocalDateTime.class)))
+        .thenReturn(List.of());
+
+    assertEquals("2026-08", service.recalculateForMonth("user-1", "2026-08"));
+
+    verify(mapper).findApprovalIdsForPeriod(
+        eq("user-1"),
+        eq(LocalDateTime.of(2026, 7, 31, 15, 0)),
+        eq(LocalDateTime.of(2026, 8, 31, 15, 0)));
+  }
+
+  @Test
+  void defaultsRecalculationToCurrentMonthWhenYearMonthIsMissing() {
+    when(mapper.findApprovalIdsForPeriod(eq("user-1"), any(LocalDateTime.class), any(LocalDateTime.class)))
+        .thenReturn(List.of());
+
+    service.recalculateForMonth("user-1", null);
+
+    verify(mapper).findApprovalIdsForPeriod(eq("user-1"), any(LocalDateTime.class), any(LocalDateTime.class));
+  }
+
+  @Test
+  void rejectsInvalidRecalculationMonth() {
+    assertThrows(
+        InvalidBenefitRecalculationException.class,
+        () -> service.recalculateForMonth("user-1", "2026-13"));
+    verify(mapper, never()).findApprovalIdsForPeriod(any(), any(), any());
   }
 
   @Test

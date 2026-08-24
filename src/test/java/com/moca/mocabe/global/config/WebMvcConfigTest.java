@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
+import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.home.service.HomeQueryService;
@@ -171,6 +172,11 @@ class WebMvcConfigTest {
         @Bean
         public BenefitHistoryQueryService benefitHistoryQueryService() {
             return org.mockito.Mockito.mock(BenefitHistoryQueryService.class);
+        }
+
+        @Bean
+        public BenefitUsageCalculationService benefitUsageCalculationService() {
+            return org.mockito.Mockito.mock(BenefitUsageCalculationService.class);
         }
 
         @Bean
