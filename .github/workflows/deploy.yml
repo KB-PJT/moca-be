@@ -89,7 +89,7 @@ jobs:
           wait_for_health() {
             # Tomcat 기동과 Flyway 검증이 끝나기 전에 고정 횟수로 종료하지 않도록
             # 기본 대기 시간을 넉넉하게 둔다. 이미지 pull·RDS 응답 지연도 포함한다.
-            max_attempts="${1:-40}"
+            max_attempts="${1:-30}"
             for attempt in $(seq 1 "$max_attempts"); do
               if curl --fail --silent --show-error --connect-timeout 2 --max-time 3 \
                   http://127.0.0.1:8080/api/v1/health; then
@@ -145,7 +145,7 @@ jobs:
             echo "실행 이미지가 배포 대상과 다릅니다. expected=$MOCA_IMAGE actual=$RUNNING_IMAGE"
             exit 1
           fi
-          wait_for_health 40
+          wait_for_health 30
 
           trap - EXIT
           rm -f "$ROLLBACK_FILE"
