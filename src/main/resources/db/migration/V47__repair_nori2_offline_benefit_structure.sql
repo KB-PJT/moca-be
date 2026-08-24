@@ -97,7 +97,11 @@ SELECT UUID(), offer.offer_id, 1, 'grant', 'standalone', repair.reward_value,
            'limits', CASE WHEN repair.monthly_usage_count IS NULL THEN JSON_ARRAY()
                     ELSE JSON_ARRAY(JSON_OBJECT('type', 'MONTHLY_USAGE_COUNT',
                                                 'value', CAST(repair.monthly_usage_count AS CHAR))) END)
-FROM nori2_offline_benefit_repair repair
+FROM (
+    SELECT DISTINCT benefit_title, offer_name, reward_value, reward_unit,
+           previous_spend_min_krw, transaction_min_krw, monthly_usage_count
+    FROM nori2_offline_benefit_repair
+) repair
 INNER JOIN benefit_offers offer
     ON offer.offer_name COLLATE utf8mb4_0900_ai_ci
        = repair.offer_name COLLATE utf8mb4_0900_ai_ci
@@ -111,6 +115,7 @@ WHERE card.gorilla_card_id = '2422'
   AND NOT EXISTS (
       SELECT 1 FROM benefit_rules existing
       WHERE existing.offer_id = offer.offer_id
+        AND existing.position = 1
   );
 
 INSERT INTO benefit_rule_targets
