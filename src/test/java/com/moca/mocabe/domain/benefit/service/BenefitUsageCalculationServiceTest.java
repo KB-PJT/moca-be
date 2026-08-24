@@ -17,6 +17,8 @@ import com.moca.mocabe.domain.benefit.model.BenefitLimitTierCandidate;
 import com.moca.mocabe.domain.benefit.model.MonthlyBenefitLimit;
 import com.moca.mocabe.domain.benefit.model.SimpleBenefitRuleRow;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
+import com.moca.mocabe.domain.home.service.HomeCardsCache;
+import com.moca.mocabe.domain.home.service.HomeGreetingCache;
 import com.moca.mocabe.global.exception.benefit.InvalidBenefitRecalculationException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,6 +31,52 @@ import org.mockito.Mockito;
 class BenefitUsageCalculationServiceTest {
   private final BenefitCalculationMapper mapper = Mockito.mock(BenefitCalculationMapper.class);
   private final BenefitUsageCalculationService service = new BenefitUsageCalculationService(mapper);
+  private final HomeCardsCache homeCardsCache = Mockito.mock(HomeCardsCache.class);
+  private final HomeGreetingCache homeGreetingCache = Mockito.mock(HomeGreetingCache.class);
+  private final BenefitUsageCalculationService cachedService =
+      new BenefitUsageCalculationService(mapper, homeCardsCache, homeGreetingCache);
+
+  @Test
+  @DisplayName("월별 재계산은 해당 월의 홈 캐시만 비운다")
+  void recalculateForMonthEvictsSingleMonthHomeCaches() {
+    when(mapper.findApprovalIdsForPeriod(eq("user-1"), any(LocalDateTime.class), any(LocalDateTime.class)))
+        .thenReturn(List.of());
+
+    cachedService.recalculateForMonth("user-1", "2026-08");
+
+    verify(homeCardsCache).evict("user-1", "2026-08");
+    verify(homeGreetingCache).evict("user-1", "2026-08");
+  }
+
+  @Test
+  @DisplayName("기간 백필은 영향받는 유저의 모든 월 홈 캐시를 비운다")
+  void calculateAndPersistForPeriodEvictsAllHomeCaches() {
+    when(mapper.findApprovalIdsForPeriod(eq("user-1"), any(LocalDateTime.class), any(LocalDateTime.class)))
+        .thenReturn(List.of("approval-1"));
+    when(mapper.findApprovalsForCalculation(List.of("approval-1"))).thenReturn(List.of());
+
+    cachedService.calculateAndPersistForPeriod(
+        "user-1", LocalDateTime.parse("2026-08-01T00:00:00"),
+        LocalDateTime.parse("2026-09-01T00:00:00"));
+
+    verify(homeCardsCache).evictAll("user-1");
+    verify(homeGreetingCache).evictAll("user-1");
+  }
+
+  @Test
+  @DisplayName("CODEF 동기화 승인 저장은 승인에 포함된 유저별로 홈 캐시를 비운다")
+  void calculateAndPersistEvictsHomeCachesForEachApprovalUser() {
+    when(mapper.findApprovalsForCalculation(List.of("approval-1")))
+        .thenReturn(List.of(new BenefitApprovalRow(
+            "approval-1", "card-1", 10_000, LocalDateTime.of(2026, 8, 12, 3, 0), null)));
+
+    cachedService.calculateAndPersist(List.of(new ApprovalInsert(
+        "approval-1", "user-1", "card-1", "merchant-1", "A-1",
+        LocalDateTime.of(2026, 8, 12, 3, 0), "merchant", 10_000, "{}")));
+
+    verify(homeCardsCache).evictAll("user-1");
+    verify(homeGreetingCache).evictAll("user-1");
+  }
 
   @Test
   void ignoresEmptyApprovalListsAndReportsNoopServiceAsDisabled() {

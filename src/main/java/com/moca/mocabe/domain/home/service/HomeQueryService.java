@@ -44,6 +44,8 @@ public class HomeQueryService {
   private final HomeMapper homeMapper;
   private final BenefitHistoryMapper benefitHistoryMapper;
   private final BenefitHistoryRepresentativeSelector representativeSelector;
+  private final HomeCardsCache homeCardsCache;
+  private final HomeGreetingCache homeGreetingCache;
 
   public HomeQueryService(UserMapper userMapper, HomeMapper homeMapper) {
     this(userMapper, homeMapper, null);
@@ -51,18 +53,25 @@ public class HomeQueryService {
 
   public HomeQueryService(
       UserMapper userMapper, HomeMapper homeMapper, BenefitHistoryMapper benefitHistoryMapper) {
+    this(userMapper, homeMapper, benefitHistoryMapper, null, null);
+  }
+
+  public HomeQueryService(
+      UserMapper userMapper, HomeMapper homeMapper, BenefitHistoryMapper benefitHistoryMapper,
+      HomeCardsCache homeCardsCache, HomeGreetingCache homeGreetingCache) {
     this.userMapper = userMapper;
     this.homeMapper = homeMapper;
     this.benefitHistoryMapper = benefitHistoryMapper;
     this.representativeSelector = new BenefitHistoryRepresentativeSelector();
+    this.homeCardsCache = homeCardsCache;
+    this.homeGreetingCache = homeGreetingCache;
   }
 
   @Transactional(readOnly = true)
   public HomeGreetingResponse getGreeting(String userId, String requestedYearMonth) {
     String yearMonth = normalizeYearMonth(requestedYearMonth);
     UserProfile profile = requireProfile(userId);
-    Long missed = homeMapper.sumMissedBenefitAmount(userId, yearMonth);
-    long missedBenefitAmount = missed == null ? 0L : missed;
+    long missedBenefitAmount = resolveMissedBenefitAmount(userId, yearMonth);
     String message =
         missedBenefitAmount > 0
             ? String.format(Locale.KOREA, "이번 달 혜택 %,d원을 놓치고 있어요!", missedBenefitAmount)
@@ -76,7 +85,7 @@ public class HomeQueryService {
     String yearMonth = normalizeYearMonth(requestedYearMonth);
     UserProfile profile = requireProfile(userId);
     String orderMode = normalizeOrderMode(requestedOrderMode, profile.getCardSortMode());
-    List<HomeCardRow> rows = homeMapper.findHomeCards(userId, yearMonth);
+    List<HomeCardRow> rows = resolveHomeCardRows(userId, yearMonth);
     List<HomeCardResponse> cards = mapCards(rows, orderMode);
     String selectedUserCardId = cards.isEmpty() ? null : cards.get(0).getUserCardId();
     return new HomeCardsResponse(yearMonth, orderMode, selectedUserCardId, cards);
@@ -140,6 +149,35 @@ public class HomeQueryService {
     target.setMonthlyUsedAmount(source.getMonthlyUsedAmount());
     target.setMonthlyLimitAmount(source.getMonthlyLimitAmount());
     return target;
+  }
+
+  private long resolveMissedBenefitAmount(String userId, String yearMonth) {
+    if (homeGreetingCache != null) {
+      Long cached = homeGreetingCache.get(userId, yearMonth);
+      if (cached != null) {
+        return cached;
+      }
+    }
+    Long missed = homeMapper.sumMissedBenefitAmount(userId, yearMonth);
+    long missedBenefitAmount = missed == null ? 0L : missed;
+    if (homeGreetingCache != null) {
+      homeGreetingCache.put(userId, yearMonth, missedBenefitAmount);
+    }
+    return missedBenefitAmount;
+  }
+
+  private List<HomeCardRow> resolveHomeCardRows(String userId, String yearMonth) {
+    if (homeCardsCache != null) {
+      List<HomeCardRow> cached = homeCardsCache.get(userId, yearMonth);
+      if (cached != null) {
+        return cached;
+      }
+    }
+    List<HomeCardRow> rows = homeMapper.findHomeCards(userId, yearMonth);
+    if (homeCardsCache != null) {
+      homeCardsCache.put(userId, yearMonth, rows == null ? List.of() : rows);
+    }
+    return rows;
   }
 
   private UserProfile requireProfile(String userId) {

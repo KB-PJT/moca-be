@@ -23,6 +23,8 @@ import com.moca.mocabe.domain.benefit.type.BenefitTargetMatchMode;
 import com.moca.mocabe.domain.benefit.type.BenefitType;
 import com.moca.mocabe.domain.benefit.type.RewardUnit;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
+import com.moca.mocabe.domain.home.service.HomeCardsCache;
+import com.moca.mocabe.domain.home.service.HomeGreetingCache;
 import com.moca.mocabe.global.exception.benefit.InvalidBenefitRecalculationException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -62,10 +64,19 @@ public class BenefitUsageCalculationService {
   private final JsonBenefitRuleEvaluator jsonRuleEvaluator = new JsonBenefitRuleEvaluator();
   private final BenefitLimitTierSelector tierSelector = new BenefitLimitTierSelector();
   private final BenefitAreaSpendService benefitAreaSpendService;
+  private final HomeCardsCache homeCardsCache;
+  private final HomeGreetingCache homeGreetingCache;
 
   public BenefitUsageCalculationService(BenefitCalculationMapper mapper) {
+    this(mapper, null, null);
+  }
+
+  public BenefitUsageCalculationService(
+      BenefitCalculationMapper mapper, HomeCardsCache homeCardsCache, HomeGreetingCache homeGreetingCache) {
     this.mapper = mapper;
     this.benefitAreaSpendService = new BenefitAreaSpendService(mapper);
+    this.homeCardsCache = homeCardsCache;
+    this.homeGreetingCache = homeGreetingCache;
   }
 
   /** 기존 단위 테스트용 CardSyncService 생성자에서 사용하는 부작용 없는 구현이다. */
@@ -83,6 +94,7 @@ public class BenefitUsageCalculationService {
       return;
     }
     recalculateFullMonths(insertedApprovals.stream().map(ApprovalInsert::approvalId).toList());
+    insertedApprovals.stream().map(ApprovalInsert::userId).distinct().forEach(this::evictHomeCaches);
   }
 
   /** 승인 동기화 전에 이미 저장된 승인까지 같은 계산 경로로 보강한다. */
@@ -97,6 +109,7 @@ public class BenefitUsageCalculationService {
       return;
     }
     recalculateFullMonths(approvalIds);
+    evictHomeCaches(userId);
   }
 
   /** 인증 사용자의 지정 월 승인 원본을 보존한 채 혜택 결과만 재계산한다. */
@@ -106,7 +119,28 @@ public class BenefitUsageCalculationService {
     LocalDateTime fromUtc = toUtc(month);
     LocalDateTime toUtc = toUtc(month.plusMonths(1));
     calculateAndPersistForPeriod(userId, fromUtc, toUtc);
+    evictHomeCaches(userId, month.toString());
     return month.toString();
+  }
+
+  /** 재계산으로 받은 혜택·놓친 혜택 금액이 바뀌므로, 해당 월의 홈 화면 캐시를 즉시 비운다. */
+  private void evictHomeCaches(String userId, String yearMonth) {
+    if (homeCardsCache != null) {
+      homeCardsCache.evict(userId, yearMonth);
+    }
+    if (homeGreetingCache != null) {
+      homeGreetingCache.evict(userId, yearMonth);
+    }
+  }
+
+  /** CODEF 동기화는 여러 월에 걸친 승인을 한 번에 반영할 수 있어, 월 구분 없이 전부 비운다. */
+  private void evictHomeCaches(String userId) {
+    if (homeCardsCache != null) {
+      homeCardsCache.evictAll(userId);
+    }
+    if (homeGreetingCache != null) {
+      homeGreetingCache.evictAll(userId);
+    }
   }
 
   private YearMonth parseRecalculationMonth(String requestedYearMonth) {

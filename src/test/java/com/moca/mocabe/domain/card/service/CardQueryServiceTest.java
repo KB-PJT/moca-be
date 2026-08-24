@@ -43,6 +43,9 @@ class CardQueryServiceTest {
     @Mock
     private CardBenefitMapper cardBenefitMapper;
 
+    @Mock
+    private com.moca.mocabe.domain.home.service.HomeCardsCache homeCardsCache;
+
     private CardQueryService cardQueryService;
 
     @BeforeEach
@@ -304,6 +307,32 @@ class CardQueryServiceTest {
 
         assertThrows(UserCardNotFoundException.class,
                 () -> cardQueryService.disconnectCard(USER_ID, ACTIVE_USER_CARD_ID));
+    }
+
+    @Test
+    @DisplayName("메모 수정, 비활성화, 재정렬, 연동 해제는 홈 카드 캐시를 모두 비운다")
+    void evictsHomeCardsCacheOnEveryMutation() {
+        CardQueryService cachedService =
+                new CardQueryService(userCardMapper, cardBenefitMapper, homeCardsCache);
+
+        when(userCardMapper.updateMemo(ACTIVE_USER_CARD_ID, USER_ID, "새 메모")).thenReturn(1);
+        when(userCardMapper.findByUserCardId(ACTIVE_USER_CARD_ID, USER_ID))
+                .thenReturn(userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, "새 메모"));
+        cachedService.updateMemo(USER_ID, ACTIVE_USER_CARD_ID, "새 메모");
+
+        when(userCardMapper.deactivateUserCard(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(1);
+        cachedService.deactivateCard(USER_ID, ACTIVE_USER_CARD_ID);
+
+        List<String> newOrder = List.of(ACTIVE_USER_CARD_ID);
+        when(userCardMapper.findActiveByUserId(USER_ID))
+                .thenReturn(List.of(userCard(ACTIVE_USER_CARD_ID, "KB My WE:SH", null, null)));
+        when(userCardMapper.findInactiveByUserId(USER_ID)).thenReturn(List.of());
+        cachedService.reorderCards(USER_ID, newOrder);
+
+        when(userCardMapper.deleteUserCard(ACTIVE_USER_CARD_ID, USER_ID)).thenReturn(1);
+        cachedService.disconnectCard(USER_ID, ACTIVE_USER_CARD_ID);
+
+        verify(homeCardsCache, org.mockito.Mockito.times(4)).evictAll(USER_ID);
     }
 
     private CardBenefitRow benefitRow(
