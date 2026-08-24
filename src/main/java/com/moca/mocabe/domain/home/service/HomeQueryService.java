@@ -7,6 +7,7 @@ import com.moca.mocabe.domain.home.dto.HomeCardsResponse;
 import com.moca.mocabe.domain.home.dto.HomeGreetingResponse;
 import com.moca.mocabe.domain.home.dto.RecentHistoryItemResponse;
 import com.moca.mocabe.domain.home.dto.RecentHistoryResponse;
+import com.moca.mocabe.domain.benefit.dto.PerformanceShortfallResponse;
 import com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper;
 import com.moca.mocabe.domain.benefit.model.BenefitHistoryRow;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryRepresentativeSelector;
@@ -134,6 +135,10 @@ public class HomeQueryService {
     target.setCalculationStatus(source.getCalculationStatus());
     target.setRejectionReason(source.getRejectionReason());
     target.setOccurredAt(source.getApprovedAt());
+    target.setRequiredPreviousSpendAmount(source.getRequiredPreviousSpendAmount());
+    target.setPreviousMonthSpendAmount(source.getPreviousMonthSpendAmount());
+    target.setMonthlyUsedAmount(source.getMonthlyUsedAmount());
+    target.setMonthlyLimitAmount(source.getMonthlyLimitAmount());
     return target;
   }
 
@@ -215,7 +220,36 @@ public class HomeQueryService {
         row.getMissedBenefitAmount(),
         row.getCalculationStatus(),
         row.getRejectionReason(),
-        occurredAt);
+        occurredAt,
+        performanceShortfall(row),
+        monthlyBenefitUsed(row),
+        monthlyBenefitLimit(row));
+  }
+
+  private PerformanceShortfallResponse performanceShortfall(RecentHistoryRow row) {
+    if (!"PERFORMANCE_NOT_MET".equals(row.getRejectionReason())
+        || row.getRequiredPreviousSpendAmount() == null) {
+      return null;
+    }
+    long required = row.getRequiredPreviousSpendAmount();
+    long achieved = row.getPreviousMonthSpendAmount() == null ? 0 : row.getPreviousMonthSpendAmount();
+    return new PerformanceShortfallResponse(required, achieved, Math.max(0, required - achieved));
+  }
+
+  private boolean hasMonthlyBenefitUsage(RecentHistoryRow row) {
+    return isAppliedStatus(row.getCalculationStatus()) && row.getMonthlyLimitAmount() > 0;
+  }
+
+  private boolean isAppliedStatus(String status) {
+    return "APPLIED".equals(status) || "PARTIALLY_APPLIED".equals(status);
+  }
+
+  private Long monthlyBenefitUsed(RecentHistoryRow row) {
+    return hasMonthlyBenefitUsage(row) ? row.getMonthlyUsedAmount() : null;
+  }
+
+  private Long monthlyBenefitLimit(RecentHistoryRow row) {
+    return hasMonthlyBenefitUsage(row) ? row.getMonthlyLimitAmount() : null;
   }
 
   private long performanceRemainingAmount(HomeCardRow row) {

@@ -160,6 +160,8 @@ paths:
         인증 사용자의 기준 월 카드 결제 승인 전체에서 최근 내역을 승인 시각 내림차순으로 반환합니다.
         혜택이 적용되지 않았거나 계산 결과가 없는 승인도 제외하지 않습니다.
         `calculationStatus`로 적용·부분 적용·미적용·미계산을 구분하며, 혜택이 없으면 혜택 관련 필드는 null 또는 0입니다.
+        전월 실적 미충족으로 미적용된 건은 `performanceShortfall`을 제공합니다. 적용 또는 부분 적용 건 중 월 한도가 있는 경우에만
+        `monthlyBenefitUsed`, `monthlyBenefitLimit`을 제공하며, 그 외에는 세 필드 모두 null입니다.
         yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용하고, limit을 생략하면 최대 5건을 반환합니다.
         userCardId를 지정하면 사용자가 보유한 해당 카드의 내역으로 제한하며, 생략하면 모든 보유카드를 조회합니다.
         승인내역이 없으면 `history`는 빈 배열입니다.
@@ -2144,6 +2146,9 @@ components:
           description: '결제 승인 시각입니다.'
           type: string
           format: date-time
+        performanceShortfall: { $ref: '#/components/schemas/PerformanceShortfallResponse' }
+        monthlyBenefitUsed: { type: integer, format: int64, nullable: true, description: '이번 달 혜택 한도 사용액입니다. APPLIED 또는 PARTIALLY_APPLIED이면서 월 한도가 있는 경우에만 값을 반환하고, 그 외에는 null입니다. 단위는 monthlyBenefitLimit과 동일합니다.' }
+        monthlyBenefitLimit: { type: integer, format: int64, nullable: true, description: '이번 달 혜택 한도입니다. APPLIED 또는 PARTIALLY_APPLIED이면서 월 한도가 있는 경우에만 값을 반환하고, 그 외에는 null입니다.' }
     BenefitHistoryApiResponse:
       description: 'BenefitHistory API의 공통 성공 응답입니다.'
       type: object
