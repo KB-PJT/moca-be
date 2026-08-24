@@ -265,6 +265,28 @@ paths:
         '401': { $ref: '#/components/responses/AuthenticationError' }
         '404':
           description: 로그인 사용자의 결제 내역이 없음
+  /benefits/recalculate:
+    post:
+      tags: [Benefit]
+      summary: 인증 사용자 혜택 계산 결과 재계산
+      description: |
+        인증 사용자의 지정 월 승인내역을 보존한 채 기존 혜택 판정 결과와 확정 혜택 사용량만 삭제하고 다시 계산합니다.
+        사용자 식별자는 요청값이 아니라 opaque access token의 인증 정보만 사용하며, 사용자의 모든 보유카드를 대상으로 합니다.
+        yearMonth를 생략하면 Asia/Seoul 기준 현재 월을 사용합니다. 승인내역이 없으면 계산 결과 없이 성공 응답을 반환합니다.
+        온라인 채널, 입점 여부, 상품권 등 승인 데이터로 판별할 수 없는 조건은 계산하지 않습니다.
+      operationId: recalculateBenefits
+      security:
+        - MocaBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/YearMonth'
+      responses:
+        '200':
+          description: 지정 월의 혜택 재계산 완료
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BenefitRecalculationApiResponse' }
+        '400': { $ref: '#/components/responses/BenefitRecalculationValidationError' }
+        '401': { $ref: '#/components/responses/AuthenticationError' }
   /reports/benefits/summary:
     get:
       tags: [Report]
@@ -1558,6 +1580,19 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    BenefitRecalculationValidationError:
+      description: yearMonth가 YYYY-MM 형식이 아님
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            data: null
+            error:
+              code: INVALID_BENEFIT_RECALCULATION
+              message: yearMonth는 YYYY-MM 형식이어야 합니다.
+              fields: {}
     HomeDataNotFound:
       description: 홈 화면에 표시할 데이터가 없음
       content:
@@ -1647,6 +1682,21 @@ components:
       properties:
         success: { type: boolean, example: true }
         data: { type: boolean, example: true }
+    BenefitRecalculationApiResponse:
+      description: 혜택 재계산 완료 월을 담은 공통 성공 응답입니다.
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          required: [yearMonth]
+          properties:
+            yearMonth:
+              type: string
+              pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+              description: 재계산한 혜택 집계 월입니다. Asia/Seoul 기준입니다.
+              example: 2026-08
     MerchantCategoriesApiResponse:
       description: 'MerchantCategories API의 공통 성공 응답입니다.'
       type: object

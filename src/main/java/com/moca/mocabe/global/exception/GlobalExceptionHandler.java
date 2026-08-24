@@ -23,6 +23,7 @@ import com.moca.mocabe.global.exception.auth.AuthenticationRequiredException;
 import com.moca.mocabe.global.exception.auth.InvalidOpaqueTokenException;
 import com.moca.mocabe.global.exception.benefit.BenefitHistoryNotFoundException;
 import com.moca.mocabe.global.exception.benefit.InvalidBenefitHistoryQueryException;
+import com.moca.mocabe.global.exception.benefit.InvalidBenefitRecalculationException;
 import com.moca.mocabe.global.auth.GoogleAuthorizationCodeException;
 import com.moca.mocabe.global.exception.response.ApiErrorResponse;
 import com.moca.mocabe.global.exception.home.InvalidHomeQueryException;
@@ -124,6 +125,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleInvalidBenefitHistoryQuery(
             InvalidBenefitHistoryQueryException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_BENEFIT_HISTORY_QUERY", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidBenefitRecalculationException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidBenefitRecalculation(
+            InvalidBenefitRecalculationException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_BENEFIT_RECALCULATION", exception.getMessage());
     }
 
     @ExceptionHandler(BenefitHistoryNotFoundException.class)

@@ -5,12 +5,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moca.mocabe.domain.auth.service.AuthApplicationService;
 import com.moca.mocabe.domain.benefit.service.BenefitHistoryQueryService;
+import com.moca.mocabe.domain.benefit.service.BenefitUsageCalculationService;
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CardLinkService;
 import com.moca.mocabe.domain.codef.service.CardSyncService;
@@ -83,6 +85,17 @@ class MerchantAuthenticationContractTest {
     @DisplayName("Authorization 헤더 없이 카테고리 목록을 조회하면 401을 반환한다")
     void rejectsUnauthenticatedCategoriesRequest() throws Exception {
         JsonNode response = new ObjectMapper().readTree(mockMvc.perform(get("/api/v1/merchants/categories"))
+                .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
+
+        assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
+    }
+
+    @Test
+    @DisplayName("Authorization 헤더 없이 혜택 재계산을 요청하면 401을 반환한다")
+    void rejectsUnauthenticatedBenefitRecalculationRequest() throws Exception {
+        JsonNode response = new ObjectMapper().readTree(mockMvc.perform(
+                        post("/api/v1/benefits/recalculate")
+                                .param("yearMonth", "2026-08"))
                 .andExpect(status().isUnauthorized()).andReturn().getResponse().getContentAsString());
 
         assertEquals("AUTHENTICATION_REQUIRED", response.path("error").path("code").asText());
@@ -174,6 +187,11 @@ class MerchantAuthenticationContractTest {
         @Bean
         public BenefitHistoryQueryService benefitHistoryQueryService() {
             return mock(BenefitHistoryQueryService.class);
+        }
+
+        @Bean
+        public BenefitUsageCalculationService benefitUsageCalculationService() {
+            return mock(BenefitUsageCalculationService.class);
         }
 
         @Bean

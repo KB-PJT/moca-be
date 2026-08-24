@@ -23,12 +23,15 @@ import com.moca.mocabe.domain.benefit.type.BenefitTargetMatchMode;
 import com.moca.mocabe.domain.benefit.type.BenefitType;
 import com.moca.mocabe.domain.benefit.type.RewardUnit;
 import com.moca.mocabe.domain.codef.model.ApprovalInsert;
+import com.moca.mocabe.global.exception.benefit.InvalidBenefitRecalculationException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -50,7 +53,8 @@ public class BenefitUsageCalculationService {
       "넷플릭스", "유튜브 프리미엄", "티빙", "디즈니플러스", "네이버플러스 멤버십",
       "쿠팡 와우 멤버십");
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
-  private static final DateTimeFormatter YEAR_MONTH = DateTimeFormatter.ofPattern("uuuu-MM");
+  private static final DateTimeFormatter YEAR_MONTH =
+      DateTimeFormatter.ofPattern("uuuu-MM").withResolverStyle(ResolverStyle.STRICT);
   private final BenefitCalculationMapper mapper;
   private final BenefitCalculator calculator = new BasicBenefitCalculator();
   private final BenefitRuleTargetEvaluator targetEvaluator = new BenefitRuleTargetEvaluator();
@@ -93,6 +97,33 @@ public class BenefitUsageCalculationService {
       return;
     }
     recalculateFullMonths(approvalIds);
+  }
+
+  /** 인증 사용자의 지정 월 승인 원본을 보존한 채 혜택 결과만 재계산한다. */
+  @Transactional
+  public String recalculateForMonth(String userId, String requestedYearMonth) {
+    YearMonth month = parseRecalculationMonth(requestedYearMonth);
+    LocalDateTime fromUtc = toUtc(month);
+    LocalDateTime toUtc = toUtc(month.plusMonths(1));
+    calculateAndPersistForPeriod(userId, fromUtc, toUtc);
+    return month.toString();
+  }
+
+  private YearMonth parseRecalculationMonth(String requestedYearMonth) {
+    if (requestedYearMonth == null || requestedYearMonth.isBlank()) {
+      return YearMonth.now(SEOUL);
+    }
+    try {
+      return YearMonth.parse(requestedYearMonth, YEAR_MONTH);
+    } catch (DateTimeParseException exception) {
+      throw new InvalidBenefitRecalculationException("yearMonth는 YYYY-MM 형식이어야 합니다.");
+    }
+  }
+
+  private LocalDateTime toUtc(YearMonth month) {
+    return month.atDay(1).atStartOfDay(SEOUL)
+        .withZoneSameInstant(java.time.ZoneOffset.UTC)
+        .toLocalDateTime();
   }
 
   private void recalculateFullMonths(List<String> approvalIds) {
