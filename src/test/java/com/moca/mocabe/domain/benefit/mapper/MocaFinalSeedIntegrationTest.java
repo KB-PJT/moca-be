@@ -99,6 +99,7 @@ class MocaFinalSeedIntegrationTest {
       assertMerchantCategoryMappings(jdbc);
       assertBenefitTargetForeignKeys(jdbc);
       assertV21PreservesExistingConditionGroup(jdbc, dataSource);
+      assertV47RepairsPartiallyAppliedOffer(jdbc, dataSource);
 
       String ruleId = jdbc.queryForObject("SELECT rule_id FROM benefit_rules LIMIT 1", String.class);
       String categoryId =
@@ -252,6 +253,33 @@ class MocaFinalSeedIntegrationTest {
     assertEquals(1, count(jdbc,
         "SELECT COUNT(*) FROM benefit_rule_targets WHERE target_id='" + targetId
             + "' AND condition_group=77"));
+  }
+
+  private void assertV47RepairsPartiallyAppliedOffer(JdbcTemplate jdbc, DataSource dataSource) {
+    String offerId = jdbc.queryForObject(
+        "SELECT offer.offer_id FROM benefit_offers offer "
+            + "INNER JOIN card_benefits benefit ON benefit.benefit_id=offer.benefit_id "
+            + "INNER JOIN card_content_versions version "
+            + "ON version.content_version_id=benefit.content_version_id "
+            + "INNER JOIN cards card ON card.card_id=version.card_id "
+            + "WHERE card.gorilla_card_id='2422' AND benefit.title='편의점' "
+            + "AND offer.offer_name='GS25·CU 5% 할인' LIMIT 1",
+        String.class);
+    jdbc.update("DELETE FROM benefit_rule_targets WHERE rule_id IN "
+        + "(SELECT rule_id FROM benefit_rules WHERE offer_id=?)", offerId);
+    jdbc.update("DELETE FROM benefit_rules WHERE offer_id=?", offerId);
+    jdbc.update("DELETE FROM benefit_limit_tiers WHERE limit_policy_id IN "
+        + "(SELECT limit_policy_id FROM benefit_limit_policies WHERE offer_id=?)", offerId);
+    jdbc.update("DELETE FROM benefit_limit_policies WHERE offer_id=?", offerId);
+
+    new ResourceDatabasePopulator(new ClassPathResource(
+        "db/migration/V47__repair_nori2_offline_benefit_structure.sql")).execute(dataSource);
+
+    assertEquals(1, count(jdbc, "SELECT COUNT(*) FROM benefit_rules WHERE offer_id='"
+        + offerId + "' AND position=1"));
+    assertEquals(2, count(jdbc, "SELECT COUNT(*) FROM benefit_rule_targets target "
+        + "INNER JOIN benefit_rules rule_data ON rule_data.rule_id=target.rule_id "
+        + "WHERE rule_data.offer_id='" + offerId + "' AND target.target_code IN ('GS25','CU')"));
   }
 
   private void assertRootCauseAudit(JdbcTemplate jdbc) {
