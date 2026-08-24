@@ -32,8 +32,8 @@ class BenefitSchemaIntegrationTest {
                 + " table_name IN ('reward_programs', 'reward_conversion_policies',"
                 + " 'card_benefits', 'card_performance_tiers', 'benefit_offers', 'benefit_rules',"
                 + " 'benefit_rule_targets', 'benefit_rule_schedules', 'benefit_limit_policies',"
-                + " 'benefit_limit_tiers', 'benefit_offer_option_requirements', 'payment_methods',"
-                + " 'payment_method_aliases', 'card_spend_rules', 'user_benefit_usages', "
+                + " 'benefit_limit_tiers', 'benefit_offer_option_requirements',"
+                + " 'card_spend_rules', 'user_benefit_usages', "
                 + "'user_benefit_calculation_outcomes')",
             Integer.class);
     Integer contentVersionForeignKeyCount =
@@ -60,10 +60,28 @@ class BenefitSchemaIntegrationTest {
             Integer.class);
 
     assertEquals(1, migrationCount);
-    assertEquals(16, tableCount);
+    assertEquals(14, tableCount);
     assertEquals(1, contentVersionForeignKeyCount);
     assertEquals(1, performanceTierForeignKeyCount);
     assertEquals(0, legacyParseColumnCount);
+  }
+
+  @Test
+  @DisplayName("사용하지 않는 결제수단 정규화 테이블을 제거한다")
+  void dropsUnusedPaymentMethodTables() {
+    Integer migrationCount =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '49' AND success = TRUE",
+            Integer.class);
+    Integer tableCount =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM information_schema.tables "
+                + "WHERE table_schema = DATABASE() "
+                + "AND table_name IN ('payment_methods', 'payment_method_aliases')",
+            Integer.class);
+
+    assertEquals(1, migrationCount);
+    assertEquals(0, tableCount);
   }
 
   @Test
