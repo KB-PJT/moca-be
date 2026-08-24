@@ -87,13 +87,16 @@ jobs:
           cp "$COMPOSE_FILE" "$ROLLBACK_FILE"
 
           wait_for_health() {
-            max_attempts="${1:-20}"
+            # Tomcat 기동과 Flyway 검증이 끝나기 전에 고정 횟수로 종료하지 않도록
+            # 기본 대기 시간을 넉넉하게 둔다. 이미지 pull·RDS 응답 지연도 포함한다.
+            max_attempts="${1:-40}"
             for attempt in $(seq 1 "$max_attempts"); do
               if curl --fail --silent --show-error --connect-timeout 2 --max-time 3 \
                   http://127.0.0.1:8080/api/v1/health; then
                 return 0
               fi
-              echo "health check 대기 중 (${attempt}/${max_attempts})"
+              health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' moca-api 2>/dev/null || echo unknown)"
+              echo "health check 대기 중 (${attempt}/${max_attempts}, status=${health_status})"
               sleep 5
             done
             echo "health check에 실패했습니다. 컨테이너 상태와 로그를 출력합니다."
@@ -142,7 +145,7 @@ jobs:
             echo "실행 이미지가 배포 대상과 다릅니다. expected=$MOCA_IMAGE actual=$RUNNING_IMAGE"
             exit 1
           fi
-          wait_for_health 20
+          wait_for_health 40
 
           trap - EXIT
           rm -f "$ROLLBACK_FILE"
