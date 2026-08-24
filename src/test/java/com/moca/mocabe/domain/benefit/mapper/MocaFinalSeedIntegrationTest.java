@@ -497,6 +497,36 @@ class MocaFinalSeedIntegrationTest {
                 + "AND offer.reward_type='points' "
                 + "AND offer.valuation_scope='transaction' "
                 + "AND offer.valuation_method='direct'"));
+    String latestNhPointRules =
+        "FROM cards card "
+            + "INNER JOIN card_content_versions version ON version.card_id=card.card_id "
+            + "INNER JOIN card_benefits benefit "
+            + "ON benefit.content_version_id=version.content_version_id "
+            + "INNER JOIN benefit_offers offer ON offer.benefit_id=benefit.benefit_id "
+            + "INNER JOIN benefit_rules rule_data ON rule_data.offer_id=offer.offer_id "
+            + "WHERE card.gorilla_card_id='360' "
+            + "AND benefit.title='모든가맹점' "
+            + "AND NOT EXISTS (SELECT 1 FROM card_content_versions newer "
+            + "WHERE newer.card_id=version.card_id "
+            + "AND (newer.last_seen_at > version.last_seen_at "
+            + "OR (newer.last_seen_at=version.last_seen_at "
+            + "AND newer.content_version_id > version.content_version_id))) ";
+    assertEquals(
+        1,
+        count(
+            jdbc,
+            "SELECT COUNT(*) "
+                + latestNhPointRules
+                + "AND offer.offer_name='전 가맹점 기본적립 0.2%' "
+                + "AND rule_data.rule_support_status='SUPPORTED'"));
+    assertEquals(
+        1,
+        count(
+            jdbc,
+            "SELECT COUNT(*) "
+                + latestNhPointRules
+                + "AND offer.offer_name='생활 영역 추가적립 0.3%' "
+                + "AND rule_data.rule_support_status='SUPPORTED'"));
     assertEquals(
         1,
         count(
