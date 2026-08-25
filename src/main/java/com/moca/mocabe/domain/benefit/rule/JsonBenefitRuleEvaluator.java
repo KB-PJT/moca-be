@@ -219,6 +219,7 @@ public class JsonBenefitRuleEvaluator {
         "USED_MONTHLY_COUNT",
         "MERCHANT",
         "MERCHANT_CATEGORY",
+        "TRANSACTION_TYPE",
         "DAY_OF_WEEK",
         "APPROVED_TIME",
         "FOREIGN_TRANSACTION",

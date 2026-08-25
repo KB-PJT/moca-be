@@ -78,6 +78,29 @@ class MerchantCardRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("결제금액을 생략하면 최소 결제금액 전체를 부족 금액으로 반환한다")
+    void returnsFullMinimumPaymentShortfallWhenPaymentAmountIsMissing() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "CGV", "MOVIE", "영화"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        candidate("card-nori", "노리2 체크카드(KB Pay)", "discount", "KRW", "4000",
+                                null, null, "0", "1", "10000")));
+
+        var response = service.recommend("user-1", "merchant-1", null);
+        var reason = response.rankedCards().get(0).recommendationReasons().stream()
+                .filter(item -> "MINIMUM_PAYMENT".equals(item.code()))
+                .findFirst().orElseThrow();
+
+        assertNull(response.recommendedCard());
+        assertEquals(BigDecimal.ZERO, reason.currentValue());
+        assertEquals(new BigDecimal("10000"), reason.requiredValue());
+        assertEquals(new BigDecimal("10000"), reason.remainingValue());
+    }
+
+    @Test
     @DisplayName("0원 기준으로 정률 혜택이 동률이면 높은 혜택률을 우선한다")
     void prefersHigherRateWhenZeroAmountMakesEstimatedValuesEqual() {
         when(mapper.findActiveMerchant("merchant-1"))
@@ -229,9 +252,13 @@ class MerchantCardRecommendationServiceTest {
         var minimumPaymentCard = response.rankedCards().stream()
                 .filter(card -> "card-4".equals(card.userCardId())).findFirst().orElseThrow();
         assertTrue(minimumPaymentCard.rank() < response.recommendedCard().rank());
-        assertEquals(false, minimumPaymentCard.recommendationReasons().stream()
+        var minimumPaymentReason = minimumPaymentCard.recommendationReasons().stream()
                 .filter(reason -> "MINIMUM_PAYMENT".equals(reason.code()))
-                .findFirst().orElseThrow().satisfied());
+                .findFirst().orElseThrow();
+        assertEquals(false, minimumPaymentReason.satisfied());
+        assertEquals(new BigDecimal("10000"), minimumPaymentReason.currentValue());
+        assertEquals(new BigDecimal("20000"), minimumPaymentReason.requiredValue());
+        assertEquals(new BigDecimal("10000"), minimumPaymentReason.remainingValue());
         assertEquals("MERCHANT_BENEFIT_MATCHED",
                 response.recommendedCard().recommendationReasons().get(0).code());
         assertEquals(true, response.rankedCards().stream()
@@ -253,9 +280,10 @@ class MerchantCardRecommendationServiceTest {
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.any())).thenReturn(List.of(boundary));
 
-        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
-                .rankedCards().get(0);
+        var response = service.recommend("user-1", "merchant-1", new BigDecimal("10000"));
+        var card = response.rankedCards().get(0);
 
+        assertNull(response.recommendedCard());
         assertEquals(true, card.performanceMet());
         assertEquals(BigDecimal.ZERO, card.estimatedValueKrw());
         assertEquals(BigDecimal.ZERO, card.monthlyRemainingKrw());

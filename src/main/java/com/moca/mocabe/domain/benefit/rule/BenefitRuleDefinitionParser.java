@@ -20,7 +20,8 @@ public class BenefitRuleDefinitionParser {
       Set.of("TRANSACTION_BENEFIT_BASE", "DAILY_USAGE_COUNT", "MONTHLY_USAGE_COUNT");
   private static final Set<String> NUMERIC_CONDITIONS =
       Set.of("PAYMENT_AMOUNT", "PREVIOUS_MONTH_SPEND", "USED_DAILY_COUNT", "USED_MONTHLY_COUNT");
-  private static final Set<String> TARGET_CONDITIONS = Set.of("MERCHANT", "MERCHANT_CATEGORY");
+  private static final Set<String> TARGET_CONDITIONS =
+      Set.of("MERCHANT", "MERCHANT_CATEGORY", "TRANSACTION_TYPE");
   private static final Set<String> BOOLEAN_CONDITIONS =
       Set.of(
           "FOREIGN_TRANSACTION",

@@ -201,10 +201,9 @@ public class MerchantCardRecommendationService {
             return false;
         }
         return card.recommendationReasons().stream()
-                .filter(reason -> "MINIMUM_PAYMENT".equals(reason.code()))
-                .findFirst()
-                .map(RecommendationReasonResponse::satisfied)
-                .orElse(true);
+                .filter(reason -> "MINIMUM_PAYMENT".equals(reason.code())
+                        || "MONTHLY_LIMIT".equals(reason.code()))
+                .allMatch(RecommendationReasonResponse::satisfied);
     }
 
     private List<RankedCardBenefitResponse> rank(List<MerchantCardBenefitCandidate> candidates,
@@ -254,7 +253,7 @@ public class MerchantCardRecommendationService {
                     candidate.monthlyLimitKrw(), candidate.monthlyUsedKrw(), monthlyRemaining,
                     item.performanceMet(),
                     recommendationReasons(candidate, item.performanceMet(), item.minimumPaymentMet(),
-                            remainingPreviousSpend,
+                            paymentAmount, remainingPreviousSpend,
                             monthlyRemaining), tiers));
         }
         return List.copyOf(result);
@@ -262,16 +261,20 @@ public class MerchantCardRecommendationService {
 
     private List<RecommendationReasonResponse> recommendationReasons(
             MerchantCardBenefitCandidate candidate, boolean performanceMet, boolean minimumPaymentMet,
-            BigDecimal remainingPreviousSpend, BigDecimal monthlyRemaining) {
+            BigDecimal paymentAmount, BigDecimal remainingPreviousSpend,
+            BigDecimal monthlyRemaining) {
+        BigDecimal minimumPaymentShortfall = candidate.transactionMinKrw() == null
+                ? BigDecimal.ZERO
+                : candidate.transactionMinKrw().subtract(paymentAmount).max(BigDecimal.ZERO);
         List<RecommendationReasonResponse> reasons = new ArrayList<>(List.of(
                 new RecommendationReasonResponse("MERCHANT_BENEFIT_MATCHED", true, null, null,
                         BigDecimal.ZERO),
                 new RecommendationReasonResponse("PREVIOUS_SPEND", performanceMet,
                         candidate.previousMonthSpendKrw(), candidate.previousSpendMinKrw(),
                         remainingPreviousSpend),
-                new RecommendationReasonResponse("MINIMUM_PAYMENT", minimumPaymentMet, null,
-                        candidate.transactionMinKrw(), minimumPaymentMet ? BigDecimal.ZERO
-                                : candidate.transactionMinKrw())));
+                new RecommendationReasonResponse("MINIMUM_PAYMENT", minimumPaymentMet,
+                        candidate.transactionMinKrw() == null ? null : paymentAmount,
+                        candidate.transactionMinKrw(), minimumPaymentShortfall)));
         if (candidate.monthlyLimitKrw() != null) {
             reasons.add(new RecommendationReasonResponse("MONTHLY_LIMIT",
                     monthlyRemaining.signum() > 0, candidate.monthlyUsedKrw(),
