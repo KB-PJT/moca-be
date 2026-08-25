@@ -96,7 +96,7 @@ class BenefitCalculationMapperIntegrationTest {
     jdbc.update(
         "INSERT INTO benefit_rules (rule_id,offer_id,position,rule_effect,stacking_mode,reward_value,"
             + "reward_unit,previous_spend_min_krw,transaction_max_krw,rule_schema_version,"
-            + "rule_support_status,rule_definition_json) VALUES (?,?,1,'grant','standalone',10,"
+            + "rule_support_status,rule_definition_json) VALUES (?,?,1,'grant','additive',10,"
             + "'percent',300000,50000,1,'SUPPORTED',CAST(? AS JSON))",
         RULE,
         OFFER,

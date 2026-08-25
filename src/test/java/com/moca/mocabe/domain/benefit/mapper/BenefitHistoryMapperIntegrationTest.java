@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -189,6 +190,26 @@ class BenefitHistoryMapperIntegrationTest {
   @AfterEach
   void tearDown() {
     clean();
+  }
+
+  @Test
+  @DisplayName("동일 승인에 적용된 기본 적립과 추가 적립을 합산해 표시한다")
+  void aggregatesAppliedBenefitsForSameApproval() {
+    jdbc.update(
+        "INSERT INTO user_benefit_usages"
+            + " (usage_id,user_card_id,offer_id,rule_id,approval_id,usage_date,eligible_amount_krw,"
+            + "reward_amount_krw,usage_status,approved_at,confirmed_at)"
+            + " VALUES (?,?,?,?,?,'2026-07-17',15000,9,'confirmed',"
+            + "'2026-07-17 05:30:00','2026-07-17 05:30:01')",
+        "a0000000-0000-4000-8000-000000000002", USER_CARD, OFFER, RULE, APPROVAL);
+
+    List<BenefitHistoryRow> rows = mapper.findHistory(
+        USER, LocalDateTime.of(2026, 6, 30, 15, 0), LocalDateTime.of(2026, 7, 31, 15, 0),
+        null, null, "LATEST", 0, 20);
+
+    assertEquals(1509L, rows.stream()
+        .filter(row -> APPROVAL.equals(row.getApprovalId()))
+        .findFirst().orElseThrow().getBenefitAmount());
   }
 
   @Test
