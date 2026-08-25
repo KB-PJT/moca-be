@@ -84,6 +84,14 @@ class DeviceServiceTest {
         verify(mapper, never()).deactivate(any(), any());
     }
 
+    @Test
+    @DisplayName("탈퇴 시 사용자의 기기 등록 내역을 모두 삭제한다")
+    void deletesAllDevicesByUserId() {
+        DeviceMapper mapper = org.mockito.Mockito.mock(DeviceMapper.class);
+        new DeviceService(mapper).deleteAllByUserId("user");
+        verify(mapper).deleteByUserId("user");
+    }
+
     private RegisterDeviceRequest request() {
         RegisterDeviceRequest request = new RegisterDeviceRequest();
         request.setFcmToken("token");

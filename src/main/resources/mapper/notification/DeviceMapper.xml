@@ -15,4 +15,5 @@
   <update id="deactivate">UPDATE user_devices SET is_active=FALSE,updated_at=UTC_TIMESTAMP(6) WHERE user_device_id=#{deviceId} AND user_id=#{userId}</update>
   <select id="findActiveByUserId" resultMap="deviceMap">SELECT user_device_id,user_id,fcm_token,device_type FROM user_devices WHERE user_id=#{userId} AND is_active=TRUE</select>
   <select id="findActiveNearbyBenefitDevices" resultMap="deviceMap">SELECT d.user_device_id,d.user_id,d.fcm_token,d.device_type FROM user_devices d INNER JOIN user_notification_settings s ON s.user_id=d.user_id WHERE d.is_active=TRUE AND s.nearby_benefit_enabled=TRUE</select>
+  <delete id="deleteByUserId">DELETE FROM user_devices WHERE user_id=#{userId}</delete>
 </mapper>
