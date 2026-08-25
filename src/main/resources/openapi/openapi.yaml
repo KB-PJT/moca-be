@@ -525,7 +525,7 @@ paths:
         가맹점의 내부 카테고리와 구조화된 카드 혜택 대상을 대조해 인증 사용자의 활성 보유 카드만 추천합니다.
         응답은 가맹점 정보, MOCA 대표 추천 카드, 보유 카드 혜택 순위의 세 영역으로 구성됩니다.
         해당 가맹점에 적용되는 보유 카드가 없으면 `recommendedCard=null`, `rankedCards=[]`입니다.
-        결제금액을 생략하면 비교용 예상 혜택 계산에 10,000원을 사용합니다. 전월 실적 데이터가 없으면
+        결제금액을 생략하면 비교용 예상 혜택 계산에 0원을 사용합니다. 전월 실적 데이터가 없으면
         0원으로 보수적으로 판단하며 확정 카드사 혜택이 아닌 구조화 룰 기반 예상값입니다.
       operationId: getMerchantCardRecommendations
       security: [{ MocaBearerAuth: [] }]
@@ -538,8 +538,8 @@ paths:
         - name: paymentAmount
           in: query
           required: false
-          description: 예상 혜택 계산에 사용할 결제 예정 금액(원), 기본값 10000입니다.
-          schema: { type: number, minimum: 1, default: 10000 }
+          description: 예상 혜택 계산에 사용할 결제 예정 금액(원)이며, 생략하면 0원입니다. 명시할 때는 0보다 커야 합니다.
+          schema: { type: number, minimum: 0, exclusiveMinimum: true, default: 0 }
       responses:
         '200':
           description: 가맹점과 온보딩 성향에 맞춘 보유 카드 추천
@@ -584,8 +584,8 @@ paths:
         - name: paymentAmount
           in: query
           required: false
-          description: 예상 혜택 계산 결제금액(원)이며 기본값은 10000입니다.
-          schema: { type: number, minimum: 1, default: 10000 }
+          description: 예상 혜택 계산 결제금액(원)이며, 생략하면 0원입니다. 명시할 때는 0보다 커야 합니다.
+          schema: { type: number, minimum: 0, exclusiveMinimum: true, default: 0 }
       responses:
         '200':
           description: 보수적으로 판정한 장소별 보유 카드 예상 혜택 추천
@@ -680,8 +680,8 @@ paths:
         - name: paymentAmount
           in: query
           required: false
-          description: 모든 가맹점 예상 혜택에 공통 적용할 결제 예정 금액이며 기본값은 10000원입니다.
-          schema: { type: number, minimum: 1, default: 10000 }
+          description: 모든 가맹점 예상 혜택에 공통 적용할 결제 예정 금액이며, 생략하면 0원입니다. 명시할 때는 0보다 커야 합니다.
+          schema: { type: number, minimum: 0, exclusiveMinimum: true, default: 0 }
       responses:
         '200':
           description: 입력 가맹점 순서의 카드 추천 목록
@@ -1826,14 +1826,14 @@ components:
         benefitPreferenceType:
           $ref: '#/components/schemas/BenefitPreferenceType'
         recommendedCard:
-          description: '1위 카드입니다. 적용 가능한 보유 카드가 없으면 null입니다.'
+          description: '순위가 가장 높은 카드 중 전월 실적과 최소 결제금액 조건을 모두 충족한 추천 카드입니다. rankedCards가 있어도 충족 카드가 없으면 null입니다.'
           nullable: true
           allOf: [{ $ref: '#/components/schemas/RankedCardBenefitResponse' }]
         recommendationAvailable:
           type: boolean
-          description: '추천 가능한 활성 보유 카드가 한 장 이상 있는지 나타냅니다.'
+          description: '전월 실적과 최소 결제금액 조건을 모두 충족한 추천 카드가 있는지 나타냅니다.'
         rankedCards:
-          description: '가맹점 대상 혜택이 있는 활성 보유 카드 순위이며 없으면 빈 배열입니다.'
+          description: '가맹점 대상 혜택이 있는 활성 보유 카드 전체 순위이며, 최소 결제금액을 충족하지 않은 카드도 제외하지 않고 낮은 우선순위로 포함합니다. 없으면 빈 배열입니다.'
           type: array
           items: { $ref: '#/components/schemas/RankedCardBenefitResponse' }
     MerchantSummaryResponse:
@@ -1861,8 +1861,8 @@ components:
         rewardUnit: { type: string, enum: [percent, KRW, point, mile], description: '혜택 원 단위입니다.' }
         rewardValue: { type: number, description: '혜택 원 단위 기준 값입니다.' }
         estimatedValueKrw: { type: number, description: '결제금액과 환산 정책으로 계산한 예상 원화 가치입니다.' }
-        estimatedPaymentAmountKrw: { type: number, description: '예상 혜택 계산에 사용한 결제 기준 금액입니다.' }
-        transactionMinKrw: { type: number, nullable: true, description: '혜택 적용 최소 결제금액이며 없으면 null입니다.' }
+        estimatedPaymentAmountKrw: { type: number, description: '예상 혜택 계산에 사용한 결제 기준 금액입니다. 요청값을 생략하면 0원으로 계산합니다.' }
+        transactionMinKrw: { type: number, nullable: true, description: '혜택 적용 최소 결제금액이며 없으면 null입니다. 현재 결제 기준 금액이 미달해도 카드는 순위에서 제외하지 않습니다.' }
         previousMonthSpendKrw: { type: number, description: '전월 인정 실적 원화 금액이며 자료가 없으면 0입니다.' }
         requiredPreviousSpendKrw: { type: number, nullable: true, description: '혜택 적용에 필요한 전월 실적이며 없으면 null입니다.' }
         remainingPreviousSpendKrw: { type: number, description: '혜택 실적 조건까지 추가로 필요한 금액이며 이미 충족했거나 조건이 없으면 0입니다.' }
@@ -1894,7 +1894,7 @@ components:
         performanceMet: { type: boolean, description: '현재 저장된 전월 실적으로 혜택 조건을 충족하는지 여부입니다.' }
         recommendationReasons:
           type: array
-          description: '프론트가 추천 이유 문구를 조합할 수 있는 구조화 근거입니다.'
+          description: '프론트가 추천 이유 문구를 조합할 수 있는 구조화 근거입니다. MINIMUM_PAYMENT.satisfied가 false인 카드는 최소 결제금액 미충족 상태이며 낮은 우선순위로 정렬됩니다.'
           items: { $ref: '#/components/schemas/RecommendationReasonResponse' }
         tiers:
           type: array
