@@ -199,16 +199,16 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("아침 미리보기는 실행 시각을 delivery 식별자로 사용한다")
-    void sendsMorningPreviewWithRunReference() throws Exception {
+    @DisplayName("오후 미리보기는 실행 시각을 delivery 식별자로 사용한다")
+    void sendsAfternoonPreviewWithRunReference() throws Exception {
         Fixture fixture = fixture();
         fixture.eligibleNearbyBenefit();
         fixture.claims();
         when(fixture.fcm.send(any(), any(), any(), any())).thenReturn("message");
 
-        fixture.service.sendMorningPreviewNotifications();
+        fixture.service.sendAfternoonPreviewNotifications(true);
 
-        verify(fixture.history).existsSent("user", "device", "TIME_BASED_BENEFIT", "preview-20:00",
+        verify(fixture.history).existsSent("user", "device", "TIME_BASED_BENEFIT", "afternoon-20:00",
                 "2026-08-28", "MORNING");
         verify(fixture.fcm).send(eq("token"), eq("출근길, 커피 혜택을 확인해보세요"), any(), any());
     }

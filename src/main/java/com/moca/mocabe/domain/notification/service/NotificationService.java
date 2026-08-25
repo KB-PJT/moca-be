@@ -60,21 +60,26 @@ public class NotificationService {
         sendTimeBasedBenefitNotifications(timeSlot, null, today);
     }
 
-    /** 당일 한정 아침 알림 점검용 발송이다. 실행 시각별로 delivery key를 분리한다. */
-    public void sendMorningPreviewNotifications() {
+    public void sendAfternoonPreviewNotifications(boolean firstMessage) {
         LocalDate today = LocalDate.now(clock);
-        String runReference = "preview-" + java.time.LocalTime.now(clock).withSecond(0).withNano(0);
-        sendTimeBasedBenefitNotifications(TimeSlot.MORNING, runReference, today);
+        String runReference = "afternoon-" + java.time.LocalTime.now(clock).withSecond(0).withNano(0);
+        String title = firstMessage ? "출근길, 커피 혜택을 확인해보세요" : "D-3! 부족한 카드 실적을 확인해보세요";
+        sendTimeBasedBenefitNotifications(TimeSlot.MORNING, runReference, today, title);
     }
 
     private void sendTimeBasedBenefitNotifications(TimeSlot timeSlot, String referenceId, LocalDate today) {
+        sendTimeBasedBenefitNotifications(timeSlot, referenceId, today, null);
+    }
+
+    private void sendTimeBasedBenefitNotifications(TimeSlot timeSlot, String referenceId, LocalDate today,
+                                                   String previewTitle) {
         for (UserDevice device : deviceMapper.findActiveNearbyBenefitDevices()) {
-            sendTimeBasedBenefitNotification(device, timeSlot, referenceId, today);
+            sendTimeBasedBenefitNotification(device, timeSlot, referenceId, today, previewTitle);
         }
     }
 
     private void sendTimeBasedBenefitNotification(UserDevice device, TimeSlot timeSlot, String referenceId,
-                                                  LocalDate today) {
+                                                  LocalDate today, String previewTitle) {
         try {
             if (mapper.existsSent(device.userId(), device.userDeviceId(), "TIME_BASED_BENEFIT", referenceId,
                     today.toString(), timeSlot.name())) {
@@ -82,7 +87,7 @@ public class NotificationService {
             }
             locationService.find(device.userId()).ifPresent(location -> {
                 if (hasEligibleNearbyMerchant(device.userId(), location)) {
-                    String title = switch (timeSlot) {
+                    String title = previewTitle != null ? previewTitle : switch (timeSlot) {
                         case MORNING -> "출근길, 커피 혜택을 확인해보세요";
                         case LUNCH -> "점심시간, 놓치고 있는 혜택을 확인해보세요";
                         case DINNER -> "오늘 마지막 결제도 혜택 놓치지 마세요";

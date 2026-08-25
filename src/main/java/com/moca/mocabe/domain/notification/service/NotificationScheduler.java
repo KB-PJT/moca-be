@@ -4,23 +4,19 @@ import com.moca.mocabe.domain.notification.type.TimeSlot;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 
 public class NotificationScheduler {
     private final NotificationService service;
     private final Clock clock;
-    private final String morningPreviewDate;
 
     public NotificationScheduler(NotificationService service) {
-        this(service, Clock.system(ZoneId.of("Asia/Seoul")), "");
+        this(service, Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
-    public NotificationScheduler(NotificationService service, Clock clock,
-                                  @Value("${moca.notification.morning-preview-date:}") String morningPreviewDate) {
+    NotificationScheduler(NotificationService service, Clock clock) {
         this.service = service;
         this.clock = clock;
-        this.morningPreviewDate = morningPreviewDate;
     }
 
     @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
@@ -43,19 +39,34 @@ public class NotificationScheduler {
         service.sendTimeBasedBenefitNotifications(TimeSlot.DINNER);
     }
 
-    @Scheduled(cron = "0 50,55 17 * * *", zone = "Asia/Seoul")
-    public void morningBenefitPreviewBeforeSix() {
-        sendMorningPreviewIfEnabledToday();
+    @Scheduled(cron = "0 0,10,20,30,40,50 16 * * *", zone = "Asia/Seoul")
+    public void afternoonBenefitNotificationFirstMessage() {
+        sendAfternoonPreviewIfToday(true);
     }
 
-    @Scheduled(cron = "0 0,5,10,15,20,25,30 18 * * *", zone = "Asia/Seoul")
-    public void morningBenefitPreviewAfterSix() {
-        sendMorningPreviewIfEnabledToday();
+    @Scheduled(cron = "0 5,15,25,35,45,55 16 * * *", zone = "Asia/Seoul")
+    public void afternoonBenefitNotificationSecondMessage() {
+        sendAfternoonPreviewIfToday(false);
     }
 
-    private void sendMorningPreviewIfEnabledToday() {
-        if (!morningPreviewDate.isBlank() && LocalDate.now(clock).toString().equals(morningPreviewDate)) {
-            service.sendMorningPreviewNotifications();
+    @Scheduled(cron = "0 0,10,20,30,40,50 17 * * *", zone = "Asia/Seoul")
+    public void afternoonBenefitNotificationFirstMessageAtFive() {
+        sendAfternoonPreviewIfToday(true);
+    }
+
+    @Scheduled(cron = "0 5,15,25,35,45,55 17 * * *", zone = "Asia/Seoul")
+    public void afternoonBenefitNotificationSecondMessageAtFive() {
+        sendAfternoonPreviewIfToday(false);
+    }
+
+    @Scheduled(cron = "0 0 18 * * *", zone = "Asia/Seoul")
+    public void afternoonBenefitNotificationAtSix() {
+        sendAfternoonPreviewIfToday(true);
+    }
+
+    private void sendAfternoonPreviewIfToday(boolean firstMessage) {
+        if (LocalDate.now(clock).equals(LocalDate.of(2026, 8, 25))) {
+            service.sendAfternoonPreviewNotifications(firstMessage);
         }
     }
 }

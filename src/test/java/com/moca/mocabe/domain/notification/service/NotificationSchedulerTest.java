@@ -17,7 +17,8 @@ class NotificationSchedulerTest {
     @DisplayName("각 Scheduler 메서드는 대응하는 알림 서비스를 호출한다")
     void delegatesToNotificationService() {
         NotificationService service = org.mockito.Mockito.mock(NotificationService.class);
-        NotificationScheduler scheduler = new NotificationScheduler(service);
+        NotificationScheduler scheduler = new NotificationScheduler(service,
+                Clock.fixed(Instant.parse("2026-08-25T08:00:00Z"), ZoneId.of("Asia/Seoul")));
 
         scheduler.morningBenefitNotification();
         scheduler.performanceDeadlineNotification();
@@ -46,15 +47,30 @@ class NotificationSchedulerTest {
     }
 
     @Test
-    @DisplayName("미리보기 날짜에만 17:50~18:30 아침 알림을 실행한다")
-    void runsMorningPreviewOnlyOnConfiguredDate() {
+    @DisplayName("오후 알림은 두 멘트를 번갈아 호출한다")
+    void runsAlternatingAfternoonPreviews() {
         NotificationService service = org.mockito.Mockito.mock(NotificationService.class);
-        Clock clock = Clock.fixed(Instant.parse("2026-08-28T09:00:00Z"), ZoneId.of("Asia/Seoul"));
-        NotificationScheduler scheduler = new NotificationScheduler(service, clock, "2026-08-28");
+        NotificationScheduler scheduler = new NotificationScheduler(service);
 
-        scheduler.morningBenefitPreviewBeforeSix();
-        scheduler.morningBenefitPreviewAfterSix();
+        scheduler.afternoonBenefitNotificationFirstMessage();
+        scheduler.afternoonBenefitNotificationSecondMessage();
+        scheduler.afternoonBenefitNotificationFirstMessageAtFive();
+        scheduler.afternoonBenefitNotificationSecondMessageAtFive();
+        scheduler.afternoonBenefitNotificationAtSix();
 
-        org.mockito.Mockito.verify(service, org.mockito.Mockito.times(2)).sendMorningPreviewNotifications();
+        verify(service, org.mockito.Mockito.times(3)).sendAfternoonPreviewNotifications(true);
+        verify(service, org.mockito.Mockito.times(2)).sendAfternoonPreviewNotifications(false);
+    }
+
+    @Test
+    @DisplayName("오늘이 아니면 오후 미리보기를 보내지 않는다")
+    void skipsAfternoonPreviewsOnOtherDates() {
+        NotificationService service = org.mockito.Mockito.mock(NotificationService.class);
+        NotificationScheduler scheduler = new NotificationScheduler(service,
+                Clock.fixed(Instant.parse("2026-08-26T08:00:00Z"), ZoneId.of("Asia/Seoul")));
+
+        scheduler.afternoonBenefitNotificationFirstMessage();
+
+        org.mockito.Mockito.verifyNoInteractions(service);
     }
 }

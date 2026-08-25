@@ -80,7 +80,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.beans.factory.annotation.Value;
 import com.moca.mocabe.domain.notification.mapper.NotificationMapper;
 import com.moca.mocabe.domain.notification.service.NotificationService;
 import com.moca.mocabe.domain.notification.service.NotificationScheduler;
@@ -171,10 +170,8 @@ public class AppConfig {
     }
 
     @Bean
-    public NotificationScheduler notificationScheduler(
-            NotificationService notificationService, Clock recommendationClock,
-            @Value("${moca.notification.morning-preview-date:}") String previewDate) {
-        return new NotificationScheduler(notificationService, recommendationClock, previewDate);
+    public NotificationScheduler notificationScheduler(NotificationService notificationService) {
+        return new NotificationScheduler(notificationService);
     }
 
 
