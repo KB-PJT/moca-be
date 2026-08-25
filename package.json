@@ -7,6 +7,8 @@
   },
   "scripts": {
     "prepare": "node .husky/install.mjs",
+    "benefits:complex": "node tools/benefit-rule-processing/generate-complex-benefit-rules.mjs",
+    "test:benefit-processing": "node --test tools/benefit-rule-processing/test/*.test.mjs",
     "hooks:pre-commit": "node .husky/scripts/pre-commit.mjs",
     "hooks:pre-push": "node .husky/scripts/pre-push.mjs",
     "hooks:post-merge": "node .husky/scripts/post-merge.mjs",

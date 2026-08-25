@@ -89,6 +89,38 @@ class JsonBenefitRuleEvaluatorTest {
   }
 
   @Test
+  void excludesAConfiguredTransactionTypeAndFailsClosedWhenItIsUnavailable() {
+    BenefitRuleDefinition definition =
+        definition(
+            List.of(),
+            List.of(),
+            List.of(new BenefitRuleDefinition.Condition(
+                "TRANSACTION_TYPE", "IN", null, List.of("GIFT_CARD"),
+                "MERCHANT_NOT_ELIGIBLE")),
+            reward("POINT", "POINT", "RATE", "0.01", null, null),
+            List.of());
+    BenefitCalculationContext giftCard =
+        new BenefitCalculationContext(
+            new BigDecimal("10000"), BigDecimal.ONE, BigDecimal.ZERO,
+            LocalDateTime.of(2026, 8, 14, 3, 0), "SHOPPING", false, 0, 0,
+            true, true, false,
+            Map.of(
+                "AVAILABLE_FIELD", Set.of("TRANSACTION_TYPE"),
+                "TRANSACTION_TYPE", Set.of("GIFT_CARD")));
+    BenefitCalculationContext unavailable =
+        new BenefitCalculationContext(
+            new BigDecimal("10000"), BigDecimal.ONE, BigDecimal.ZERO,
+            LocalDateTime.of(2026, 8, 14, 3, 0), "SHOPPING");
+
+    BenefitCalculationResult excluded =
+        evaluator.evaluate("gift", definition, giftCard, BigDecimal.ZERO, BigDecimal.ZERO);
+    assertFalse(excluded.applicable());
+    assertEquals(BenefitRejectionReason.MERCHANT_NOT_ELIGIBLE, excluded.rejectionReason());
+    assertUnavailable(
+        evaluator.evaluate("unknown", definition, unavailable, BigDecimal.ZERO, BigDecimal.ZERO));
+  }
+
+  @Test
   void failsClosedWhenAllAnyNoneOrTypeCannotBeEvaluated() {
     Set<String> onlyPayment = Set.of("PAYMENT_AMOUNT");
     BenefitRuleDefinition unavailableAll =

@@ -25,6 +25,7 @@ class BenefitRuleDefinitionParserTest {
                   {"type":"USED_MONTHLY_COUNT","operator":"LTE","value":"5"},
                   {"type":"MERCHANT","operator":"EQ","value":"merchant-id"},
                   {"type":"MERCHANT_CATEGORY","operator":"IN","values":["CAFE"]},
+                  {"type":"TRANSACTION_TYPE","operator":"IN","values":["GIFT_CARD"]},
                   {"type":"DAY_OF_WEEK","operator":"IN","values":["FRIDAY"]},
                   {"type":"APPROVED_TIME","operator":"BETWEEN","values":["09:00","18:00"]},
                   {"type":"FOREIGN_TRANSACTION","operator":"EQ","value":"false"}
@@ -44,7 +45,7 @@ class BenefitRuleDefinitionParserTest {
             }
             """);
 
-    assertEquals(9, definition.conditions().all().size());
+    assertEquals(10, definition.conditions().all().size());
     assertEquals(List.of(), definition.conditions().any());
     assertEquals(List.of(), definition.conditions().none());
     assertEquals(3, definition.limits().size());
