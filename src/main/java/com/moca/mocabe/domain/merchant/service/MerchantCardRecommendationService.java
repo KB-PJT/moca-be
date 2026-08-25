@@ -147,10 +147,11 @@ public class MerchantCardRecommendationService {
             }
             List<MerchantCardBenefitCandidate> candidates = eligibilityEvaluator.evaluate(
                     rules.getOrDefault(id, List.of()), id, lineages.getOrDefault(id, List.of()), null, today);
-            List<RankedCardBenefitResponse> ranked = rank(candidates, amount, preference, today);
+            RankingResult ranking = rank(candidates, amount, preference, today);
             return new MerchantCardRecommendationResponse(
                     new MerchantSummaryResponse(id, merchant.name(), merchant.categoryCode(),
-                            merchant.categoryName()), preference, recommendedCard(ranked), ranked);
+                            merchant.categoryName()), preference,
+                    ranking.recommendedCard(), ranking.rankedCards());
         }).toList();
         return new MerchantCardRecommendationBatchResponse(responses);
     }
@@ -172,11 +173,11 @@ public class MerchantCardRecommendationService {
                 today, performanceMonth);
         List<MerchantCardBenefitCandidate> candidates = eligibilityEvaluator.evaluate(
                 ruleRows, merchant.merchantId(), categoryLineageIds, placeConfidence, today);
-        List<RankedCardBenefitResponse> rankedCards = rank(candidates, normalizedAmount, preference, today);
+        RankingResult ranking = rank(candidates, normalizedAmount, preference, today);
         return new MerchantCardRecommendationResponse(
                 new MerchantSummaryResponse(merchant.merchantId(), merchant.name(), merchant.categoryCode(),
                         merchant.categoryName()), preference,
-                recommendedCard(rankedCards), rankedCards);
+                ranking.recommendedCard(), ranking.rankedCards());
     }
 
     private MerchantCardRecommendationResponse emptyResponse(String userId, String placeName) {
@@ -189,29 +190,13 @@ public class MerchantCardRecommendationService {
         return preference == null ? BenefitPreferenceType.IMMEDIATE_SAVINGS : preference;
     }
 
-    private RankedCardBenefitResponse recommendedCard(List<RankedCardBenefitResponse> rankedCards) {
-        return rankedCards.stream()
-                .filter(this::isRecommendationEligible)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private boolean isRecommendationEligible(RankedCardBenefitResponse card) {
-        if (!card.performanceMet()) {
-            return false;
-        }
-        return card.recommendationReasons().stream()
-                .filter(reason -> "MINIMUM_PAYMENT".equals(reason.code())
-                        || "MONTHLY_LIMIT".equals(reason.code()))
-                .allMatch(RecommendationReasonResponse::satisfied);
-    }
-
-    private List<RankedCardBenefitResponse> rank(List<MerchantCardBenefitCandidate> candidates,
-                                                 BigDecimal paymentAmount,
-                                                 BenefitPreferenceType preference,
-                                                 LocalDate usageDate) {
+    private RankingResult rank(List<MerchantCardBenefitCandidate> candidates,
+                               BigDecimal paymentAmount,
+                               BenefitPreferenceType preference,
+                               LocalDate usageDate) {
         CardBenefitRankingStrategy strategy = rankingStrategies.get(preference);
         Map<String, ScoredCandidate> bestByCard = new LinkedHashMap<>();
+        Map<String, ScoredCandidate> bestEligibleByCard = new LinkedHashMap<>();
         for (MerchantCardBenefitCandidate candidate : candidates) {
             boolean minimumPaymentMet = candidate.transactionMinKrw() == null
                     || paymentAmount.compareTo(candidate.transactionMinKrw()) >= 0;
@@ -229,34 +214,68 @@ public class MerchantCardRecommendationService {
             if (current == null || isHigherPriority(scored, current)) {
                 bestByCard.put(candidate.userCardId(), scored);
             }
+            if (isRecommendationEligible(scored)) {
+                ScoredCandidate eligible = bestEligibleByCard.get(candidate.userCardId());
+                if (eligible == null || isHigherPriority(scored, eligible)) {
+                    bestEligibleByCard.put(candidate.userCardId(), scored);
+                }
+            }
         }
         Map<String, List<BenefitTierResponse>> tiersByOffer = benefitTiersByOffer(candidates, usageDate);
         List<ScoredCandidate> sorted = new ArrayList<>(bestByCard.values());
-        sorted.sort(Comparator.comparing(ScoredCandidate::score).reversed()
-                .thenComparing(Comparator.comparing(this::ratePriority).reversed()));
-        List<RankedCardBenefitResponse> result = new ArrayList<>();
+        sorted.sort(scoredComparator());
+        Map<String, Integer> rankByCard = new LinkedHashMap<>();
+        List<RankedCardBenefitResponse> rankedCards = new ArrayList<>();
         for (int index = 0; index < sorted.size(); index++) {
             ScoredCandidate item = sorted.get(index);
-            MerchantCardBenefitCandidate candidate = item.candidate();
-            BigDecimal remainingPreviousSpend = remainingPreviousSpend(candidate);
-            List<BenefitTierResponse> tiers = candidate.offerId() == null
-                    ? List.of() : tiersByOffer.getOrDefault(candidate.offerId(), List.of());
-            BenefitTierProgress tierProgress = tierProgress(candidate, candidates, tiers);
-            BigDecimal monthlyRemaining = monthlyRemaining(candidate);
-            result.add(new RankedCardBenefitResponse(index + 1, candidate.userCardId(), candidate.cardName(),
-                    candidate.issuerName(), candidate.cardImageUrl(), candidate.offerName(), candidate.rewardType(),
-                    candidate.rewardUnit(), candidate.rewardValue(), item.estimatedValueKrw(), paymentAmount,
-                    candidate.transactionMinKrw(), candidate.previousMonthSpendKrw(),
-                    candidate.previousSpendMinKrw(), remainingPreviousSpend,
-                    tierProgress.currentTier(), tierProgress.nextTier(), tierProgress.targetAmount(),
-                    tierProgress.currentTierAchieved(), tierProgress.remainingAmountToNextTier(),
-                    candidate.monthlyLimitKrw(), candidate.monthlyUsedKrw(), monthlyRemaining,
-                    item.performanceMet(),
-                    recommendationReasons(candidate, item.performanceMet(), item.minimumPaymentMet(),
-                            paymentAmount, remainingPreviousSpend,
-                            monthlyRemaining), tiers));
+            int rank = index + 1;
+            rankByCard.put(item.candidate().userCardId(), rank);
+            rankedCards.add(toResponse(item, rank, paymentAmount, candidates, tiersByOffer));
         }
-        return List.copyOf(result);
+        ScoredCandidate recommended = bestEligibleByCard.values().stream()
+                .sorted(scoredComparator())
+                .findFirst()
+                .orElse(null);
+        RankedCardBenefitResponse recommendedCard = recommended == null
+                ? null
+                : toResponse(recommended, rankByCard.get(recommended.candidate().userCardId()),
+                        paymentAmount, candidates, tiersByOffer);
+        return new RankingResult(recommendedCard, List.copyOf(rankedCards));
+    }
+
+    private RankedCardBenefitResponse toResponse(
+            ScoredCandidate item, int rank, BigDecimal paymentAmount,
+            List<MerchantCardBenefitCandidate> candidates,
+            Map<String, List<BenefitTierResponse>> tiersByOffer) {
+        MerchantCardBenefitCandidate candidate = item.candidate();
+        BigDecimal remainingPreviousSpend = remainingPreviousSpend(candidate);
+        List<BenefitTierResponse> tiers = candidate.offerId() == null
+                ? List.of() : tiersByOffer.getOrDefault(candidate.offerId(), List.of());
+        BenefitTierProgress tierProgress = tierProgress(candidate, candidates, tiers);
+        BigDecimal monthlyRemaining = monthlyRemaining(candidate);
+        return new RankedCardBenefitResponse(rank, candidate.userCardId(), candidate.cardName(),
+                candidate.issuerName(), candidate.cardImageUrl(), candidate.offerName(), candidate.rewardType(),
+                candidate.rewardUnit(), candidate.rewardValue(), item.estimatedValueKrw(), paymentAmount,
+                candidate.transactionMinKrw(), candidate.previousMonthSpendKrw(),
+                candidate.previousSpendMinKrw(), remainingPreviousSpend,
+                tierProgress.currentTier(), tierProgress.nextTier(), tierProgress.targetAmount(),
+                tierProgress.currentTierAchieved(), tierProgress.remainingAmountToNextTier(),
+                candidate.monthlyLimitKrw(), candidate.monthlyUsedKrw(), monthlyRemaining,
+                item.performanceMet(),
+                recommendationReasons(candidate, item.performanceMet(), item.minimumPaymentMet(),
+                        paymentAmount, remainingPreviousSpend, monthlyRemaining), tiers);
+    }
+
+    private boolean isRecommendationEligible(ScoredCandidate scored) {
+        BigDecimal remaining = monthlyRemaining(scored.candidate());
+        return scored.performanceMet()
+                && scored.minimumPaymentMet()
+                && (remaining == null || remaining.signum() > 0);
+    }
+
+    private Comparator<ScoredCandidate> scoredComparator() {
+        return Comparator.comparing(ScoredCandidate::score).reversed()
+                .thenComparing(Comparator.comparing(this::ratePriority).reversed());
     }
 
     private List<RecommendationReasonResponse> recommendationReasons(
@@ -430,6 +449,9 @@ public class MerchantCardRecommendationService {
 
     private record ScoredCandidate(MerchantCardBenefitCandidate candidate, BigDecimal estimatedValueKrw,
                                    BigDecimal score, boolean performanceMet, boolean minimumPaymentMet) { }
+
+    private record RankingResult(RankedCardBenefitResponse recommendedCard,
+                                 List<RankedCardBenefitResponse> rankedCards) { }
 
     private record BenefitTierProgress(Integer currentTier, Integer nextTier, BigDecimal targetAmount,
                                        boolean currentTierAchieved,

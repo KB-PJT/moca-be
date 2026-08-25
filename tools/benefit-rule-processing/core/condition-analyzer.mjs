@@ -91,9 +91,13 @@ export function analyzeConditions(benefit) {
     all.push(condition('DAY_OF_WEEK', 'IN', null, ['SATURDAY', 'SUNDAY']));
   }
 
-  const exclusions = analyzeExclusions(benefit);
+  const exclusions = recognized.has('EXCLUSIONS')
+    ? analyzeExclusions(benefit)
+    : {transactionTypes: [], complete: true};
   const paymentChannel = analyzePaymentChannel(benefit);
-  const performanceTiers = analyzePerformanceTiers(benefit);
+  const performanceTiers = recognized.has('PERFORMANCE_TIER')
+    ? analyzePerformanceTiers(benefit)
+    : {tiers: [], complete: true};
   if (benefit.paymentChannelEligibilityRequired) {
     all.push(condition('PAYMENT_CHANNEL_ELIGIBLE', 'EQ', 'true'));
   }

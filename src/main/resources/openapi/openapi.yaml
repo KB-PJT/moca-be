@@ -1826,12 +1826,15 @@ components:
         benefitPreferenceType:
           $ref: '#/components/schemas/BenefitPreferenceType'
         recommendedCard:
-          description: '순위가 가장 높은 카드 중 전월 실적과 최소 결제금액 조건을 모두 충족한 추천 카드입니다. rankedCards가 있어도 충족 카드가 없으면 null입니다.'
+          description: >-
+            전월 실적과 최소 결제금액을 충족하고 월 혜택 한도가 남은 후보 중 예상 가치가 가장 높은
+            추천 카드 혜택입니다. 동일 카드의 전체 순위용 혜택이 미충족이면 그 카드에서 충족 가능한
+            다른 혜택을 선택할 수 있으며, 충족 후보가 없으면 null입니다.
           nullable: true
           allOf: [{ $ref: '#/components/schemas/RankedCardBenefitResponse' }]
         recommendationAvailable:
           type: boolean
-          description: '전월 실적과 최소 결제금액 조건을 모두 충족한 추천 카드가 있는지 나타냅니다.'
+          description: '전월 실적·최소 결제금액을 충족하고 월 혜택 한도가 남은 추천 카드가 있는지 나타냅니다.'
         rankedCards:
           description: '가맹점 대상 혜택이 있는 활성 보유 카드 전체 순위이며, 최소 결제금액을 충족하지 않은 카드도 제외하지 않고 낮은 우선순위로 포함합니다. 없으면 빈 배열입니다.'
           type: array

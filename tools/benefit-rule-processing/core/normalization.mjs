@@ -1,7 +1,7 @@
 export function textOf(benefit) {
   return [benefit.benefitTitle, benefit.benefitDescription, benefit.detailText]
     .filter(Boolean)
-    .join('\n')
+    .join(' ')
     .replaceAll('\r', '')
     .replace(/[ \t]+/g, ' ')
     .trim();

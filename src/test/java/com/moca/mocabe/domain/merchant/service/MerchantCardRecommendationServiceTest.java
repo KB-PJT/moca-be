@@ -137,6 +137,33 @@ class MerchantCardRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("동일 카드의 최고 혜택이 소진돼도 한도가 남은 혜택을 대표 추천한다")
+    void recommendsEligibleBenefitFromSameCardWhenHigherRateBenefitIsExhausted() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "CGV", "MOVIE", "영화"));
+        MerchantCardBenefitCandidate exhausted = new MerchantCardBenefitCandidate(
+                "merchant-1", "CGV", "MOVIE", "영화", "card-1", "복합 혜택 카드",
+                "카드사", null, "20% 소진 혜택", "discount", "percent",
+                new BigDecimal("20"), null, null, null, BigDecimal.ZERO, BigDecimal.ONE,
+                new BigDecimal("10000"), new BigDecimal("10000"));
+        MerchantCardBenefitCandidate available = new MerchantCardBenefitCandidate(
+                "merchant-1", "CGV", "MOVIE", "영화", "card-1", "복합 혜택 카드",
+                "카드사", null, "5% 사용 가능 혜택", "discount", "percent",
+                new BigDecimal("5"), null, null, null, BigDecimal.ZERO, BigDecimal.ONE,
+                new BigDecimal("10000"), BigDecimal.ZERO);
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(exhausted, available));
+
+        var response = service.recommend("user-1", "merchant-1", null);
+
+        assertEquals("20% 소진 혜택", response.rankedCards().get(0).benefitTitle());
+        assertEquals("5% 사용 가능 혜택", response.recommendedCard().benefitTitle());
+        assertEquals(new BigDecimal("5"), response.recommendedCard().rewardValue());
+    }
+
+    @Test
     @DisplayName("미충족 카드가 1위여도 충족 카드 중 가장 높은 순위를 대표 추천한다")
     void recommendsHighestRankedSatisfiedCard() {
         when(mapper.findActiveMerchant("merchant-1"))
