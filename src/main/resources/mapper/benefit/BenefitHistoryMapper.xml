@@ -2,32 +2,61 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.moca.mocabe.domain.benefit.mapper.BenefitHistoryMapper">
     <sql id="historySource">
-        SELECT ubu.usage_id AS benefit_history_id, approval.approval_id, approval.merchant_name,
+        SELECT MIN(ubu.usage_id) AS benefit_history_id, approval.approval_id, approval.merchant_name,
                COALESCE(ubu.approved_at, approval.approved_at) AS approved_at,
                approval.amount AS payment_amount,
-               CAST(CASE WHEN ubu.reward_original_unit IN ('point', 'mile')
-                         THEN ubu.reward_original_value ELSE ubu.reward_amount_krw END AS SIGNED) AS benefit_amount,
-               CASE WHEN ubu.reward_original_unit = 'point' THEN 'POINT'
-                    WHEN ubu.reward_original_unit = 'mile' THEN 'MILEAGE'
+               CAST(CASE WHEN COUNT(DISTINCT ubu.reward_original_unit) = 1
+                              AND MAX(ubu.reward_original_unit) = 'point'
+                              AND COUNT(DISTINCT rule.rule_id) > 1
+                              AND COUNT(DISTINCT rule.reward_unit) = 1
+                              AND MAX(rule.reward_unit) = 'percent'
+                         THEN FLOOR(approval.amount * SUM(rule.reward_value) / 100)
+                         ELSE SUM(CASE WHEN ubu.reward_original_unit IN ('point', 'mile')
+                                       THEN ubu.reward_original_value ELSE ubu.reward_amount_krw END)
+                    END AS SIGNED) AS benefit_amount,
+               CASE WHEN COUNT(DISTINCT ubu.reward_original_unit) = 1
+                          AND MAX(ubu.reward_original_unit) = 'point' THEN 'POINT'
+                    WHEN COUNT(DISTINCT ubu.reward_original_unit) = 1
+                          AND MAX(ubu.reward_original_unit) = 'mile' THEN 'MILEAGE'
                     ELSE 'KRW' END AS benefit_unit,
                0 AS missed_benefit_amount,
-               CASE WHEN ubu.reward_original_unit = 'mile' THEN 'MILEAGE'
-                    WHEN ubu.reward_original_unit = 'point' THEN 'POINT'
-                    WHEN bo.reward_type = 'discount' THEN 'DISCOUNT'
-                    WHEN bo.reward_type = 'cashback' THEN 'CASHBACK'
-                    WHEN bo.reward_type = 'points' THEN 'POINT' END AS benefit_type,
-               COALESCE(bo.offer_name, cb.title) AS benefit_title, ubu.user_card_id,
+               CASE WHEN COUNT(DISTINCT CASE WHEN ubu.reward_original_unit = 'mile' THEN 'MILEAGE'
+                                             WHEN ubu.reward_original_unit = 'point' THEN 'POINT'
+                                             WHEN bo.reward_type = 'discount' THEN 'DISCOUNT'
+                                             WHEN bo.reward_type = 'cashback' THEN 'CASHBACK'
+                                             WHEN bo.reward_type = 'points' THEN 'POINT' END) > 1 THEN 'MULTIPLE'
+                    WHEN MAX(ubu.reward_original_unit) = 'mile' THEN 'MILEAGE'
+                    WHEN MAX(ubu.reward_original_unit) = 'point' THEN 'POINT'
+                    WHEN MAX(bo.reward_type) = 'discount' THEN 'DISCOUNT'
+                    WHEN MAX(bo.reward_type) = 'cashback' THEN 'CASHBACK'
+                    WHEN MAX(bo.reward_type) = 'points' THEN 'POINT' END AS benefit_type,
+               GROUP_CONCAT(DISTINCT COALESCE(bo.offer_name, cb.title)
+                            ORDER BY COALESCE(bo.offer_name, cb.title) SEPARATOR ', ') AS benefit_title,
+               ubu.user_card_id,
                CONCAT_WS(' ', COALESCE(cv.name, uc.card_name_from_codef),
                          NULLIF(TRIM(uc.card_no), '')) AS card_name,
                'APPLIED' AS calculation_status, NULL AS rejection_reason,
                NULL AS required_previous_spend_amount, NULL AS previous_month_spend_amount,
-               ubu.limit_policy_id, ubu.usage_date, ubu.reward_original_value,
-               ubu.reward_original_unit
+               CASE WHEN COUNT(DISTINCT ubu.limit_policy_id) = 1 THEN MAX(ubu.limit_policy_id) END AS limit_policy_id,
+               MIN(ubu.usage_date) AS usage_date,
+               CASE WHEN COUNT(DISTINCT ubu.reward_original_unit) = 1
+                          AND MAX(ubu.reward_original_unit) = 'point'
+                          AND COUNT(DISTINCT rule.rule_id) > 1
+                          AND COUNT(DISTINCT rule.reward_unit) = 1
+                          AND MAX(rule.reward_unit) = 'percent'
+                    THEN FLOOR(approval.amount * SUM(rule.reward_value) / 100)
+                    WHEN COUNT(DISTINCT ubu.reward_original_unit) = 1
+                          AND MAX(ubu.reward_original_unit) IN ('point', 'mile')
+                    THEN SUM(ubu.reward_original_value) END AS reward_original_value,
+               CASE WHEN COUNT(DISTINCT ubu.reward_original_unit) = 1
+                          AND MAX(ubu.reward_original_unit) IN ('point', 'mile')
+                    THEN MAX(ubu.reward_original_unit) END AS reward_original_unit
         FROM user_benefit_usages ubu
         INNER JOIN user_cards uc ON uc.user_card_id = ubu.user_card_id
         INNER JOIN card_payment_approvals approval ON approval.approval_id = ubu.approval_id
         INNER JOIN benefit_offers bo ON bo.offer_id = ubu.offer_id
         INNER JOIN card_benefits cb ON cb.benefit_id = bo.benefit_id
+        LEFT JOIN benefit_rules rule ON rule.rule_id = ubu.rule_id
         LEFT JOIN cards c ON c.card_id = uc.card_id
         LEFT JOIN card_content_versions cv ON cv.card_id = c.card_id
           AND NOT EXISTS (SELECT 1 FROM card_content_versions newer WHERE newer.card_id = cv.card_id
@@ -42,6 +71,8 @@
                 AND partial_outcome.rule_id = ubu.rule_id
                 AND partial_outcome.outcome_status = 'partially_applied'
           )
+        GROUP BY ubu.approval_id, approval.merchant_name, COALESCE(ubu.approved_at, approval.approved_at),
+                 approval.amount, ubu.user_card_id, cv.name, uc.card_no
         UNION ALL
         SELECT outcome.outcome_id, approval.approval_id, approval.merchant_name, approval.approved_at,
                approval.amount, CAST(outcome.applied_reward_value AS SIGNED),

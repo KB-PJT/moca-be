@@ -124,7 +124,7 @@
         INNER JOIN benefit_rule_targets t ON t.rule_id = r.rule_id
         WHERE uc.user_card_id = #{userCardId}
           AND r.rule_effect = 'grant'
-          AND r.stacking_mode = 'standalone'
+          AND r.stacking_mode IN ('standalone', 'additive')
           AND o.reward_type IN ('discount', 'cashback', 'points')
           AND r.reward_unit IN ('percent', 'KRW', 'point', 'mile')
           AND t.target_type IN ('all_merchants', 'merchant_category', 'merchant')
