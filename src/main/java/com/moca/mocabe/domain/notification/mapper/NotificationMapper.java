@@ -21,4 +21,5 @@ public interface NotificationMapper {
                       @Param("status") String status);
     int updateHistory(@Param("historyId") String historyId, @Param("status") String status,
                       @Param("messageId") String messageId, @Param("errorMessage") String errorMessage);
+    int deleteHistoryByUserId(@Param("userId") String userId);
 }

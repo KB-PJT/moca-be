@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 알림 대상 선별·중복 확인·기기별 발송을 담당한다. */
 public class NotificationService {
@@ -152,6 +153,11 @@ public class NotificationService {
             mapper.updateHistory(historyId, "FAILED", null,
                     exception.getClass().getSimpleName());
         }
+    }
+
+    @Transactional
+    public void deleteAllByUserId(String userId) {
+        mapper.deleteHistoryByUserId(userId);
     }
 
     private String deliveryKey(String userId, String deviceId, String type, String referenceId,
