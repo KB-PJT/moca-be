@@ -3,6 +3,7 @@ package com.moca.mocabe.domain.merchant.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +59,99 @@ class MerchantCardRecommendationServiceTest {
         assertNull(response.recommendedCard());
         assertEquals(List.of(), response.rankedCards());
         assertEquals(BenefitPreferenceType.IMMEDIATE_SAVINGS, response.benefitPreferenceType());
+    }
+
+    @Test
+    @DisplayName("결제금액을 생략하면 0원을 기준으로 예상 혜택을 계산한다")
+    void defaultsMissingPaymentAmountToZero() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(candidateWithoutMonthlyLimit()));
+
+        var card = service.recommend("user-1", "merchant-1", null).recommendedCard();
+
+        assertEquals(BigDecimal.ZERO, card.estimatedPaymentAmountKrw());
+        assertEquals(0, card.estimatedValueKrw().compareTo(BigDecimal.ZERO));
+    }
+
+    @Test
+    @DisplayName("0원 기준으로 정률 혜택이 동률이면 높은 혜택률을 우선한다")
+    void prefersHigherRateWhenZeroAmountMakesEstimatedValuesEqual() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        candidate("card-5", "5% 카드", "discount", "percent", "5", null,
+                                null, "0", "1"),
+                        candidate("card-10", "10% 카드", "discount", "percent", "10", null,
+                                null, "0", "1"),
+                        candidate("card-tie", "10% 카드", "discount", "percent", "10", null,
+                                null, "0", "1"),
+                        candidate("card-tie", "5% 카드", "discount", "percent", "5", null,
+                                null, "0", "1"),
+                        candidate("card-state", "조건 없음", "discount", "percent", "10", null,
+                                null, "0", "1"),
+                        candidate("card-state", "최소금액 조건", "discount", "percent", "10", null,
+                                null, "0", "1", "20000"),
+                        candidate("card-performance", "실적 충족", "discount", "percent", "10", null,
+                                null, "0", "1"),
+                        candidate("card-performance", "실적 미충족", "discount", "percent", "10", null,
+                                "300000", "0", "1")));
+
+        var response = service.recommend("user-1", "merchant-1", null);
+
+        assertEquals("card-10", response.recommendedCard().userCardId());
+        assertEquals(new BigDecimal("10"), response.rankedCards().stream()
+                .filter(card -> "card-tie".equals(card.userCardId()))
+                .findFirst().orElseThrow().rewardValue());
+        assertTrue(response.rankedCards().stream()
+                .anyMatch(card -> "card-5".equals(card.userCardId())));
+    }
+
+    @Test
+    @DisplayName("미충족 카드가 1위여도 충족 카드 중 가장 높은 순위를 대표 추천한다")
+    void recommendsHighestRankedSatisfiedCard() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        candidate("card-unmet", "미충족 카드", "discount", "percent", "20", null,
+                                "300000", "0", "1"),
+                        candidate("card-met", "충족 카드", "discount", "percent", "5", null,
+                                null, "0", "1")));
+
+        var response = service.recommend("user-1", "merchant-1", null);
+
+        assertEquals("card-met", response.recommendedCard().userCardId());
+        assertTrue(response.rankedCards().stream()
+                .anyMatch(card -> "card-unmet".equals(card.userCardId()) && !card.performanceMet()));
+    }
+
+    @Test
+    @DisplayName("모든 카드가 미충족이면 대표 추천 없이 순위만 반환한다")
+    void returnsNoRecommendationWhenAllCardsAreUnmet() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "이마트", "MART", "마트"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        candidate("card-performance", "실적 미충족", "discount", "percent", "20", null,
+                                "300000", "0", "1"),
+                        candidate("card-minimum", "최소금액 미충족", "discount", "percent", "10", null,
+                                null, "0", "1", "20000")));
+
+        var response = service.recommend("user-1", "merchant-1", null);
+
+        assertNull(response.recommendedCard());
+        assertEquals(2, response.rankedCards().size());
     }
 
     @Test
@@ -122,15 +216,19 @@ class MerchantCardRecommendationServiceTest {
 
         var response = service.recommend("user-1", "merchant-1", new BigDecimal("10000"));
 
-        assertEquals(4, response.rankedCards().size());
+        assertEquals(5, response.rankedCards().size());
         assertEquals("card-2", response.recommendedCard().userCardId());
         assertEquals(new BigDecimal("30.00"), response.recommendedCard().estimatedValueKrw());
-        assertEquals("card-1", response.rankedCards().get(1).userCardId());
-        assertEquals(false, response.rankedCards().get(1).performanceMet());
-        assertEquals(new BigDecimal("180000"),
-                response.rankedCards().get(1).remainingPreviousSpendKrw());
+        var card1 = response.rankedCards().stream()
+                .filter(card -> "card-1".equals(card.userCardId())).findFirst().orElseThrow();
+        assertEquals(false, card1.performanceMet());
+        assertEquals(new BigDecimal("180000"), card1.remainingPreviousSpendKrw());
         assertEquals(BigDecimal.ZERO, response.recommendedCard().remainingPreviousSpendKrw());
         assertEquals(new BigDecimal("10000"), response.recommendedCard().estimatedPaymentAmountKrw());
+        assertEquals("card-4", response.rankedCards().get(4).userCardId());
+        assertEquals(false, response.rankedCards().get(4).recommendationReasons().stream()
+                .filter(reason -> "MINIMUM_PAYMENT".equals(reason.code()))
+                .findFirst().orElseThrow().satisfied());
         assertEquals("MERCHANT_BENEFIT_MATCHED",
                 response.recommendedCard().recommendationReasons().get(0).code());
         assertEquals(true, response.rankedCards().stream()
@@ -153,7 +251,7 @@ class MerchantCardRecommendationServiceTest {
                 org.mockito.ArgumentMatchers.any())).thenReturn(List.of(boundary));
 
         var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
-                .recommendedCard();
+                .rankedCards().get(0);
 
         assertEquals(true, card.performanceMet());
         assertEquals(BigDecimal.ZERO, card.estimatedValueKrw());
@@ -177,7 +275,7 @@ class MerchantCardRecommendationServiceTest {
                 org.mockito.ArgumentMatchers.any())).thenReturn(List.of(limited));
 
         var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
-                .recommendedCard();
+                .rankedCards().get(0);
 
         assertEquals(new BigDecimal("500"), card.estimatedValueKrw());
         assertEquals(new BigDecimal("500"), card.monthlyRemainingKrw());
@@ -204,7 +302,7 @@ class MerchantCardRecommendationServiceTest {
                                 new BigDecimal("5000"))));
 
         var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
-                .recommendedCard();
+                .rankedCards().get(0);
 
         assertEquals(1, card.currentTier());
         assertEquals(2, card.nextTier());
@@ -232,7 +330,7 @@ class MerchantCardRecommendationServiceTest {
                 org.mockito.ArgumentMatchers.any())).thenReturn(tiers);
 
         var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
-                .recommendedCard();
+                .rankedCards().get(0);
 
         assertEquals(2, card.currentTier());
         assertNull(card.nextTier());
@@ -279,7 +377,7 @@ class MerchantCardRecommendationServiceTest {
                 org.mockito.ArgumentMatchers.any())).thenReturn(candidates);
 
         var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
-                .recommendedCard();
+                .rankedCards().get(0);
 
         assertEquals(1, card.currentTier());
         assertEquals(2, card.nextTier());
