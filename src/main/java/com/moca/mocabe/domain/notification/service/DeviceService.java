@@ -37,4 +37,9 @@ public class DeviceService {
             mapper.deactivate(device.userDeviceId(), userId);
         }
     }
+
+    @Transactional
+    public void deleteAllByUserId(String userId) {
+        mapper.deleteByUserId(userId);
+    }
 }

@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.moca.mocabe.domain.card.service.CardQueryService;
 import com.moca.mocabe.domain.codef.service.CodefCredentialStore;
+import com.moca.mocabe.domain.notification.service.DeviceService;
+import com.moca.mocabe.domain.notification.service.NotificationService;
 import com.moca.mocabe.domain.support.service.SupportInquiryService;
 import com.moca.mocabe.domain.user.mapper.WithdrawalRequestMapper;
 import com.moca.mocabe.domain.user.model.UserProfile;
@@ -52,6 +54,12 @@ class UserApplicationServiceTest {
 
     @Mock
     private SupportInquiryService supportInquiryService;
+
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private DeviceService deviceService;
 
     @Mock
     private WithdrawalRequestMapper withdrawalRequestMapper;
@@ -213,12 +221,15 @@ class UserApplicationServiceTest {
         verify(withdrawalRequestMapper).insertWithdrawalRequest("not_needed", "설명", true);
         InOrder inOrder = org.mockito.Mockito.inOrder(
                 withdrawalRequestMapper, opaqueTokenService, cardQueryService,
-                codefCredentialStore, supportInquiryService, userDomainService);
+                codefCredentialStore, supportInquiryService, notificationService, deviceService,
+                userDomainService);
         inOrder.verify(withdrawalRequestMapper).insertWithdrawalRequest("not_needed", "설명", true);
         inOrder.verify(opaqueTokenService).revokeAll(USER_ID);
         inOrder.verify(cardQueryService).deleteAllByUserId(USER_ID);
         inOrder.verify(codefCredentialStore).deleteAllByUserId(USER_ID);
         inOrder.verify(supportInquiryService).deleteAllByUserId(USER_ID);
+        inOrder.verify(notificationService).deleteAllByUserId(USER_ID);
+        inOrder.verify(deviceService).deleteAllByUserId(USER_ID);
         inOrder.verify(userDomainService).deleteUser(USER_ID);
     }
 

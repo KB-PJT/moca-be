@@ -134,7 +134,6 @@ test('소문자 포인트와 마일리지 유형도 올바른 보상 단위를 �
   assert.equal(processBenefit(benefit({benefitType: 'mileage'}))
     .ruleDefinition.reward.rewardUnit, 'MILE');
 });
-
 test('주말 전용 문구는 토요일과 일요일 조건으로 구조화한다', () => {
   const result = processBenefit(benefit({
     benefitDescription: '주말에만 생활 영역 추가적립 0.3%',

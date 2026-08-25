@@ -216,9 +216,12 @@ public class AppConfig {
                                                          CardQueryService cardQueryService,
                                                          CodefCredentialStore codefCredentialStore,
                                                          SupportInquiryService supportInquiryService,
+                                                         NotificationService notificationService,
+                                                         DeviceService deviceService,
                                                          WithdrawalRequestMapper withdrawalRequestMapper) {
         return new UserApplicationService(userDomainService, opaqueTokenService, cardQueryService,
-                codefCredentialStore, supportInquiryService, withdrawalRequestMapper);
+                codefCredentialStore, supportInquiryService, notificationService, deviceService,
+                withdrawalRequestMapper);
     }
 
     @Bean
