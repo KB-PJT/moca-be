@@ -129,6 +129,7 @@ class MerchantCardRecommendationServiceTest {
 
         var response = service.recommend("user-1", "merchant-1", null);
 
+        assertEquals("card-unmet", response.rankedCards().get(0).userCardId());
         assertEquals("card-met", response.recommendedCard().userCardId());
         assertTrue(response.rankedCards().stream()
                 .anyMatch(card -> "card-unmet".equals(card.userCardId()) && !card.performanceMet()));
@@ -225,8 +226,10 @@ class MerchantCardRecommendationServiceTest {
         assertEquals(new BigDecimal("180000"), card1.remainingPreviousSpendKrw());
         assertEquals(BigDecimal.ZERO, response.recommendedCard().remainingPreviousSpendKrw());
         assertEquals(new BigDecimal("10000"), response.recommendedCard().estimatedPaymentAmountKrw());
-        assertEquals("card-4", response.rankedCards().get(4).userCardId());
-        assertEquals(false, response.rankedCards().get(4).recommendationReasons().stream()
+        var minimumPaymentCard = response.rankedCards().stream()
+                .filter(card -> "card-4".equals(card.userCardId())).findFirst().orElseThrow();
+        assertTrue(minimumPaymentCard.rank() < response.recommendedCard().rank());
+        assertEquals(false, minimumPaymentCard.recommendationReasons().stream()
                 .filter(reason -> "MINIMUM_PAYMENT".equals(reason.code()))
                 .findFirst().orElseThrow().satisfied());
         assertEquals("MERCHANT_BENEFIT_MATCHED",
