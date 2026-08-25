@@ -233,9 +233,7 @@ public class MerchantCardRecommendationService {
         }
         Map<String, List<BenefitTierResponse>> tiersByOffer = benefitTiersByOffer(candidates, usageDate);
         List<ScoredCandidate> sorted = new ArrayList<>(bestByCard.values());
-        sorted.sort(Comparator.comparing(ScoredCandidate::minimumPaymentMet).reversed()
-                .thenComparing(Comparator.comparing(ScoredCandidate::performanceMet).reversed())
-                .thenComparing(Comparator.comparing(ScoredCandidate::score).reversed())
+        sorted.sort(Comparator.comparing(ScoredCandidate::score).reversed()
                 .thenComparing(Comparator.comparing(this::ratePriority).reversed()));
         List<RankedCardBenefitResponse> result = new ArrayList<>();
         for (int index = 0; index < sorted.size(); index++) {
@@ -307,12 +305,6 @@ public class MerchantCardRecommendationService {
     }
 
     private boolean isHigherPriority(ScoredCandidate candidate, ScoredCandidate current) {
-        if (candidate.minimumPaymentMet() != current.minimumPaymentMet()) {
-            return candidate.minimumPaymentMet();
-        }
-        if (candidate.performanceMet() != current.performanceMet()) {
-            return candidate.performanceMet();
-        }
         int scoreComparison = candidate.score().compareTo(current.score());
         return scoreComparison > 0
                 || (scoreComparison == 0
