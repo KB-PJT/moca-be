@@ -4,9 +4,9 @@ import {analyzeConditions} from './condition-analyzer.mjs';
 const BENEFIT_TYPES = new Set(['DISCOUNT', 'CASHBACK', 'POINT', 'MILEAGE']);
 const CALCULATIONS = new Set(['RATE', 'FIXED', 'PER_SPEND_UNIT', 'PER_USAGE_UNIT']);
 
-function rewardUnit(benefit) {
-  if (benefit.benefitType === 'POINT') return 'POINT';
-  if (benefit.benefitType === 'MILEAGE') return 'MILE';
+function rewardUnit(type) {
+  if (type === 'POINT') return 'POINT';
+  if (type === 'MILEAGE') return 'MILE';
   return 'KRW';
 }
 
@@ -29,7 +29,7 @@ function rewardFor(benefit) {
   if (mode === 'PER_SPEND_UNIT' && !positiveNumber(spendUnitAmount)) return null;
   return {
     benefitType: type,
-    rewardUnit: rewardUnit(benefit),
+    rewardUnit: rewardUnit(type),
     calculation: mode,
     rate,
     value,
