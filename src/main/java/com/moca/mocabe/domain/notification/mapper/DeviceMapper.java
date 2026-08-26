@@ -15,4 +15,5 @@ public interface DeviceMapper {
     int deactivate(@Param("deviceId") String deviceId, @Param("userId") String userId);
     List<UserDevice> findActiveByUserId(@Param("userId") String userId);
     List<UserDevice> findActiveNearbyBenefitDevices();
+    int deleteByUserId(@Param("userId") String userId);
 }

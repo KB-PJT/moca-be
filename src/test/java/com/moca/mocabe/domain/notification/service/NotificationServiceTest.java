@@ -311,6 +311,15 @@ class NotificationServiceTest {
         verify(fixture.fcm, never()).send(any(), any(), any(), any());
     }
 
+    @Test
+    @DisplayName("탈퇴 시 사용자의 알림 발송 이력을 모두 삭제한다")
+    void deletesAllHistoryByUserId() {
+        NotificationMapper history = org.mockito.Mockito.mock(NotificationMapper.class);
+        service(history, org.mockito.Mockito.mock(DeviceMapper.class), org.mockito.Mockito.mock(FcmService.class),
+                Instant.parse("2026-08-28T11:00:00Z")).deleteAllByUserId("user");
+        verify(history).deleteHistoryByUserId("user");
+    }
+
     private NotificationService service(NotificationMapper history, DeviceMapper devices, FcmService fcm, Instant now) {
         Clock clock = Clock.fixed(now, ZoneId.of("Asia/Seoul"));
         return new NotificationService(history, devices, fcm, clock,
