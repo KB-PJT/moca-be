@@ -35066,7 +35066,7 @@ SELECT UUID(), offer.offer_id, 1, offer.priority,
            WHEN 2 THEN '조건 없는 전 가맹점 기본적립'
            ELSE '전월 30만원 이상 생활 영역 추가적립'
        END,
-       'grant', 'standalone',
+       'grant', 'additive',
        CASE offer.position WHEN 2 THEN 0.2 ELSE 0.3 END,
        'percent', CASE offer.position WHEN 2 THEN NULL ELSE 300000 END,
        'floor', 1, 'SUPPORTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)

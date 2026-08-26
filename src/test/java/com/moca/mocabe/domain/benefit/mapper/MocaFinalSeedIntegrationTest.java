@@ -556,6 +556,16 @@ class MocaFinalSeedIntegrationTest {
                 + "AND offer.offer_name='생활 영역 추가적립 0.3%' "
                 + "AND rule_data.rule_support_status='SUPPORTED'"));
     assertEquals(
+        2,
+        count(
+            jdbc,
+            "SELECT COUNT(*) "
+                + latestNhPointRules
+                + "AND offer.offer_name IN "
+                + "('전 가맹점 기본적립 0.2%','생활 영역 추가적립 0.3%') "
+                + "AND offer.stacking_mode='additive' "
+                + "AND rule_data.stacking_mode='additive'"));
+    assertEquals(
         1,
         count(
             jdbc,
