@@ -2,6 +2,7 @@ package com.moca.mocabe.domain.merchant.recommendation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitCandidate;
 import com.moca.mocabe.domain.merchant.model.MerchantCardBenefitRuleRow;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -129,8 +130,24 @@ class CardBenefitEligibilityEvaluatorTest {
         assertEquals(1, evaluate(List.of(row), null, List.of(), null).size());
     }
 
-    private List<?> evaluate(List<MerchantCardBenefitRuleRow> rows, String merchantId,
-                             List<String> lineageIds, String confidence) {
+    @Test
+    @DisplayName("stacking mode는 rule, offer, standalone 순서로 결정한다")
+    void resolvesStackingModeInDomainPolicyOrder() {
+        MerchantCardBenefitRuleRow rulePriority = rowWithStacking("additive", "replace");
+        MerchantCardBenefitRuleRow offerFallback = rowWithStacking(null, "highest_only");
+        MerchantCardBenefitRuleRow defaultFallback = rowWithStacking(null, null);
+
+        assertEquals("additive", evaluate(List.of(rulePriority), null, List.of(), null)
+                .get(0).stackingMode());
+        assertEquals("highest_only", evaluate(List.of(offerFallback), null, List.of(), null)
+                .get(0).stackingMode());
+        assertEquals("standalone", evaluate(List.of(defaultFallback), null, List.of(), null)
+                .get(0).stackingMode());
+    }
+
+    private List<MerchantCardBenefitCandidate> evaluate(
+            List<MerchantCardBenefitRuleRow> rows, String merchantId,
+            List<String> lineageIds, String confidence) {
         BigDecimal placeConfidence = confidence == null ? null : new BigDecimal(confidence);
         return evaluator.evaluate(rows, merchantId, lineageIds, placeConfidence, USAGE_DATE);
     }
@@ -148,5 +165,16 @@ class CardBenefitEligibilityEvaluatorTest {
                 ruleId, ruleEffect, validFrom, validTo, matchMode, targetType,
                 targetCategoryId, targetMerchantId, minimumConfidence,
                 hasSchedule, hasOptionRequirement);
+    }
+
+    private MerchantCardBenefitRuleRow rowWithStacking(
+            String ruleStackingMode, String offerStackingMode) {
+        return new MerchantCardBenefitRuleRow(
+                "merchant-1", "이마트", "MART", "마트", "card-1", "카드",
+                "카드사", null, "혜택", "points", "percent", BigDecimal.ONE,
+                null, null, null, BigDecimal.ZERO, BigDecimal.ONE, null, BigDecimal.ZERO,
+                "rule-stacking", "grant", null, null, "include", "all_merchants",
+                null, null, BigDecimal.ZERO, false, false, "offer-1", 1,
+                ruleStackingMode, offerStackingMode);
     }
 }

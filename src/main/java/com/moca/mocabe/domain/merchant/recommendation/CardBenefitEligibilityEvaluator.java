@@ -28,8 +28,21 @@ public class CardBenefitEligibilityEvaluator {
         return rowsByRule.values().stream()
                 .filter(ruleRows -> isEligible(
                         ruleRows, merchantId, categoryLineageIds, placeConfidence, usageDate))
-                .map(ruleRows -> ruleRows.get(0).toCandidate())
+                .map(ruleRows -> {
+                    MerchantCardBenefitRuleRow rule = ruleRows.get(0);
+                    return rule.toCandidate(resolveStackingMode(rule));
+                })
                 .toList();
+    }
+
+    private String resolveStackingMode(MerchantCardBenefitRuleRow rule) {
+        if (rule.ruleStackingMode() != null && !rule.ruleStackingMode().isBlank()) {
+            return rule.ruleStackingMode();
+        }
+        if (rule.offerStackingMode() != null && !rule.offerStackingMode().isBlank()) {
+            return rule.offerStackingMode();
+        }
+        return "standalone";
     }
 
     private boolean isEligible(List<MerchantCardBenefitRuleRow> rows, String merchantId,

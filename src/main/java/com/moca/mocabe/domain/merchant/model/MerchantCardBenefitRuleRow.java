@@ -14,9 +14,10 @@ public record MerchantCardBenefitRuleRow(
         String ruleId, String ruleEffect, LocalDate validFrom, LocalDate validTo,
         String matchMode, String targetType, String targetMerchantCategoryId, String targetMerchantId,
         BigDecimal minimumPlaceConfidence, Boolean hasSchedule, Boolean hasOptionRequirement,
-        String offerId, Integer benefitTierPosition, String stackingMode) {
+        String offerId, Integer benefitTierPosition,
+        String ruleStackingMode, String offerStackingMode) {
 
-    public MerchantCardBenefitCandidate toCandidate() {
+    public MerchantCardBenefitCandidate toCandidate(String stackingMode) {
         return new MerchantCardBenefitCandidate(
                 merchantId, merchantName, categoryCode, categoryName,
                 userCardId, cardName, issuerName, cardImageUrl,
@@ -42,6 +43,6 @@ public record MerchantCardBenefitRuleRow(
                 transactionMinKrw, previousSpendMinKrw, previousMonthSpendKrw, krwPerRewardUnit,
                 monthlyLimitKrw, monthlyUsedKrw, ruleId, ruleEffect, validFrom, validTo, matchMode,
                 targetType, targetMerchantCategoryId, targetMerchantId, minimumPlaceConfidence,
-                hasSchedule, hasOptionRequirement, null, null, "standalone");
+                hasSchedule, hasOptionRequirement, null, null, null, null);
     }
 }
