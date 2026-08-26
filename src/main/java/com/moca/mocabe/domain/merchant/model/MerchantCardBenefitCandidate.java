@@ -10,7 +10,7 @@ public record MerchantCardBenefitCandidate(
         BigDecimal rewardBasisAmount, BigDecimal transactionMinKrw, BigDecimal previousSpendMinKrw,
         BigDecimal previousMonthSpendKrw, BigDecimal krwPerRewardUnit,
         BigDecimal monthlyLimitKrw, BigDecimal monthlyUsedKrw, String offerId,
-        Integer benefitTierPosition) {
+        Integer benefitTierPosition, String stackingMode) {
 
     /** 기존 단일 룰 생성부와의 호환을 위한 생성자다. */
     public MerchantCardBenefitCandidate(
@@ -23,6 +23,6 @@ public record MerchantCardBenefitCandidate(
         this(merchantId, merchantName, categoryCode, categoryName, userCardId, cardName, issuerName,
                 cardImageUrl, offerName, rewardType, rewardUnit, rewardValue, rewardBasisAmount,
                 transactionMinKrw, previousSpendMinKrw, previousMonthSpendKrw, krwPerRewardUnit,
-                monthlyLimitKrw, monthlyUsedKrw, null, null);
+                monthlyLimitKrw, monthlyUsedKrw, null, null, "standalone");
     }
 }

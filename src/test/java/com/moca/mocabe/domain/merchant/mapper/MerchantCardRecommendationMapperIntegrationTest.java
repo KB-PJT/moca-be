@@ -130,6 +130,7 @@ class MerchantCardRecommendationMapperIntegrationTest {
     assertEquals(OFFER, row.offerId());
     assertEquals("마트 적립", row.offerName());
     assertEquals(1, row.benefitTierPosition());
+    assertEquals("standalone", row.stackingMode());
     assertFalse(row.hasSchedule());
     assertFalse(row.hasOptionRequirement());
 

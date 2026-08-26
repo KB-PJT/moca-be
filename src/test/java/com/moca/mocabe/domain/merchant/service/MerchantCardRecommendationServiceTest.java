@@ -164,6 +164,51 @@ class MerchantCardRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("올바른POINT체크카드 편의점 기본 0.2%와 추가 0.3%를 0.5%로 합산한다")
+    void sumsAdditiveBenefitsForSameCard() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "CU", "CONVENIENCE", "편의점"));
+        MerchantCardBenefitCandidate base = additiveCandidate(
+                "offer-base", "전 가맹점 기본적립 0.2%", "0.2", null, "0");
+        MerchantCardBenefitCandidate extra = additiveCandidate(
+                "offer-extra", "생활 영역 추가적립 0.3%", "0.3", "300000", "300000");
+        MerchantCardBenefitCandidate standalone = candidate(
+                "card-point", "올바른POINT체크카드", "points", "percent", "0.1", null,
+                null, "300000", "1");
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(base, extra, standalone));
+
+        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
+                .recommendedCard();
+
+        assertEquals(new BigDecimal("0.5"), card.rewardValue());
+        assertEquals(0, card.estimatedValueKrw().compareTo(new BigDecimal("50.00")));
+        assertEquals(2, card.appliedBenefits().size());
+        assertEquals(List.of("전 가맹점 기본적립 0.2%", "생활 영역 추가적립 0.3%"),
+                card.appliedBenefits().stream().map(item -> item.benefitTitle()).toList());
+    }
+
+    @Test
+    @DisplayName("additive 혜택만 있는 카드도 합산 결과를 대표 후보로 사용한다")
+    void recommendsCombinedPlanWithoutStandaloneBenefit() {
+        when(mapper.findActiveMerchant("merchant-1"))
+                .thenReturn(new MerchantDetailRow("merchant-1", "CU", "CONVENIENCE", "편의점"));
+        when(eligibilityEvaluator.evaluate(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq("merchant-1"),
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        additiveCandidate("offer-base", "기본 적립", "0.2", null, "0"),
+                        additiveCandidate("offer-extra", "추가 적립", "0.3", null, "0")));
+
+        var card = service.recommend("user-1", "merchant-1", new BigDecimal("10000"))
+                .recommendedCard();
+
+        assertEquals(new BigDecimal("0.5"), card.rewardValue());
+    }
+
+    @Test
     @DisplayName("미충족 카드가 1위여도 충족 카드 중 가장 높은 순위를 대표 추천한다")
     void recommendsHighestRankedSatisfiedCard() {
         when(mapper.findActiveMerchant("merchant-1"))
@@ -595,11 +640,22 @@ class MerchantCardRecommendationServiceTest {
         return new MerchantCardBenefitCandidate("merchant-1", "이마트", "MART", "마트", cardId, cardName,
                 "카드사", null, "마트 혜택", rewardType, rewardUnit, new BigDecimal(rewardValue),
                 decimal(basis), decimal(transactionMinimum), decimal(requiredSpend), new BigDecimal(previousSpend),
-                new BigDecimal(conversion), new BigDecimal("10000"), BigDecimal.ZERO, offerId, tierPosition);
+                new BigDecimal(conversion), new BigDecimal("10000"), BigDecimal.ZERO, offerId, tierPosition,
+                "standalone");
     }
 
     private BigDecimal decimal(String value) {
         return value == null ? null : new BigDecimal(value);
+    }
+
+    private MerchantCardBenefitCandidate additiveCandidate(
+            String offerId, String offerName, String rewardValue,
+            String requiredSpend, String previousSpend) {
+        return new MerchantCardBenefitCandidate(
+                "merchant-1", "CU", "CONVENIENCE", "편의점", "card-point", "올바른POINT체크카드",
+                "NH농협카드", null, offerName, "points", "percent", new BigDecimal(rewardValue),
+                null, null, decimal(requiredSpend), new BigDecimal(previousSpend), BigDecimal.ONE,
+                null, BigDecimal.ZERO, offerId, 1, "additive");
     }
 
     private MerchantCardBenefitCandidate candidateWithoutMonthlyLimit() {

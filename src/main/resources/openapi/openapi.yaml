@@ -1852,18 +1852,18 @@ components:
       required: [rank, userCardId, cardName, benefitTitle, rewardType, rewardUnit, rewardValue,
                  estimatedValueKrw, estimatedPaymentAmountKrw, previousMonthSpendKrw,
                  remainingPreviousSpendKrw, isCurrentTierAchieved, remainingAmountToNextTier,
-                 monthlyUsedKrw, performanceMet, recommendationReasons, tiers]
+                 monthlyUsedKrw, performanceMet, recommendationReasons, tiers, appliedBenefits]
       properties:
         rank: { type: integer, minimum: 1, description: '온보딩 혜택 성향을 반영한 1부터 시작하는 순위입니다.' }
         userCardId: { type: string, description: '인증 사용자의 보유 카드 식별자입니다.' }
         cardName: { type: string, description: '카드 상품명입니다.' }
         issuerName: { type: string, description: '카드사명입니다.' }
         cardImageUrl: { type: string, nullable: true, description: '카드 이미지 URL이며 없으면 null입니다.' }
-        benefitTitle: { type: string, description: '순위 계산에 사용한 구조화 혜택명입니다.' }
+        benefitTitle: { type: string, description: '순위 계산에 사용한 구조화 혜택명입니다. 여러 additive 혜택이 합산되면 ` + `로 연결됩니다.' }
         rewardType: { type: string, description: 'discount, cashback, points, rebate 중 혜택 종류입니다.' }
         rewardUnit: { type: string, enum: [percent, KRW, point, mile], description: '혜택 원 단위입니다.' }
-        rewardValue: { type: number, description: '혜택 원 단위 기준 값입니다.' }
-        estimatedValueKrw: { type: number, description: '결제금액과 환산 정책으로 계산한 예상 원화 가치입니다.' }
+        rewardValue: { type: number, description: '혜택 원 단위 기준 값입니다. 동일 종류·단위·산식의 additive 혜택은 합산값이며, 혼합 단위의 상세 값은 appliedBenefits를 사용합니다.' }
+        estimatedValueKrw: { type: number, description: '결제금액과 환산 정책으로 계산한 적용 가능 additive 혜택 전체의 예상 원화 가치 합계입니다.' }
         estimatedPaymentAmountKrw: { type: number, description: '예상 혜택 계산에 사용한 결제 기준 금액입니다. 요청값을 생략하면 0원으로 계산합니다.' }
         transactionMinKrw: { type: number, nullable: true, description: '혜택 적용 최소 결제금액이며 없으면 null입니다. 현재 결제 기준 금액이 미달해도 카드는 순위에서 제외하지 않습니다.' }
         previousMonthSpendKrw: { type: number, description: '전월 인정 실적 원화 금액이며 자료가 없으면 0입니다.' }
@@ -1909,6 +1909,21 @@ components:
           description: '현재 혜택 offer에 연결된 전체 실적 구간입니다. 현재 실적과 무관하게 미달성 다음 구간도 포함합니다.'
           items:
             $ref: '#/components/schemas/BenefitTierResponse'
+        appliedBenefits:
+          type: array
+          minItems: 1
+          description: 'estimatedValueKrw 합계에 포함된 개별 혜택입니다. 단일 혜택도 원소 한 건으로 반환합니다.'
+          items:
+            $ref: '#/components/schemas/AppliedCardBenefitResponse'
+    AppliedCardBenefitResponse:
+      type: object
+      required: [benefitTitle, rewardType, rewardUnit, rewardValue, estimatedValueKrw]
+      properties:
+        benefitTitle: { type: string, description: '합산에 포함된 구조화 혜택명입니다.' }
+        rewardType: { type: string, description: 'discount, cashback, points, rebate 중 개별 혜택 종류입니다.' }
+        rewardUnit: { type: string, enum: [percent, KRW, point, mile], description: '개별 혜택 원 단위입니다.' }
+        rewardValue: { type: number, description: '개별 혜택의 원 단위 기준 값입니다.' }
+        estimatedValueKrw: { type: number, description: '개별 혜택을 원화로 환산한 예상 가치입니다.' }
     BenefitTierResponse:
       type: object
       required: [tier, requiredPreviousSpendKrw, monthlyLimitKrw]
