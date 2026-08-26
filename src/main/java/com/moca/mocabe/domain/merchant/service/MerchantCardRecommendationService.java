@@ -6,6 +6,7 @@ import com.moca.mocabe.domain.merchant.dto.MerchantSummaryResponse;
 import com.moca.mocabe.domain.merchant.dto.RecommendationReasonResponse;
 import com.moca.mocabe.domain.merchant.dto.RankedCardBenefitResponse;
 import com.moca.mocabe.domain.merchant.dto.BenefitTierResponse;
+import com.moca.mocabe.domain.merchant.dto.AppliedCardBenefitResponse;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCardRecommendationMapper;
 import com.moca.mocabe.domain.merchant.mapper.MerchantCategoryMapper;
 import com.moca.mocabe.domain.merchant.model.KakaoPlace;
@@ -195,8 +196,7 @@ public class MerchantCardRecommendationService {
                                BenefitPreferenceType preference,
                                LocalDate usageDate) {
         CardBenefitRankingStrategy strategy = rankingStrategies.get(preference);
-        Map<String, ScoredCandidate> bestByCard = new LinkedHashMap<>();
-        Map<String, ScoredCandidate> bestEligibleByCard = new LinkedHashMap<>();
+        Map<String, List<ScoredCandidate>> candidatesByCard = new LinkedHashMap<>();
         for (MerchantCardBenefitCandidate candidate : candidates) {
             boolean minimumPaymentMet = candidate.transactionMinKrw() == null
                     || paymentAmount.compareTo(candidate.transactionMinKrw()) >= 0;
@@ -209,18 +209,18 @@ public class MerchantCardRecommendationService {
                     || candidate.previousMonthSpendKrw().compareTo(candidate.previousSpendMinKrw()) >= 0;
             BigDecimal score = strategy.score(candidate, estimated);
             ScoredCandidate scored = new ScoredCandidate(
-                    candidate, estimated, score, performanceMet, minimumPaymentMet);
-            ScoredCandidate current = bestByCard.get(candidate.userCardId());
-            if (current == null || isHigherPriority(scored, current)) {
-                bestByCard.put(candidate.userCardId(), scored);
-            }
-            if (isRecommendationEligible(scored)) {
-                ScoredCandidate eligible = bestEligibleByCard.get(candidate.userCardId());
-                if (eligible == null || isHigherPriority(scored, eligible)) {
-                    bestEligibleByCard.put(candidate.userCardId(), scored);
-                }
-            }
+                    candidate, estimated, score, performanceMet, minimumPaymentMet, List.of());
+            candidatesByCard.computeIfAbsent(candidate.userCardId(), ignored -> new ArrayList<>()).add(scored);
         }
+        Map<String, ScoredCandidate> bestByCard = new LinkedHashMap<>();
+        Map<String, ScoredCandidate> bestEligibleByCard = new LinkedHashMap<>();
+        candidatesByCard.forEach((cardId, cardCandidates) -> {
+            bestByCard.put(cardId, bestCardPlan(cardCandidates, strategy, false));
+            ScoredCandidate eligible = bestCardPlan(cardCandidates, strategy, true);
+            if (eligible != null) {
+                bestEligibleByCard.put(cardId, eligible);
+            }
+        });
         Map<String, List<BenefitTierResponse>> tiersByOffer = benefitTiersByOffer(candidates, usageDate);
         List<ScoredCandidate> sorted = new ArrayList<>(bestByCard.values());
         sorted.sort(scoredComparator());
@@ -263,7 +263,91 @@ public class MerchantCardRecommendationService {
                 candidate.monthlyLimitKrw(), candidate.monthlyUsedKrw(), monthlyRemaining,
                 item.performanceMet(),
                 recommendationReasons(candidate, item.performanceMet(), item.minimumPaymentMet(),
-                        paymentAmount, remainingPreviousSpend, monthlyRemaining), tiers);
+                        paymentAmount, remainingPreviousSpend, monthlyRemaining), tiers,
+                item.components().isEmpty()
+                        ? List.of(toAppliedBenefit(item))
+                        : item.components().stream().map(this::toAppliedBenefit).toList());
+    }
+
+    private AppliedCardBenefitResponse toAppliedBenefit(ScoredCandidate item) {
+        return new AppliedCardBenefitResponse(item.candidate().offerName(), item.candidate().rewardType(),
+                item.candidate().rewardUnit(), item.candidate().rewardValue(), item.estimatedValueKrw());
+    }
+
+    private ScoredCandidate bestCardPlan(List<ScoredCandidate> candidates,
+                                         CardBenefitRankingStrategy strategy,
+                                         boolean eligibleOnly) {
+        List<ScoredCandidate> pool = eligibleOnly
+                ? candidates.stream().filter(this::isRecommendationEligible).toList()
+                : candidates;
+        if (pool.isEmpty()) {
+            return null;
+        }
+        ScoredCandidate standalone = pool.stream()
+                .filter(item -> !"additive".equals(item.candidate().stackingMode()))
+                .max(this::comparePriority).orElse(null);
+        List<ScoredCandidate> applicableAdditivePool = pool.stream()
+                .filter(item -> "additive".equals(item.candidate().stackingMode()))
+                .filter(this::isRecommendationEligible)
+                .toList();
+        List<ScoredCandidate> additive = applicableAdditivePool.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> offerKey(item.candidate()), LinkedHashMap::new,
+                        java.util.stream.Collectors.collectingAndThen(
+                                java.util.stream.Collectors.toList(),
+                                values -> values.stream().max(this::comparePriority).orElseThrow())))
+                .values().stream().toList();
+        ScoredCandidate additivePlan = additive.isEmpty() ? null : combineAdditive(additive, strategy);
+        if (!eligibleOnly && additivePlan == null) {
+            additivePlan = pool.stream()
+                    .filter(item -> "additive".equals(item.candidate().stackingMode()))
+                    .max(this::comparePriority).orElse(null);
+        }
+        if (standalone == null) {
+            return additivePlan;
+        }
+        if (additivePlan == null) {
+            return standalone;
+        }
+        return isHigherPriority(additivePlan, standalone) ? additivePlan : standalone;
+    }
+
+    private int comparePriority(ScoredCandidate left, ScoredCandidate right) {
+        return isHigherPriority(left, right) ? 1 : isHigherPriority(right, left) ? -1 : 0;
+    }
+
+    private String offerKey(MerchantCardBenefitCandidate candidate) {
+        return candidate.offerId() == null ? candidate.offerName() : candidate.offerId();
+    }
+
+    private ScoredCandidate combineAdditive(List<ScoredCandidate> components,
+                                            CardBenefitRankingStrategy strategy) {
+        ScoredCandidate primary = components.stream().max(this::comparePriority).orElseThrow();
+        MerchantCardBenefitCandidate source = primary.candidate();
+        BigDecimal estimated = components.stream().map(ScoredCandidate::estimatedValueKrw)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        boolean compatibleRate = components.stream().allMatch(item -> sameRewardScale(source, item.candidate()));
+        BigDecimal rewardValue = compatibleRate
+                ? components.stream().map(item -> item.candidate().rewardValue())
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                : source.rewardValue();
+        String title = components.stream().map(item -> item.candidate().offerName()).distinct()
+                .collect(java.util.stream.Collectors.joining(" + "));
+        MerchantCardBenefitCandidate combined = new MerchantCardBenefitCandidate(
+                source.merchantId(), source.merchantName(), source.categoryCode(), source.categoryName(),
+                source.userCardId(), source.cardName(), source.issuerName(), source.cardImageUrl(),
+                title, source.rewardType(), source.rewardUnit(), rewardValue, source.rewardBasisAmount(),
+                source.transactionMinKrw(), source.previousSpendMinKrw(), source.previousMonthSpendKrw(),
+                source.krwPerRewardUnit(), null, BigDecimal.ZERO, null, null, "additive");
+        return new ScoredCandidate(combined, estimated, strategy.score(combined, estimated), true, true,
+                List.copyOf(components));
+    }
+
+    private boolean sameRewardScale(MerchantCardBenefitCandidate left,
+                                    MerchantCardBenefitCandidate right) {
+        return Objects.equals(left.rewardType(), right.rewardType())
+                && Objects.equals(left.rewardUnit(), right.rewardUnit())
+                && Objects.equals(left.rewardBasisAmount(), right.rewardBasisAmount());
     }
 
     private boolean isRecommendationEligible(ScoredCandidate scored) {
@@ -448,7 +532,8 @@ public class MerchantCardRecommendationService {
     }
 
     private record ScoredCandidate(MerchantCardBenefitCandidate candidate, BigDecimal estimatedValueKrw,
-                                   BigDecimal score, boolean performanceMet, boolean minimumPaymentMet) { }
+                                   BigDecimal score, boolean performanceMet, boolean minimumPaymentMet,
+                                   List<ScoredCandidate> components) { }
 
     private record RankingResult(RankedCardBenefitResponse recommendedCard,
                                  List<RankedCardBenefitResponse> rankedCards) { }

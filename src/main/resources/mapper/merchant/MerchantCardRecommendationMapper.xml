@@ -69,6 +69,8 @@
             <arg column="has_option_requirement" javaType="java.lang.Boolean"/>
             <arg column="offer_id" javaType="java.lang.String"/>
             <arg column="benefit_tier_position" javaType="java.lang.Integer"/>
+            <arg column="rule_stacking_mode" javaType="java.lang.String"/>
+            <arg column="offer_stacking_mode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
@@ -102,6 +104,8 @@
                uc.user_card_id, COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
                i.issuer_name, NULLIF(cv.image_url, '') AS card_image_url,
                o.offer_id, o.offer_name, o.reward_type, r.position AS benefit_tier_position,
+               r.stacking_mode AS rule_stacking_mode,
+               o.stacking_mode AS offer_stacking_mode,
                r.reward_unit, r.reward_value, r.reward_basis_amount,
                r.transaction_min_krw, r.previous_spend_min_krw,
                COALESCE(ps.current_spend_amount, 0) AS previous_month_spend_krw,
@@ -177,6 +181,8 @@
                uc.user_card_id, COALESCE(cv.name, uc.card_name_from_codef) AS card_name,
                i.issuer_name, NULLIF(cv.image_url, '') AS card_image_url,
                o.offer_id, o.offer_name, o.reward_type, r.position AS benefit_tier_position,
+               r.stacking_mode AS rule_stacking_mode,
+               o.stacking_mode AS offer_stacking_mode,
                r.reward_unit, r.reward_value, r.reward_basis_amount,
                r.transaction_min_krw, r.previous_spend_min_krw,
                COALESCE(ps.current_spend_amount, 0) AS previous_month_spend_krw,

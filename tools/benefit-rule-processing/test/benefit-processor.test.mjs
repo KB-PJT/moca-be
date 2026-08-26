@@ -119,6 +119,27 @@ test('제외 문맥의 상품권과 세금만 제외 거래로 구조화한다',
   assert.deepEqual(result.policies.exclusions.transactionTypes, ['GIFT_CARD', 'TAX']);
 });
 
+test('여러 줄의 상품권과 세금 제외 문구를 모두 구조화한다', () => {
+  const result = processBenefit(benefit({
+    detailText: '상품권 및\n국세 결제는 적립 대상에서 제외',
+    recognizedConditions: ['REWARD_FORMULA', 'EXCLUSIONS'],
+  }));
+  assert.deepEqual(result.policies.exclusions.transactionTypes, ['GIFT_CARD', 'TAX']);
+  assert.equal(result.policies.exclusions.complete, true);
+});
+
+test('미만 상한이 있는 실적 구간을 추출한다', () => {
+  const result = processBenefit(benefit({
+    detailText: '30만원 이상 ~ 60만원 미만: 1만원\n60만원 이상: 2만원',
+    recognizedConditions: ['REWARD_FORMULA', 'PERFORMANCE_TIER'],
+  }));
+  assert.deepEqual(result.policies.performanceTiers.tiers, [
+    {minimumSpend: 300000, maximumSpendExclusive: 600000, limitValue: 10000},
+    {minimumSpend: 600000, maximumSpendExclusive: null, limitValue: 20000},
+  ]);
+  assert.deepEqual(result.unsupportedConditions, []);
+});
+
 test('필드 경계를 공백으로 연결해 replace 문구를 판정한다', () => {
   const result = processBenefit(benefit({
     benefitTitle: '기본 적립',
@@ -134,6 +155,7 @@ test('소문자 포인트와 마일리지 유형도 올바른 보상 단위를 �
   assert.equal(processBenefit(benefit({benefitType: 'mileage'}))
     .ruleDefinition.reward.rewardUnit, 'MILE');
 });
+
 test('주말 전용 문구는 토요일과 일요일 조건으로 구조화한다', () => {
   const result = processBenefit(benefit({
     benefitDescription: '주말에만 생활 영역 추가적립 0.3%',

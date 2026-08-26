@@ -1,7 +1,7 @@
 import {parseKoreanAmount} from './korean-amount.mjs';
 import {textOf, unique} from './normalization.mjs';
 
-const TIER_PATTERN = /(\d[\d,]*(?:\.\d+)?)\s*(백만|만|천)?원\s*(?:이상)?(?:\s*[~～-]\s*(\d[\d,]*(?:\.\d+)?)\s*(백만|만|천)?원?)?\s*[:：]\s*(\d[\d,]*(?:\.\d+)?)\s*(백만|만|천)?원/g;
+const TIER_PATTERN = /(\d[\d,]*(?:\.\d+)?)\s*(백만|만|천)?원\s*(?:이상)?(?:\s*[~～-]\s*(\d[\d,]*(?:\.\d+)?)\s*(백만|만|천)?원?\s*(?:미만)?)?\s*[:：]\s*(\d[\d,]*(?:\.\d+)?)\s*(백만|만|천)?원/g;
 
 export function analyzePerformanceTiers(benefit) {
   const tiers = [];
